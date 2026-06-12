@@ -1,0 +1,38 @@
+#!/bin/bash
+set -euo pipefail
+
+REPO_ROOT="$(pwd)"
+REPORT_DIR="$REPO_ROOT/test-results"
+mkdir -p "$REPORT_DIR"
+
+echo "==> Using repo root: $REPO_ROOT"
+echo "==> Installing test dependencies..."
+# Upgrading pip is best-effort: some managed/Debian environments ship a pip
+# that cannot self-uninstall (missing RECORD). Don't let that abort the run.
+python3 -m pip install --quiet --upgrade pip || \
+  echo "    (pip self-upgrade skipped; continuing)"
+# Install the app's own runtime deps (if present) plus the test toolchain so
+# every module under test is importable regardless of the base image.
+if [ -f requirements.txt ]; then
+  python3 -m pip install --quiet -r requirements.txt || \
+    echo "    (requirements.txt install reported issues; continuing)"
+fi
+python3 -m pip install --quiet pytest pytest-cov pytest-asyncio httpx
+
+echo "==> Running backend tests..."
+python3 -m pytest . \
+  -v -ra \
+  --tb=short \
+  --maxfail=20 \
+  --junitxml="$REPORT_DIR/junit.xml" \
+  --cov=. \
+  --cov-report=term-missing \
+  --cov-report=xml:"$REPORT_DIR/coverage.xml" \
+  --cov-report=html:"$REPORT_DIR/htmlcov" \
+  2>&1 | tee "$REPORT_DIR/pytest-terminal-output.txt"
+
+TEST_EXIT=${PIPESTATUS[0]}
+echo ""
+echo "==> Test run complete with exit code: $TEST_EXIT"
+echo "==> Artifacts saved to: $REPORT_DIR"
+exit $TEST_EXIT
