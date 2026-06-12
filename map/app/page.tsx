@@ -122,8 +122,34 @@ function ProfileMenu({ user, onSignOut }: { user: MapUser; onSignOut: () => void
           }}
         >
           <div style={{ padding: "10px 12px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>
-              {user.guest ? "Guest" : user.email}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                fontSize: 14,
+                fontWeight: 600,
+              }}
+            >
+              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                {user.guest ? "Guest" : user.email}
+              </span>
+              <span
+                style={{
+                  flexShrink: 0,
+                  fontSize: 10.5,
+                  fontWeight: 600,
+                  letterSpacing: "0.05em",
+                  textTransform: "uppercase",
+                  padding: "2px 7px",
+                  borderRadius: 999,
+                  color: user.role === "developer" ? "#fff" : "#525252",
+                  background:
+                    user.role === "developer" ? "#0a0a0a" : "rgba(0,0,0,0.06)",
+                }}
+              >
+                {user.role}
+              </span>
             </div>
             <div style={{ fontSize: 12, color: "#86868b", marginTop: 2 }}>
               {user.guest

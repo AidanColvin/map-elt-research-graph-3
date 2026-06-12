@@ -14,10 +14,21 @@ import { useState } from "react";
  * - "Continue as guest" sets a guest session and proceeds.
  */
 
-export type MapUser = { email: string; guest: boolean };
+export type MapRole = "developer" | "user";
+export type MapUser = { email: string; guest: boolean; role: MapRole };
 
 const USERS_KEY = "map.users";
 const SESSION_KEY = "map.session";
+
+// Emails granted the "developer" role; every other account is a "user".
+const DEVELOPER_EMAILS = new Set<string>(["aidanacolvin@gmail.com"]);
+
+// takes: an email address (any case)
+// does: classifies the account — developer for listed emails, else user
+// returns: the account's MapRole
+export function roleForEmail(email: string): MapRole {
+  return DEVELOPER_EMAILS.has(email.trim().toLowerCase()) ? "developer" : "user";
+}
 
 export function getSession(): MapUser | null {
   try {
@@ -170,7 +181,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       try {
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
       } catch {}
-      finish({ email: em, guest: false });
+      finish({ email: em, guest: false, role: roleForEmail(em) });
       return;
     }
 
@@ -178,7 +189,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     if (existing !== password) {
       return setError("Incorrect password for this account. Try again.");
     }
-    finish({ email: em, guest: false });
+    finish({ email: em, guest: false, role: roleForEmail(em) });
   }
 
   function oauthNotice(provider: string) {
@@ -266,7 +277,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           )}
         </div>
 
-        <button style={S.ghost} onClick={() => finish({ email: "guest", guest: true })}>
+        <button style={S.ghost} onClick={() => finish({ email: "guest", guest: true, role: "user" })}>
           Continue as guest →
         </button>
 
