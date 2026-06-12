@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { SECTORS } from "./sectors";
+import { getSectorSuggestion } from "./sectors";
 import { getCompanySuggestion } from "./companySuggestions";
 
 type Quick = { label: string; onClick: () => void };
@@ -54,10 +54,38 @@ function CommandDeck({
   onRunSector: (name: string) => void;
 }) {
   const [company, setCompany] = useState("");
-  const [sector, setSector] = useState(SECTORS[0]);
+  const [sector, setSector] = useState("");
 
   const suggestion = getCompanySuggestion(company);
   const ghostSuffix = suggestion ? suggestion.slice(company.length) : "";
+
+  const sectorSuggestion = getSectorSuggestion(sector);
+  const sectorGhost = sectorSuggestion ? sectorSuggestion.slice(sector.length) : "";
+
+  // takes: a form submit event
+  // does: scans the completed sector suggestion if one is showing, else the
+  //       typed text; clears the field afterward
+  // returns: nothing
+  function submitSector(e: React.FormEvent) {
+    e.preventDefault();
+    const target = sectorSuggestion ?? sector;
+    if (target.trim()) {
+      onRunSector(target);
+      setSector("");
+    }
+  }
+
+  // takes: a keydown event on the sector input
+  // does: accepts the gray ghost sector on Tab or Right-arrow-at-end
+  // returns: nothing
+  function onSectorKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!sectorSuggestion) return;
+    const atEnd = e.currentTarget.selectionStart === sector.length;
+    if (e.key === "Tab" || (e.key === "ArrowRight" && atEnd)) {
+      e.preventDefault();
+      setSector(sectorSuggestion);
+    }
+  }
 
   // takes: a form submit event
   // does: runs the completed company suggestion if one is showing, else what
@@ -111,25 +139,29 @@ function CommandDeck({
 
       <div className="h-6 w-px bg-gray-200" aria-hidden />
 
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onRunSector(sector);
-        }}
-        className="flex items-center gap-3"
-      >
-        <select
-          value={sector}
-          onChange={(e) => setSector(e.target.value)}
-          aria-label="Sector"
-          className="bg-transparent border-0 text-[15px] text-gray-700 outline-none cursor-pointer pr-1"
-        >
-          {SECTORS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+      <form onSubmit={submitSector} className="flex items-center gap-3">
+        <div className="relative flex-1">
+          {sectorGhost && (
+            <div
+              aria-hidden
+              className="absolute inset-0 flex items-center px-3 py-2 text-[15px] pointer-events-none overflow-hidden whitespace-pre"
+              style={{ fontFamily: "inherit", lineHeight: "normal" }}
+            >
+              <span style={{ color: "transparent" }}>{sector}</span>
+              <span style={{ color: "#b6b6bc" }}>{sectorGhost}</span>
+            </div>
+          )}
+          <input
+            value={sector}
+            onChange={(e) => setSector(e.target.value)}
+            onKeyDown={onSectorKeyDown}
+            placeholder="Scan a sector…"
+            aria-label="Sector"
+            autoComplete="off"
+            spellCheck={false}
+            className="relative w-full bg-transparent border-0 text-[15px] text-gray-700 placeholder:text-gray-400 outline-none px-3 py-2"
+          />
+        </div>
         <button
           type="submit"
           className="rounded-2xl bg-gray-900/90 hover:bg-gray-900 text-white text-sm font-medium px-5 py-2 transition-colors"
