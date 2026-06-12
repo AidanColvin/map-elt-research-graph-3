@@ -1,0 +1,19 @@
+/* Map design tokens: the single source for color, type, radius, shadow,
+   and motion. Components must use these vars, never one-off values. */
+:root {
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+  --tracking-tight: -0.022em;
+  --bg: #F5F5F7;
+  --surface: #FFFFFF;
+  --text: #1D1D1F;
+  --text-2: #6E6E73;
+  --hairline: rgba(0,0,0,0.08);
+  --accent: #0071E3;
+  --danger: #DC2626;
+  --r-sm: 12px;
+  --r-md: 18px;
+  --r-lg: 22px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --t: 200ms;
+}

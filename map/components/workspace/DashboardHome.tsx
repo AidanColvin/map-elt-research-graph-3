@@ -1,142 +1,192 @@
 "use client";
 
 import { useState } from "react";
+import Card from "@/components/ui/Card";
+import SearchBar from "@/components/ui/SearchBar";
 import { SECTORS } from "./sectors";
 import { getCompanySuggestion } from "./companySuggestions";
 
-type Quick = { label: string; onClick: () => void };
+type Mode = "company" | "sector";
 
-// takes: onRunCompany(name), onRunSector(name), and the quick-access widgets
-// does: renders the Apple-style Dashboard launchpad — greeting, a single
-//       floating glass command deck, and a row of quick-access cards
-// returns: the dashboard overview element
-export default function DashboardHome({
-  onRunCompany,
-  onRunSector,
-  quick,
-}: {
+export type DashboardHomeProps = {
+  userName: string;
   onRunCompany: (name: string) => void;
   onRunSector: (name: string) => void;
-  quick: Quick[];
-}) {
+  onBrowseAccounts: () => void;
+  recentScan: { sector: string; date: string } | null;
+  topAccount: { name: string; metric: string };
+  accountsCount: number;
+  scansRun: number;
+};
+
+// takes: a label and value pair
+// does: renders one stat of the dashboard stat row
+// returns: the stat element
+function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="px-6">
-      <h1 className="text-4xl font-light tracking-tight text-gray-900 mt-20 mb-8 text-center">
-        Welcome to Map.
-      </h1>
-
-      <CommandDeck onRunCompany={onRunCompany} onRunSector={onRunSector} />
-
-      <div className="grid grid-cols-3 gap-6 max-w-4xl mx-auto mt-16">
-        {quick.map((q) => (
-          <div
-            key={q.label}
-            onClick={q.onClick}
-            className="p-6 rounded-2xl bg-white/40 backdrop-blur-sm border border-white/10 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-          >
-            <p className="text-sm text-gray-500">{q.label}</p>
-          </div>
-        ))}
+    <div style={{ textAlign: "center" }}>
+      <div
+        style={{
+          fontSize: 22,
+          fontWeight: 700,
+          letterSpacing: "var(--tracking-tight)",
+          color: "var(--text)",
+        }}
+      >
+        {value}
       </div>
+      <div style={{ fontSize: 12.5, color: "var(--text-2)", marginTop: 2 }}>{label}</div>
     </div>
   );
 }
 
-// takes: onRunCompany(name) and onRunSector(name) callbacks
-// does: renders the consolidated spotlight deck — a company search (with inline
-//       gray autocomplete) and a sector dropdown in one floating glass pill
-// returns: the command-deck element
-function CommandDeck({
+// takes: the user's name, run callbacks for both engines, the browse action,
+//        and live values for the cards and stat row
+// does: renders the Dashboard launchpad: greeting, headline, one search bar
+//       with a Company / Sector toggle, value cards, and a stat row
+// returns: the dashboard overview element
+export default function DashboardHome({
+  userName,
   onRunCompany,
   onRunSector,
-}: {
-  onRunCompany: (name: string) => void;
-  onRunSector: (name: string) => void;
-}) {
-  const [company, setCompany] = useState("");
-  const [sector, setSector] = useState(SECTORS[0]);
+  onBrowseAccounts,
+  recentScan,
+  topAccount,
+  accountsCount,
+  scansRun,
+}: DashboardHomeProps) {
+  const [mode, setMode] = useState<Mode>("company");
+  const [query, setQuery] = useState("");
 
-  const suggestion = getCompanySuggestion(company);
-  const ghostSuffix = suggestion ? suggestion.slice(company.length) : "";
-
-  // takes: a form submit event
-  // does: runs the completed company suggestion if one is showing, else what
-  //       was typed; clears the field afterward
+  // takes: the submitted search text
+  // does: routes it to the engine the toggle selects; company submissions
+  //       complete to the autocomplete suggestion when one matches
   // returns: nothing
-  function submitCompany(e: React.FormEvent) {
-    e.preventDefault();
-    const target = suggestion ?? company;
-    if (target.trim()) {
-      onRunCompany(target);
-      setCompany("");
+  function submit(text: string) {
+    if (mode === "company") {
+      onRunCompany(getCompanySuggestion(text) ?? text);
+    } else {
+      onRunSector(text);
     }
-  }
-
-  // takes: a keydown event on the company input
-  // does: accepts the gray ghost suggestion on Tab or Right-arrow-at-end
-  // returns: nothing
-  function onCompanyKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!suggestion) return;
-    const atEnd = e.currentTarget.selectionStart === company.length;
-    if (e.key === "Tab" || (e.key === "ArrowRight" && atEnd)) {
-      e.preventDefault();
-      setCompany(suggestion);
-    }
+    setQuery("");
   }
 
   return (
-    <div className="max-w-2xl mx-auto flex items-center gap-4 p-4 bg-white/70 backdrop-blur-md border border-white/20 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-      <form onSubmit={submitCompany} className="relative flex-1">
-        {ghostSuffix && (
-          <div
-            aria-hidden
-            className="absolute inset-0 flex items-center px-3 py-2 text-[15px] pointer-events-none overflow-hidden whitespace-pre"
-            style={{ fontFamily: "inherit", lineHeight: "normal" }}
-          >
-            <span style={{ color: "transparent" }}>{company}</span>
-            <span style={{ color: "#b6b6bc" }}>{ghostSuffix}</span>
-          </div>
-        )}
-        <input
-          value={company}
-          onChange={(e) => setCompany(e.target.value)}
-          onKeyDown={onCompanyKeyDown}
-          placeholder="Search a company…"
-          aria-label="Company or ticker"
-          autoComplete="off"
-          spellCheck={false}
-          className="relative w-full bg-transparent border-0 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none px-3 py-2"
-        />
-      </form>
-
-      <div className="h-6 w-px bg-gray-200" aria-hidden />
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          onRunSector(sector);
+    <div style={{ padding: "0 24px", fontFamily: "var(--font)" }}>
+      <div
+        style={{
+          textAlign: "center",
+          marginTop: 64,
+          fontSize: 15,
+          color: "var(--text-2)",
         }}
-        className="flex items-center gap-3"
       >
-        <select
-          value={sector}
-          onChange={(e) => setSector(e.target.value)}
-          aria-label="Sector"
-          className="bg-transparent border-0 text-[15px] text-gray-700 outline-none cursor-pointer pr-1"
-        >
-          {SECTORS.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
+        Good to see you, {userName}.
+      </div>
+      <h1
+        style={{
+          margin: "8px 0 28px",
+          textAlign: "center",
+          fontSize: 44,
+          fontWeight: 700,
+          letterSpacing: "var(--tracking-tight)",
+          color: "var(--text)",
+        }}
+      >
+        Welcome to Map.
+      </h1>
+
+      <div
+        style={{
+          maxWidth: 640,
+          margin: "0 auto",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 14,
+        }}
+      >
+        <div className="tk-seg" role="tablist" aria-label="Search mode">
+          {(
+            [
+              { key: "company", label: "Company" },
+              { key: "sector", label: "Sector" },
+            ] as { key: Mode; label: string }[]
+          ).map((m) => (
+            <button
+              key={m.key}
+              role="tab"
+              aria-selected={mode === m.key}
+              className={mode === m.key ? "active" : ""}
+              onClick={() => setMode(m.key)}
+            >
+              {m.label}
+            </button>
           ))}
-        </select>
-        <button
-          type="submit"
-          className="rounded-2xl bg-gray-900/90 hover:bg-gray-900 text-white text-sm font-medium px-5 py-2 transition-colors"
-        >
-          Scan
-        </button>
-      </form>
+        </div>
+        <SearchBar
+          placeholder={
+            mode === "company"
+              ? "Search any public company or ticker"
+              : "Search any sector: Technology, Oncology, Fintech"
+          }
+          value={query}
+          onChange={setQuery}
+          onSubmit={submit}
+          buttonLabel={mode === "company" ? "Analyze" : "Scan"}
+          listId={mode === "sector" ? "dash-sectors" : undefined}
+          ariaLabel={mode === "company" ? "Company or ticker" : "Sector"}
+        />
+        <datalist id="dash-sectors">
+          {SECTORS.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+          gap: 20,
+          maxWidth: 880,
+          margin: "56px auto 0",
+        }}
+      >
+        <Card
+          title="Recent Scan"
+          icon={<span aria-hidden>◎</span>}
+          value={recentScan ? recentScan.sector : "No scans yet"}
+          preview={recentScan ? recentScan.date : "Run your first sector scan"}
+          onClick={() => onRunSector(recentScan ? recentScan.sector : "Oncology")}
+        />
+        <Card
+          title="Top Account"
+          icon={<span aria-hidden>▣</span>}
+          value={topAccount.name}
+          preview={topAccount.metric}
+          onClick={() => onRunCompany(topAccount.name)}
+        />
+        <Card
+          title="Browse Companies"
+          icon={<span aria-hidden>▤</span>}
+          value={`${accountsCount} companies`}
+          preview="Open the partner database →"
+          onClick={onBrowseAccounts}
+        />
+      </div>
+
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: 56,
+          margin: "44px auto 24px",
+        }}
+      >
+        <Stat label="Scans run this session" value={String(scansRun)} />
+        <Stat label="Accounts tracked" value={String(accountsCount)} />
+      </div>
     </div>
   );
 }

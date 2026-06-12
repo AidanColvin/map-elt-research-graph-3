@@ -21,10 +21,10 @@ function lookupPassword(user: MapUser): string | null {
 }
 
 // takes: an email address
-// does: derives a display name from the local part — splits on dots,
-//       underscores, and digits, then capitalizes each piece
+// does: derives a display name from the local part, splitting on dots,
+//       underscores, and digits, then capitalizing each piece
 // returns: the friendly name string
-function nameFromEmail(email: string): string {
+export function nameFromEmail(email: string): string {
   const local = email.split("@")[0] || "";
   const parts = local.split(/[._\-\d]+/).filter(Boolean);
   if (!parts.length) return email;
@@ -64,7 +64,7 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 }
 
 // takes: the signed-in user and an onSignOut callback
-// does: renders the Account page — name, email, and the masked password with
+// does: renders the Account page: name, email, and the masked password with
 //       a one-click copy button (copies the real password to the clipboard),
 //       plus the sign-out action that used to live in the profile dropdown
 // returns: the account canvas card element
@@ -132,7 +132,7 @@ export default function AccountPage({
         </div>
 
         <Row label="Name">{user.guest ? "Guest" : nameFromEmail(user.email)}</Row>
-        <Row label="Email">{user.guest ? "—" : user.email}</Row>
+        <Row label="Email">{user.guest ? "-" : user.email}</Row>
         <Row label="Password">
           {password ? (
             <>
@@ -156,7 +156,7 @@ export default function AccountPage({
               </button>
             </>
           ) : (
-            <span style={{ color: "#86868b", fontSize: 13.5 }}>No password — guest session</span>
+            <span style={{ color: "#86868b", fontSize: 13.5 }}>No password: guest session</span>
           )}
         </Row>
 

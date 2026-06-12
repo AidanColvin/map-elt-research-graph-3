@@ -4,11 +4,11 @@ import type { AccountProfile, AccountColumn } from "./accountProfile";
 import { ACCOUNT_COLUMNS } from "./accountProfile";
 
 // takes: a website-or-link string (one full URL, or domains split by " / ")
-// does: turns it into clickable anchors — splitting only on a space-padded
+// does: turns it into clickable anchors, splitting only on a space-padded
 //       slash so full URLs stay intact; bare domains are normalized to https
 // returns: an array of anchor elements, or a muted dash when empty
 function renderLinks(value: string) {
-  if (!value.trim()) return <span className="acct-empty">—</span>;
+  if (!value.trim()) return <span className="acct-empty">-</span>;
   return value
     .split(/\s+\/\s+|\s+/)
     .filter(Boolean)
@@ -24,12 +24,12 @@ function renderLinks(value: string) {
 }
 
 // takes: one cell value and its column definition
-// does: renders the cell — links for link columns, a clamped tooltip block for
+// does: renders the cell: links for link columns, a clamped tooltip block for
 //       wide text columns, a muted dash for empties, plain text otherwise
 // returns: the cell's inner React content
 function renderCell(value: string, col: AccountColumn) {
   if (col.kind === "link") return renderLinks(value);
-  if (!value.trim()) return <span className="acct-empty">—</span>;
+  if (!value.trim()) return <span className="acct-empty">-</span>;
   if (col.kind === "wide") return <span title={value}>{value}</span>;
   return value;
 }
@@ -59,7 +59,7 @@ function AccountRow({ account, columns }: { account: AccountProfile; columns: Ac
 
 // takes: the array of account rows to display
 // does: renders the full native data table (sticky frosted header, pinned
-//       Account column) — pure presentation, no data or state logic
+//       Account column): pure presentation, no data or state logic
 // returns: the accounts <table> element
 export default function AccountsTable({ accounts }: { accounts: AccountProfile[] }) {
   return (

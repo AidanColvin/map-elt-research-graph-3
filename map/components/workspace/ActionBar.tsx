@@ -100,8 +100,8 @@ export function CompanyActionBar({
 }
 
 // takes: controlled value/onChange for the chosen sector, onRun(sector), busy
-// does: renders the Sector Scan command row — a clean sector dropdown with a
-//       refined tinted action trigger
+// does: renders the Sector Scan command row: a free-text sector input with a
+//       datalist of curated sectors and the pill action trigger
 // returns: the sector action-bar element
 export function SectorActionBar({
   value,
@@ -119,25 +119,28 @@ export function SectorActionBar({
   // returns: nothing
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!busy) onRun(value);
+    if (!busy && value.trim()) onRun(value.trim());
   }
 
   return (
     <form style={rowStyle} onSubmit={submit}>
-      <select
+      <input
         className="ws-input"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        placeholder="Search any sector: Technology, Oncology, Fintech"
         aria-label="Sector"
+        autoComplete="off"
+        spellCheck={false}
+        list="ws-sectors"
         style={{ flex: 1 }}
-      >
+      />
+      <datalist id="ws-sectors">
         {SECTORS.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
+          <option key={s} value={s} />
         ))}
-      </select>
-      <button type="submit" className="ws-btn" disabled={busy}>
+      </datalist>
+      <button type="submit" className="ws-btn" disabled={busy || !value.trim()}>
         {busy ? "Scanning…" : "Scan"}
       </button>
     </form>

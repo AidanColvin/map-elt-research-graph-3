@@ -1,23 +1,22 @@
 "use client";
 
 /**
- * Shared primitives for the unified Map workspace — one typography scale,
+ * Shared primitives for the unified Map workspace: one typography scale,
  * one glassmorphic card treatment, one loading state, used identically by
  * both workflows.
  */
 
-export const FONT =
-  "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif";
+export const FONT = "var(--font)";
 
 // Rich glass module: translucent fill, backdrop blur, an incredibly light
-// white border for the floating edge, and a soft diffuse shadow for depth.
+// white border for the floating edge, and the token shadow for depth.
 export const cardStyle: React.CSSProperties = {
   background: "rgba(255,255,255,0.62)",
   backdropFilter: "saturate(180%) blur(14px)",
   WebkitBackdropFilter: "saturate(180%) blur(14px)",
-  borderRadius: 22,
-  border: "1px solid rgba(255,255,255,0.1)",
-  boxShadow: "0 1px 1px rgba(0,0,0,0.03), 0 16px 48px rgba(0,0,0,0.055)",
+  borderRadius: "var(--r-lg)",
+  border: "1px solid var(--hairline)",
+  boxShadow: "var(--shadow)",
   overflow: "hidden",
 };
 
@@ -55,7 +54,7 @@ export function Loading({ label, detail }: { label: string; detail?: string }) {
 }
 
 // takes: a title string, an optional toolbar node, and the card's children
-// does: renders a canvas module — thin uppercase eyebrow, an optional pinned
+// does: renders a canvas module: thin uppercase eyebrow, an optional pinned
 //       command toolbar beneath it, then the scrollable content area
 // returns: a floating glass card section element
 export function CanvasCard({

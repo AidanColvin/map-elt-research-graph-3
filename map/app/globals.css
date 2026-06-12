@@ -986,26 +986,25 @@ a {
 /* Inputs: generous padding, ultra-subtle borders, soft placeholders. */
 .ws-input {
   width: 100%;
-  border: 1px solid rgba(0, 0, 0, 0.06);
-  border-radius: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
   padding: 13px 18px;
   font-size: 15px;
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
-    Helvetica, Arial, sans-serif;
+  font-family: var(--font);
   background: rgba(255, 255, 255, 0.85);
-  color: #1d1d1f;
+  color: var(--text);
   outline: none;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color var(--t) var(--ease), box-shadow var(--t) var(--ease);
 }
 .ws-input:hover {
   border-color: rgba(0, 0, 0, 0.12);
 }
 .ws-input:focus {
-  border-color: rgba(0, 0, 0, 0.18);
-  box-shadow: 0 0 0 4px rgba(0, 0, 0, 0.04);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(0, 113, 227, 0.12);
 }
 .ws-input::placeholder {
-  color: #b6b6bc;
+  color: var(--text-2);
   font-weight: 400;
 }
 select.ws-input {
@@ -1013,19 +1012,20 @@ select.ws-input {
   cursor: pointer;
 }
 
-/* Action trigger: a refined tinted pill instead of a solid black slab. */
+/* Action trigger: a full pill with generous horizontal padding. */
 .ws-btn {
   border: none;
-  border-radius: 13px;
-  padding: 13px 26px;
+  border-radius: 999px;
+  padding: 13px 28px;
   font-size: 14.5px;
   font-weight: 590;
-  font-family: inherit;
-  color: #1d1d1f;
+  font-family: var(--font);
+  color: var(--text);
   background: rgba(0, 0, 0, 0.055);
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.18s ease, transform 0.12s ease, opacity 0.18s ease;
+  transition: background var(--t) var(--ease), transform var(--t) var(--ease),
+    opacity var(--t) var(--ease);
 }
 .ws-btn:hover:not(:disabled) {
   background: rgba(0, 0, 0, 0.1);
@@ -1038,24 +1038,24 @@ select.ws-input {
   cursor: default;
 }
 
-/* Sub-navigation items: muted gray, calm hover, black when active. */
+/* Sub-navigation items: muted gray, calm hover, pill highlight when active. */
 .ws-nav-item {
   border: none;
   background: none;
-  font-family: inherit;
+  font-family: var(--font);
   font-size: 13.5px;
   font-weight: 500;
-  color: #86868b;
+  color: var(--text-2);
   padding: 6px 14px;
   border-radius: 999px;
   cursor: pointer;
-  transition: color 0.18s ease, background 0.18s ease;
+  transition: color var(--t) var(--ease), background var(--t) var(--ease);
 }
 .ws-nav-item:hover {
-  color: #1d1d1f;
+  color: var(--text);
 }
 .ws-nav-item.active {
-  color: #1d1d1f;
+  color: var(--text);
   background: rgba(0, 0, 0, 0.05);
   font-weight: 600;
 }
@@ -1195,4 +1195,95 @@ select.ws-input {
   pointer-events: none;
   display: flex;
   align-items: center;
+}
+
+/* ------------------------- Token-driven UI primitives ------------------------- */
+/* Card: surface bg, hairline border, hover lift 2px with a deeper shadow. */
+.tk-card {
+  background: var(--surface);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow);
+  font-family: var(--font);
+  color: var(--text);
+  text-align: left;
+  transition: transform var(--t) var(--ease), box-shadow var(--t) var(--ease);
+}
+.tk-card.tk-clickable {
+  cursor: pointer;
+}
+.tk-card.tk-clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06), 0 16px 40px rgba(0, 0, 0, 0.1);
+}
+.tk-card.tk-clickable:active {
+  transform: translateY(0) scale(0.99);
+}
+
+/* Example chip: a small pill that fills the search and fires the action. */
+.tk-chip {
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 13.5px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--text);
+  background: var(--surface);
+  cursor: pointer;
+  transition: background var(--t) var(--ease), transform var(--t) var(--ease),
+    border-color var(--t) var(--ease);
+}
+.tk-chip:hover {
+  background: rgba(0, 0, 0, 0.04);
+  border-color: rgba(0, 0, 0, 0.14);
+}
+.tk-chip:active {
+  transform: scale(0.97);
+}
+
+/* Skeleton: animated gray blocks shown only during a real fetch. */
+.tk-skel {
+  border-radius: var(--r-sm);
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.05) 25%,
+    rgba(0, 0, 0, 0.09) 50%,
+    rgba(0, 0, 0, 0.05) 75%
+  );
+  background-size: 200% 100%;
+  animation: tkShimmer 1.4s var(--ease) infinite;
+}
+@keyframes tkShimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Segmented control: one intent at a time (Company / Sector). */
+.tk-seg {
+  display: inline-flex;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  padding: 3px;
+}
+.tk-seg button {
+  border: none;
+  background: none;
+  border-radius: 999px;
+  padding: 7px 18px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: var(--font);
+  color: var(--text-2);
+  cursor: pointer;
+  transition: color var(--t) var(--ease), background var(--t) var(--ease);
+}
+.tk-seg button.active {
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+.tk-seg button:active {
+  transform: scale(0.97);
 }

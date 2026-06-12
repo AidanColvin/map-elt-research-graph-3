@@ -3,11 +3,13 @@
 import { useState } from "react";
 import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
-import AccountPage from "@/components/workspace/AccountPage";
+import NavBar from "@/components/ui/NavBar";
+import AccountPage, { nameFromEmail } from "@/components/workspace/AccountPage";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import DashboardHome from "@/components/workspace/DashboardHome";
+import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { SECTORS } from "@/components/workspace/sectors";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
@@ -157,45 +159,10 @@ function GlobalHeader({
   );
 }
 
-// takes: the active view key and an onChange(view) callback
-// does: renders the elegant horizontal sub-navigation bar fixed just below
-//       the global header — Dashboard, Company Profile, Sector Scan
-// returns: the sub-nav element
-function SubNav({ view, onChange }: { view: View; onChange: (v: View) => void }) {
-  return (
-    <nav
-      aria-label="Workspace views"
-      style={{
-        position: "fixed",
-        top: HEADER_H,
-        left: 0,
-        right: 0,
-        height: SUBNAV_H,
-        zIndex: 90,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        background: "rgba(255,255,255,0.55)",
-        backdropFilter: "saturate(180%) blur(14px)",
-        WebkitBackdropFilter: "saturate(180%) blur(14px)",
-        borderBottom: "1px solid rgba(0,0,0,0.04)",
-        fontFamily: FONT,
-      }}
-    >
-      {VIEWS.map((v) => (
-        <button
-          key={v.key}
-          className={`ws-nav-item ${view === v.key ? "active" : ""}`}
-          onClick={() => onChange(v.key)}
-          aria-current={view === v.key ? "page" : undefined}
-        >
-          {v.label}
-        </button>
-      ))}
-    </nav>
-  );
-}
+// The dashboard's Top Account card: prefer Apple (curated, resolves
+// instantly), else the first account in the database.
+const TOP_ACCOUNT =
+  ACCOUNTS.find((a) => a.account.toLowerCase().startsWith("apple")) ?? ACCOUNTS[0];
 
 // takes: nothing (page component)
 // does: orchestrates the whole program — intro → auth gate → the workspace
@@ -210,6 +177,8 @@ export default function MapHome() {
   const [view, setView] = useState<View>("dashboard");
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState(SECTORS[0]);
+  const [scansRun, setScansRun] = useState(0);
+  const [recentScan, setRecentScan] = useState<{ sector: string; date: string } | null>(null);
   const dive = useDeepDive();
   const scan = useSectorScan();
 
@@ -222,6 +191,25 @@ export default function MapHome() {
     setCompanyDraft(company);
     dive.run(company);
     if (view === "sector") setView("company");
+  }
+
+  // takes: a sector name
+  // does: runs the scan, records it for the Recent Scan card and the session
+  //       stat row, and focuses the Sector Scan view
+  // returns: nothing
+  function runSector(name: string) {
+    setSectorDraft(name);
+    scan.run(name);
+    setScansRun((c) => c + 1);
+    setRecentScan({
+      sector: name,
+      date: new Date().toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }),
+    });
+    setView("sector");
   }
 
   // The auth gate shows on every hard refresh / first load by design: the
@@ -256,7 +244,7 @@ export default function MapHome() {
         onHome={() => setView("dashboard")}
         onProfile={() => setView("account")}
       />
-      <SubNav view={view} onChange={setView} />
+      <NavBar items={VIEWS} active={view} onChange={setView} top={HEADER_H} height={SUBNAV_H} />
 
       {/* All three views stay mounted; toggling display from none re-runs the
           .ws-view opacity/transform entrance without unmounting anything, so
@@ -267,21 +255,22 @@ export default function MapHome() {
           style={{ display: view === "dashboard" ? "block" : "none" }}
         >
           <DashboardHome
+            userName={user.guest ? "Guest" : nameFromEmail(user.email)}
             onRunCompany={(name) => {
               setCompanyDraft(name);
               dive.run(name);
               setView("company");
             }}
-            onRunSector={(name) => {
-              setSectorDraft(name);
-              scan.run(name);
-              setView("sector");
+            onRunSector={runSector}
+            onBrowseAccounts={() => setView("accounts")}
+            recentScan={recentScan}
+            topAccount={{
+              name: TOP_ACCOUNT.account,
+              metric:
+                TOP_ACCOUNT.approximateRevenue || TOP_ACCOUNT.topIndustrySectorProfile,
             }}
-            quick={[
-              { label: "Recent Scan: Oncology", onClick: () => { setSectorDraft("Oncology"); scan.run("Oncology"); setView("sector"); } },
-              { label: "Top Account: Apple", onClick: () => { setCompanyDraft("Apple"); dive.run("Apple"); setView("company"); } },
-              { label: "Browse Companies →", onClick: () => setView("accounts") },
-            ]}
+            accountsCount={ACCOUNTS.length}
+            scansRun={scansRun}
           />
         </div>
 
@@ -310,6 +299,7 @@ export default function MapHome() {
             scan={scan}
             draft={sectorDraft}
             onDraftChange={setSectorDraft}
+            onRun={runSector}
             onSelectCompany={selectCompany}
             activeCompany={dive.company}
           />

@@ -5,7 +5,7 @@ import { useState } from "react";
 /**
  * Keyless auth gate shown after the intro animation.
  *
- * - Email/password accounts live entirely in the browser (localStorage) —
+ * - Email/password accounts live entirely in the browser (localStorage):
  *   no server, no database, no API keys, consistent with the project's
  *   "completely free to run" rule.
  * - Google / Microsoft buttons are present but real OAuth requires
@@ -174,7 +174,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
   function oauthNotice(provider: string) {
     setError("");
     setNotice(
-      `${provider} sign-in needs an OAuth app registration (client ID) to work — this deployment runs with no keys. Use email or continue as guest.`,
+      `${provider} sign-in needs an OAuth app registration (client ID) to work: this deployment runs with no keys. Use email or continue as guest.`,
     );
   }
 
@@ -184,7 +184,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
         <div style={{ textAlign: "center", marginBottom: 22 }}>
           <div style={{ fontSize: 30, fontWeight: 700, letterSpacing: "-0.03em" }}>Map</div>
           <div style={{ color: "#737373", fontSize: 14, marginTop: 6 }}>
-            {mode === "login" ? "Welcome back — log in to continue" : "Create your account"}
+            {mode === "login" ? "Welcome back, log in to continue" : "Create your account"}
           </div>
         </div>
 
