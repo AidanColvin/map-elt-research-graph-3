@@ -5,6 +5,8 @@ import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
+import AccountsCanvas from "@/components/workspace/AccountsCanvas";
+import DashboardHome from "@/components/workspace/DashboardHome";
 import { SECTORS } from "@/components/workspace/sectors";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
@@ -13,12 +15,13 @@ import { FONT } from "@/components/workspace/ui";
 const HEADER_H = 52;
 const SUBNAV_H = 44;
 
-type View = "dashboard" | "company" | "sector";
+type View = "dashboard" | "company" | "sector" | "accounts";
 
 const VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company Profile" },
   { key: "sector", label: "Sector Scan" },
+  { key: "accounts", label: "Accounts" },
 ];
 
 // takes: an optional pixel size
@@ -277,19 +280,6 @@ export default function MapHome() {
   // in-page citation anchors working identically everywhere.
   const canvasMax = `calc(100vh - ${HEADER_H + SUBNAV_H + 48}px)`;
 
-  const sectorPanel = (
-    <SectorCanvas
-      scan={scan}
-      draft={sectorDraft}
-      onDraftChange={setSectorDraft}
-      onSelectCompany={selectCompany}
-      activeCompany={dive.company}
-    />
-  );
-  const companyPanel = (
-    <CompanyCanvas dive={dive} draft={companyDraft} onDraftChange={setCompanyDraft} />
-  );
-
   return (
     <div
       style={{
@@ -318,17 +308,25 @@ export default function MapHome() {
       <main style={{ padding: `${HEADER_H + SUBNAV_H + 24}px 28px 36px` }}>
         <div
           className="ws-view"
-          style={{
-            display: view === "dashboard" ? "grid" : "none",
-            gridTemplateColumns: "repeat(auto-fit, minmax(min(460px, 100%), 1fr))",
-            gap: 24,
-            alignItems: "start",
-            maxWidth: 1680,
-            margin: "0 auto",
-          }}
+          style={{ display: view === "dashboard" ? "block" : "none" }}
         >
-          <div style={{ height: canvasMax, display: "flex" }}>{sectorPanel}</div>
-          <div style={{ height: canvasMax, display: "flex" }}>{companyPanel}</div>
+          <DashboardHome
+            onRunCompany={(name) => {
+              setCompanyDraft(name);
+              dive.run(name);
+              setView("company");
+            }}
+            onRunSector={(name) => {
+              setSectorDraft(name);
+              scan.run(name);
+              setView("sector");
+            }}
+            quick={[
+              { label: "Recent Scan: Oncology", onClick: () => { setSectorDraft("Oncology"); scan.run("Oncology"); setView("sector"); } },
+              { label: "Top Account: Apple", onClick: () => { setCompanyDraft("Apple"); dive.run("Apple"); setView("company"); } },
+              { label: "Browse Accounts →", onClick: () => setView("accounts") },
+            ]}
+          />
         </div>
 
         <div
@@ -359,6 +357,18 @@ export default function MapHome() {
             onSelectCompany={selectCompany}
             activeCompany={dive.company}
           />
+        </div>
+
+        <div
+          className="ws-view"
+          style={{
+            display: view === "accounts" ? "flex" : "none",
+            height: canvasMax,
+            maxWidth: 1680,
+            margin: "0 auto",
+          }}
+        >
+          <AccountsCanvas />
         </div>
       </main>
     </div>
