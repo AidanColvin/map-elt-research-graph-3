@@ -7,7 +7,6 @@ import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import DashboardHome from "@/components/workspace/DashboardHome";
-import { SECTORS } from "@/components/workspace/sectors";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { FONT } from "@/components/workspace/ui";
@@ -251,7 +250,7 @@ export default function MapHome() {
   const [user, setUser] = useState<MapUser | null>(null);
   const [view, setView] = useState<View>("dashboard");
   const [companyDraft, setCompanyDraft] = useState("");
-  const [sectorDraft, setSectorDraft] = useState(SECTORS[0]);
+  const [sectorDraft, setSectorDraft] = useState("");
   const dive = useDeepDive();
   const scan = useSectorScan();
 
