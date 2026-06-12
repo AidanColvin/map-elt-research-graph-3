@@ -1116,12 +1116,12 @@ select.ws-input {
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #86868b;
-  padding: 9px 18px;
+  padding: 8px 14px;
   white-space: nowrap;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .acct-table tbody td {
-  padding: 9px 18px;
+  padding: 8px 14px;
   vertical-align: top;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
   color: #4b4b51;
@@ -1162,7 +1162,7 @@ select.ws-input {
    uniform and scannable; the full text stays available on hover (title). */
 .acct-table td.acct-wide span {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
