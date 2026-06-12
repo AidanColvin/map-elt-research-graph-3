@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
+import AccountPage from "@/components/workspace/AccountPage";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
@@ -15,13 +16,15 @@ import { FONT } from "@/components/workspace/ui";
 const HEADER_H = 52;
 const SUBNAV_H = 44;
 
-type View = "dashboard" | "company" | "sector" | "accounts";
+type View = "dashboard" | "company" | "sector" | "accounts" | "account";
 
+// "accounts" keeps its key/route so existing handlers stay intact; only the
+// display label changed to "Companies".
 const VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company Profile" },
   { key: "sector", label: "Sector Scan" },
-  { key: "accounts", label: "Accounts" },
+  { key: "accounts", label: "Companies" },
 ];
 
 // takes: an optional pixel size
@@ -46,120 +49,62 @@ function LogoMark({ size = 22 }: { size?: number }) {
   );
 }
 
-// takes: the signed-in user and an onSignOut callback
-// does: owns the profile dropdown — trigger button, outside-click dismissal,
-//       account summary, and the sign-out action
-// returns: the profile menu element
-function ProfileMenu({ user, onSignOut }: { user: MapUser; onSignOut: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // takes: nothing (effect)
-  // does: registers a document listener that closes the menu on outside click
-  // returns: a cleanup function removing the listener
-  useEffect(() => {
-    if (!open) return;
-    // takes: a document mousedown event
-    // does: closes the menu when the click landed outside the menu subtree
-    // returns: nothing
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
-
+// takes: the signed-in user and an onOpen callback
+// does: renders the Profile button as a direct link to the Account page —
+//       the previous dropdown menu is gone; sign-out lives on that page now
+// returns: the profile button element
+function ProfileButton({ user, onOpen }: { user: MapUser; onOpen: () => void }) {
   return (
-    <div ref={ref} style={{ position: "relative" }}>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
-        aria-expanded={open}
+    <button
+      onClick={onOpen}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        border: "1px solid rgba(0,0,0,0.08)",
+        borderRadius: 999,
+        padding: "5px 14px 5px 6px",
+        background: "rgba(255,255,255,0.8)",
+        cursor: "pointer",
+        fontFamily: FONT,
+        fontSize: 13.5,
+        color: "#1d1d1f",
+      }}
+    >
+      <span
         style={{
+          width: 26,
+          height: 26,
+          borderRadius: "50%",
+          background: "#1d1d1f",
+          color: "#fff",
           display: "flex",
           alignItems: "center",
-          gap: 8,
-          border: "1px solid rgba(0,0,0,0.08)",
-          borderRadius: 999,
-          padding: "5px 14px 5px 6px",
-          background: "rgba(255,255,255,0.8)",
-          cursor: "pointer",
-          fontFamily: FONT,
-          fontSize: 13.5,
-          color: "#1d1d1f",
+          justifyContent: "center",
+          fontSize: 12,
+          fontWeight: 600,
         }}
       >
-        <span
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: "#1d1d1f",
-            color: "#fff",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            fontWeight: 600,
-          }}
-        >
-          {user.guest ? "G" : user.email[0].toUpperCase()}
-        </span>
-        Profile
-      </button>
-
-      {open && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 8px)",
-            width: 240,
-            background: "#ffffff",
-            borderRadius: 16,
-            boxShadow: "0 1px 2px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.14)",
-            padding: 8,
-          }}
-        >
-          <div style={{ padding: "10px 12px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-            <div style={{ fontSize: 14, fontWeight: 600 }}>
-              {user.guest ? "Guest" : user.email}
-            </div>
-            <div style={{ fontSize: 12, color: "#86868b", marginTop: 2 }}>
-              {user.guest
-                ? "Browsing without an account"
-                : "Signed in · account stored in this browser"}
-            </div>
-          </div>
-          <button
-            onClick={onSignOut}
-            style={{
-              width: "100%",
-              textAlign: "left",
-              border: "none",
-              background: "none",
-              padding: "10px 12px",
-              fontSize: 14,
-              color: "#dc2626",
-              cursor: "pointer",
-              fontFamily: FONT,
-              borderRadius: 8,
-            }}
-          >
-            {user.guest ? "Exit guest mode" : "Sign out"}
-          </button>
-        </div>
-      )}
-    </div>
+        {user.guest ? "G" : user.email[0].toUpperCase()}
+      </span>
+      Profile
+    </button>
   );
 }
 
-// takes: the signed-in user and an onSignOut callback
-// does: renders the fixed glassmorphism header chrome — logo + wordmark on
-//       the left, the extracted ProfileMenu on the right
+// takes: the signed-in user, an onHome callback, and an onProfile callback
+// does: renders the fixed glassmorphism header chrome — a clickable logo +
+//       wordmark routing home on the left, the Profile link on the right
 // returns: the global header element
-function GlobalHeader({ user, onSignOut }: { user: MapUser; onSignOut: () => void }) {
+function GlobalHeader({
+  user,
+  onHome,
+  onProfile,
+}: {
+  user: MapUser;
+  onHome: () => void;
+  onProfile: () => void;
+}) {
   return (
     <header
       style={{
@@ -180,7 +125,20 @@ function GlobalHeader({ user, onSignOut }: { user: MapUser; onSignOut: () => voi
         fontFamily: FONT,
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <button
+        onClick={onHome}
+        title="Home"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          border: "none",
+          background: "none",
+          padding: 0,
+          cursor: "pointer",
+          fontFamily: FONT,
+        }}
+      >
         <LogoMark />
         <span
           style={{
@@ -193,8 +151,8 @@ function GlobalHeader({ user, onSignOut }: { user: MapUser; onSignOut: () => voi
         >
           map
         </span>
-      </div>
-      <ProfileMenu user={user} onSignOut={onSignOut} />
+      </button>
+      <ProfileButton user={user} onOpen={onProfile} />
     </header>
   );
 }
@@ -295,10 +253,8 @@ export default function MapHome() {
     >
       <GlobalHeader
         user={user}
-        onSignOut={() => {
-          clearSession();
-          setUser(null);
-        }}
+        onHome={() => setView("dashboard")}
+        onProfile={() => setView("account")}
       />
       <SubNav view={view} onChange={setView} />
 
@@ -324,7 +280,7 @@ export default function MapHome() {
             quick={[
               { label: "Recent Scan: Oncology", onClick: () => { setSectorDraft("Oncology"); scan.run("Oncology"); setView("sector"); } },
               { label: "Top Account: Apple", onClick: () => { setCompanyDraft("Apple"); dive.run("Apple"); setView("company"); } },
-              { label: "Browse Accounts →", onClick: () => setView("accounts") },
+              { label: "Browse Companies →", onClick: () => setView("accounts") },
             ]}
           />
         </div>
@@ -369,6 +325,25 @@ export default function MapHome() {
           }}
         >
           <AccountsCanvas />
+        </div>
+
+        <div
+          className="ws-view"
+          style={{
+            display: view === "account" ? "flex" : "none",
+            height: canvasMax,
+            maxWidth: 720,
+            margin: "0 auto",
+          }}
+        >
+          <AccountPage
+            user={user}
+            onSignOut={() => {
+              clearSession();
+              setUser(null);
+              setView("dashboard");
+            }}
+          />
         </div>
       </main>
     </div>

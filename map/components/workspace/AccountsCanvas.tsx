@@ -50,7 +50,7 @@ function AccountsToolbar() {
       }}
     >
       <span style={{ fontSize: 13, color: "#86868b" }}>
-        {ACCOUNTS.length} partner accounts · UNC Innovate Carolina industry database
+        {ACCOUNTS.length} partner companies · UNC Innovate Carolina industry database
       </span>
       <span style={{ display: "flex", gap: 8 }}>
         {buttons.map(([label, fn]) => (
@@ -77,7 +77,7 @@ function AccountsToolbar() {
 // returns: the accounts canvas card element
 export default function AccountsCanvas() {
   return (
-    <CanvasCard title="Accounts" toolbar={<AccountsToolbar />}>
+    <CanvasCard title="Companies" toolbar={<AccountsToolbar />}>
       <div style={{ height: "100%", overflow: "auto" }}>
         <AccountsTable accounts={ACCOUNTS} />
       </div>
