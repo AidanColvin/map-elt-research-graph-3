@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
+import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
@@ -14,13 +15,17 @@ import { FONT } from "@/components/workspace/ui";
 const HEADER_H = 52;
 const SUBNAV_H = 44;
 
-type View = "dashboard" | "company" | "sector" | "accounts";
+type View = "dashboard" | "company" | "sector" | "accounts" | "account";
 
+// The sub-nav routes (the "account" view is reached via the Profile button,
+// not the sub-nav, so it's intentionally not listed here). Display text for
+// the accounts route is "Companies"; its view key stays "accounts" so nothing
+// that references the route breaks.
 const VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company Profile" },
   { key: "sector", label: "Sector Scan" },
-  { key: "accounts", label: "Accounts" },
+  { key: "accounts", label: "Companies" },
 ];
 
 // takes: an optional pixel size
@@ -45,35 +50,73 @@ function LogoMark({ size = 22 }: { size?: number }) {
   );
 }
 
-// takes: the signed-in user and an onSignOut callback
-// does: owns the profile dropdown — trigger button, outside-click dismissal,
-//       account summary, and the sign-out action
-// returns: the profile menu element
-function ProfileMenu({ user, onSignOut }: { user: MapUser; onSignOut: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // takes: nothing (effect)
-  // does: registers a document listener that closes the menu on outside click
-  // returns: a cleanup function removing the listener
-  useEffect(() => {
-    if (!open) return;
-    // takes: a document mousedown event
-    // does: closes the menu when the click landed outside the menu subtree
-    // returns: nothing
-    function onClick(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [open]);
-
+// takes: the signed-in user, an onHome handler (logo → home), and an onProfile
+//        handler (Profile button → account view)
+// does: renders the fixed glassmorphism header chrome — a clickable logo +
+//       wordmark on the left that returns home, and the Profile button on the
+//       right that opens the account page (no dropdown)
+// returns: the global header element
+function GlobalHeader({
+  user,
+  onHome,
+  onProfile,
+}: {
+  user: MapUser;
+  onHome: () => void;
+  onProfile: () => void;
+}) {
   return (
-    <div ref={ref} style={{ position: "relative" }}>
+    <header
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        height: HEADER_H,
+        zIndex: 100,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        padding: "0 20px",
+        background: "rgba(255,255,255,0.66)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+        borderBottom: "1px solid rgba(0,0,0,0.05)",
+        fontFamily: FONT,
+      }}
+    >
+      {/* Logo + wordmark is a home link. It uses in-app navigation (no full
+          reload) so the session and intro aren't re-triggered. */}
       <button
-        onClick={() => setOpen((o) => !o)}
-        aria-haspopup="menu"
-        aria-expanded={open}
+        onClick={onHome}
+        aria-label="Map home"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+          padding: 0,
+        }}
+      >
+        <LogoMark />
+        <span
+          style={{
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: "0.32em",
+            color: "#1d1d1f",
+            userSelect: "none",
+          }}
+        >
+          map
+        </span>
+      </button>
+
+      <button
+        onClick={onProfile}
+        aria-label="Open account"
         style={{
           display: "flex",
           alignItems: "center",
@@ -106,120 +149,6 @@ function ProfileMenu({ user, onSignOut }: { user: MapUser; onSignOut: () => void
         </span>
         Profile
       </button>
-
-      {open && (
-        <div
-          role="menu"
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "calc(100% + 8px)",
-            width: 240,
-            background: "#ffffff",
-            borderRadius: 16,
-            boxShadow: "0 1px 2px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.14)",
-            padding: 8,
-          }}
-        >
-          <div style={{ padding: "10px 12px", borderBottom: "1px solid rgba(0,0,0,0.06)" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                fontSize: 14,
-                fontWeight: 600,
-              }}
-            >
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
-                {user.guest ? "Guest" : user.email}
-              </span>
-              <span
-                style={{
-                  flexShrink: 0,
-                  fontSize: 10.5,
-                  fontWeight: 600,
-                  letterSpacing: "0.05em",
-                  textTransform: "uppercase",
-                  padding: "2px 7px",
-                  borderRadius: 999,
-                  color: user.role === "developer" ? "#fff" : "#525252",
-                  background:
-                    user.role === "developer" ? "#0a0a0a" : "rgba(0,0,0,0.06)",
-                }}
-              >
-                {user.role}
-              </span>
-            </div>
-            <div style={{ fontSize: 12, color: "#86868b", marginTop: 2 }}>
-              {user.guest
-                ? "Browsing without an account"
-                : "Signed in · account stored in this browser"}
-            </div>
-          </div>
-          <button
-            onClick={onSignOut}
-            style={{
-              width: "100%",
-              textAlign: "left",
-              border: "none",
-              background: "none",
-              padding: "10px 12px",
-              fontSize: 14,
-              color: "#dc2626",
-              cursor: "pointer",
-              fontFamily: FONT,
-              borderRadius: 8,
-            }}
-          >
-            {user.guest ? "Exit guest mode" : "Sign out"}
-          </button>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// takes: the signed-in user and an onSignOut callback
-// does: renders the fixed glassmorphism header chrome — logo + wordmark on
-//       the left, the extracted ProfileMenu on the right
-// returns: the global header element
-function GlobalHeader({ user, onSignOut }: { user: MapUser; onSignOut: () => void }) {
-  return (
-    <header
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: HEADER_H,
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 20px",
-        background: "rgba(255,255,255,0.66)",
-        backdropFilter: "saturate(180%) blur(20px)",
-        WebkitBackdropFilter: "saturate(180%) blur(20px)",
-        borderBottom: "1px solid rgba(0,0,0,0.05)",
-        fontFamily: FONT,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <LogoMark />
-        <span
-          style={{
-            fontSize: 16,
-            fontWeight: 600,
-            letterSpacing: "0.32em",
-            color: "#1d1d1f",
-            userSelect: "none",
-          }}
-        >
-          map
-        </span>
-      </div>
-      <ProfileMenu user={user} onSignOut={onSignOut} />
     </header>
   );
 }
@@ -320,10 +249,8 @@ export default function MapHome() {
     >
       <GlobalHeader
         user={user}
-        onSignOut={() => {
-          clearSession();
-          setUser(null);
-        }}
+        onHome={() => setView("dashboard")}
+        onProfile={() => setView("account")}
       />
       <SubNav view={view} onChange={setView} />
 
@@ -349,7 +276,7 @@ export default function MapHome() {
             quick={[
               { label: "Recent Scan: Oncology", onClick: () => { setSectorDraft("Oncology"); scan.run("Oncology"); setView("sector"); } },
               { label: "Top Account: Apple", onClick: () => { setCompanyDraft("Apple"); dive.run("Apple"); setView("company"); } },
-              { label: "Browse Accounts →", onClick: () => setView("accounts") },
+              { label: "Browse Companies →", onClick: () => setView("accounts") },
             ]}
           />
         </div>
@@ -394,6 +321,24 @@ export default function MapHome() {
           }}
         >
           <AccountsCanvas />
+        </div>
+
+        <div
+          className="ws-view"
+          style={{
+            display: view === "account" ? "block" : "none",
+            maxWidth: 560,
+            margin: "0 auto",
+          }}
+        >
+          <AccountView
+            user={user}
+            onSignOut={() => {
+              clearSession();
+              setUser(null);
+              setView("dashboard");
+            }}
+          />
         </div>
       </main>
     </div>
