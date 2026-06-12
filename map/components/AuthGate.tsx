@@ -6,8 +6,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
-  GithubAuthProvider,
-  OAuthProvider,
 } from "firebase/auth";
 import { firebaseEnabled, getFirebaseAuth } from "@/lib/firebase";
 
@@ -149,25 +147,6 @@ function GoogleIcon() {
   );
 }
 
-function GitHubIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 16 16" aria-hidden fill="#1d1d1f">
-      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z" />
-    </svg>
-  );
-}
-
-function MicrosoftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden>
-      <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-      <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-      <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-      <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-    </svg>
-  );
-}
-
 export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -243,11 +222,11 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     finish({ email: em, guest: false, role: roleForEmail(em) });
   }
 
-  // takes: "Google", "Microsoft", or "GitHub"
-  // does: runs the real OAuth popup via Firebase when configured; otherwise
-  //       shows the no-keys notice
+  // takes: "Google"
+  // does: runs the real Google OAuth popup via Firebase when configured;
+  //       otherwise shows the no-keys notice
   // returns: nothing (async)
-  async function oauthSignIn(provider: "Google" | "Microsoft" | "GitHub") {
+  async function oauthSignIn(provider: "Google") {
     setError("");
     setNotice("");
     const auth = getFirebaseAuth();
@@ -257,12 +236,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       );
       return;
     }
-    const p =
-      provider === "Google"
-        ? new GoogleAuthProvider()
-        : provider === "GitHub"
-          ? new GithubAuthProvider()
-          : new OAuthProvider("microsoft.com");
+    const p = new GoogleAuthProvider();
     try {
       const cred = await signInWithPopup(auth, p);
       const em = (cred.user.email || "").toLowerCase();
@@ -284,12 +258,6 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
 
         <button style={S.oauth} onClick={() => oauthSignIn("Google")}>
           <GoogleIcon /> Continue with Google
-        </button>
-        <button style={S.oauth} onClick={() => oauthSignIn("Microsoft")}>
-          <MicrosoftIcon /> Continue with Microsoft
-        </button>
-        <button style={S.oauth} onClick={() => oauthSignIn("GitHub")}>
-          <GitHubIcon /> Continue with GitHub
         </button>
 
         <div
