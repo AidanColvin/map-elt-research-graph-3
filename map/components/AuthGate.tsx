@@ -148,6 +148,11 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     onDone(user);
   }
 
+  // takes: a form submit event
+  // does: smart submit so creating an account and logging in never dead-ends —
+  //       a brand-new email is registered (saved to this browser) and signed
+  //       in; an existing email is verified against its saved password
+  // returns: nothing
   function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -157,18 +162,23 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     if (password.length < 6) return setError("Password must be at least 6 characters.");
 
     const users = loadUsers();
-    if (mode === "signup") {
-      if (users[em]) return setError("An account with this email already exists. Log in instead.");
+    const existing = users[em];
+
+    if (existing === undefined) {
+      // First time we've seen this email — register it and sign in.
       users[em] = password;
       try {
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
       } catch {}
       finish({ email: em, guest: false });
-    } else {
-      if (!users[em]) return setError("No account found for this email. Sign up first.");
-      if (users[em] !== password) return setError("Incorrect password.");
-      finish({ email: em, guest: false });
+      return;
     }
+
+    // Email already has an account — verify the password.
+    if (existing !== password) {
+      return setError("Incorrect password for this account. Try again.");
+    }
+    finish({ email: em, guest: false });
   }
 
   function oauthNotice(provider: string) {
