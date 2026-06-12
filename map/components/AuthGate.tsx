@@ -22,7 +22,16 @@ import { firebaseEnabled, getFirebaseAuth } from "@/lib/firebase";
  */
 
 export type MapRole = "developer" | "user";
-export type MapUser = { email: string; guest: boolean; role: MapRole };
+export type MapUser = {
+  email: string;
+  guest: boolean;
+  role: MapRole;
+  // Optional display name (e.g. from a Google profile).
+  name?: string;
+  // The plaintext password is held ONLY in memory for the current session so
+  // the account page can show/copy it; it is never written to storage.
+  password?: string;
+};
 
 const USERS_KEY = "map.users";
 const SESSION_KEY = "map.session";
@@ -154,9 +163,14 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
+  // takes: the signed-in MapUser (may include an in-memory password)
+  // does: persists a sanitized session (never the password) and hands the
+  //       full in-memory user to the app
+  // returns: nothing
   function finish(user: MapUser) {
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      const { password, ...safe } = user;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(safe));
     } catch {}
     onDone(user);
   }
@@ -198,7 +212,13 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           mode === "signup"
             ? await createUserWithEmailAndPassword(auth, em, password)
             : await signInWithEmailAndPassword(auth, em, password);
-        finish({ email: cred.user.email || em, guest: false, role: roleForEmail(em) });
+        finish({
+          email: cred.user.email || em,
+          guest: false,
+          role: roleForEmail(em),
+          name: cred.user.displayName || undefined,
+          password,
+        });
       } catch (err) {
         setError(prettyError(err));
       }
@@ -213,13 +233,13 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       try {
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
       } catch {}
-      finish({ email: em, guest: false, role: roleForEmail(em) });
+      finish({ email: em, guest: false, role: roleForEmail(em), password });
       return;
     }
     if (existing !== password) {
       return setError("Incorrect password for this account. Try again.");
     }
-    finish({ email: em, guest: false, role: roleForEmail(em) });
+    finish({ email: em, guest: false, role: roleForEmail(em), password });
   }
 
   // takes: "Google"
@@ -240,7 +260,12 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     try {
       const cred = await signInWithPopup(auth, p);
       const em = (cred.user.email || "").toLowerCase();
-      finish({ email: cred.user.email || provider, guest: false, role: roleForEmail(em) });
+      finish({
+        email: cred.user.email || provider,
+        guest: false,
+        role: roleForEmail(em),
+        name: cred.user.displayName || undefined,
+      });
     } catch (err) {
       setError(prettyError(err));
     }
