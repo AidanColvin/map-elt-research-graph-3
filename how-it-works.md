@@ -1,50 +1,63 @@
 # How Map Works
 
-A one page brief, written for any reader.
+One page brief.
 
 ## The goal
 
-University partnership teams spend hours researching companies by hand: pulling financials, reading filings, finding which companies overlap with campus research, and assembling it all into a report someone can act on. Map set out to do that mechanical work in about a minute, with three rules:
+Partnership teams research companies by hand. It takes hours. Map does the mechanical part in about a minute, under three rules:
 
-1. **Free forever.** No paid services anywhere. Anyone can run it without signing up for anything.
-2. **Every fact has a source.** Each number and claim links back to an official public record, so a reader can check it.
-3. **No made up text.** There is no AI writing in the reports. The words come from official filings and public databases, assembled by fixed rules.
+1. **Free.** No paid services. No accounts or keys to run reports.
+2. **Sourced.** Every fact links to an official public record.
+3. **No AI text.** Report words come from official filings and public databases, assembled by fixed rules.
 
 ## What it does
 
-Map is one website with three tools behind a single sign in:
+Three tools behind one sign in:
 
-* **Company Deep Dive.** Type any public company and get a full report: what the company does, its financials, its risks, its leadership, with charts. Seven major companies (Apple, NVIDIA, Microsoft, Alphabet, AWS, Anthropic, OpenAI) have hand written reports that load instantly. Every other public company gets a report built live from government records.
-* **Sector Scan.** Type an industry (for example "Oncology") and get a report mapping the companies in that industry to related research at UNC Chapel Hill: who they are, what they are working on, where the overlap is, and talking points for outreach. The same data also opens as charts, ten year financial trends, a spreadsheet, and a slide deck.
-* **Accounts.** A table of 142 partner companies with researched, verified profiles, downloadable as a spreadsheet, a PDF, or plain text.
+| Tool | You type | You get |
+|---|---|---|
+| Company Deep Dive | a public company | full report: business, financials, risks, leadership, charts |
+| Sector Scan | an industry | report mapping companies to UNC Chapel Hill research, plus charts, trends, a spreadsheet, a slide deck |
+| Accounts | nothing | 142 verified partner profiles, downloadable |
+
+Seven major companies (Apple, NVIDIA, Microsoft, Alphabet, AWS, Anthropic, OpenAI) have hand written reports that load instantly. Everything else is built live from public records.
 
 ## How it works
 
-All the facts come from free public sources that need no account or key:
+```mermaid
+flowchart LR
+    Y[You type a company<br/>or industry] --> A[App fetches public<br/>records in parallel]
+    A --> SEC[SEC EDGAR<br/>financials, filings]
+    A --> CT[ClinicalTrials.gov<br/>drug pipelines]
+    A --> PM[PubMed<br/>UNC research papers]
+    A --> NIH[NIH RePORTER<br/>grants]
+    SEC & CT & PM & NIH --> B[Fixed rules assemble<br/>the report]
+    B --> V[Every claim checked<br/>against 2 sources]
+    V --> R[Report streams<br/>to your screen]
+```
 
-| Source | What it provides |
-|---|---|
-| SEC EDGAR (the US government filing system) | financials, annual reports, executive names |
-| ClinicalTrials.gov | what each company is testing in the clinic |
-| PubMed | published research, including papers coauthored with UNC |
-| NIH RePORTER | government research grants |
-| Wikipedia and OpenAlex | company overviews and research activity |
+Key points:
 
-When you ask for a report, the app fetches from these sources at the same time (so it stays fast), then assembles the report section by section using fixed rules. For a deep dive, the narrative is the company's own words taken from its latest annual report. For a sector scan, every claim must be backed by at least two official sources; anything that cannot be double checked is flagged for human review instead of guessed. Wikipedia and news aggregators are never used as citations.
-
-The report streams onto your screen as it is built, with a live progress bar showing real work ("4 of 18 companies analyzed"), not a timer.
+* Deep dive narrative is the company's own words from its latest annual report.
+* Sector scan claims need two official sources. Unverified claims get flagged for human review, not guessed.
+* Wikipedia and news aggregators are never citations.
+* The progress bar shows real work ("4 of 18 companies analyzed"), not a timer.
 
 ## How to use it
 
-1. Open the site and sign in (email and password, Google, or Microsoft).
-2. From the Dashboard, type a company name to run a Deep Dive, or an industry name to run a Sector Scan.
-3. Read the report on screen. Citations are numbered; click any source to verify it.
-4. For a sector scan, switch views at the top: Report, Visualize (charts), Trends (ten year financials), Excel, or Slide Deck.
-5. Download what you need: PDF, Word, Markdown, Excel, or PowerPoint.
-6. Open the Accounts tab to browse the partner database and download it.
+```mermaid
+flowchart LR
+    S[Sign in] --> D[Dashboard:<br/>type a name] --> R[Read report,<br/>click citations] --> V[Switch views:<br/>charts, trends,<br/>Excel, slides] --> X[Download:<br/>PDF, Word, Excel,<br/>PowerPoint, Markdown]
+```
 
-## What to keep in mind
+1. Sign in with email, Google, or Microsoft.
+2. Type a company or industry on the Dashboard.
+3. Read the report. Click any citation to verify it.
+4. For sector scans, switch views: Report, Visualize, Trends, Excel, Slide Deck.
+5. Download in any format. The Accounts tab holds the partner database.
 
-* Private companies have no government filings, so their reports are lighter.
-* Reports are drafts. They remove the mechanical research work, but a person should verify before acting on them.
-* This is an independent project, not affiliated with or endorsed by UNC Chapel Hill, and it is not investment advice.
+## Keep in mind
+
+* Private companies have no filings, so their reports are lighter.
+* Reports are drafts. Verify before acting.
+* Independent project. Not affiliated with UNC Chapel Hill. Not investment advice.
