@@ -1,174 +1,249 @@
 "use client";
 
 import { useState } from "react";
-import { getSectorSuggestion } from "./sectors";
-import { getCompanySuggestion } from "./companySuggestions";
+import { OrbitNetwork } from "@/components/Chart3D";
+import CompanyLogo from "@/app/components/CompanyLogo";
+import { SECTORS, getSectorSuggestion } from "./sectors";
 
-type Quick = { label: string; onClick: () => void };
+// Curated deep-dive companies shown on the launchpad — instant, recognizable
+// entry points. Domains feed the existing CompanyLogo fallback chain.
+const DEEP_DIVES = [
+  { name: "Apple", ticker: "AAPL", domain: "apple.com", accent: "#1d1d1f" },
+  { name: "NVIDIA", ticker: "NVDA", domain: "nvidia.com", accent: "#76b900" },
+  { name: "Microsoft", ticker: "MSFT", domain: "microsoft.com", accent: "#0078d4" },
+  { name: "Alphabet", ticker: "GOOGL", domain: "abc.xyz", accent: "#4285f4" },
+  { name: "Anthropic", ticker: "Private", domain: "anthropic.com", accent: "#cc785c" },
+];
 
-// takes: onRunCompany(name), onRunSector(name), and the quick-access widgets
-// does: renders the Apple-style Dashboard launchpad — greeting, a single
-//       floating glass command deck, and a row of quick-access cards
+const TRENDING = [
+  { name: "Clean Energy", count: 31, up: true },
+  { name: "Biotech", count: 44, up: true },
+  { name: "Quantum", count: 12, up: false },
+  { name: "Gene Therapy", count: 19, up: true },
+];
+
+// Illustrative preview points for the live-scan orbit card.
+const SCAN_POINTS = [
+  { label: "Merck", size: 0.9, highlight: true, weight: 2 },
+  { label: "Pfizer", size: 0.8, highlight: true, weight: 2 },
+  { label: "AstraZeneca", size: 0.7, weight: 1 },
+  { label: "Novartis", size: 0.65, weight: 1 },
+  { label: "Amgen", size: 0.6, highlight: true, weight: 1 },
+  { label: "Gilead", size: 0.5, weight: 1 },
+  { label: "BioNTech", size: 0.45, weight: 1 },
+  { label: "Moderna", size: 0.5, weight: 1 },
+  { label: "Regeneron", size: 0.4, highlight: true, weight: 1 },
+  { label: "Vertex", size: 0.35, weight: 1 },
+  { label: "Illumina", size: 0.3, weight: 1 },
+  { label: "Exact Sciences", size: 0.3, weight: 1 },
+];
+
+// takes: the raw search text
+// does: decides whether the query names a sector (curated list match) or a
+//       company — the same split the focused views use
+// returns: "sector" | "company"
+function classifyQuery(q: string): "sector" | "company" {
+  const v = q.trim().toLowerCase();
+  if (SECTORS.some((s) => s.toLowerCase() === v)) return "sector";
+  return "company";
+}
+
+// takes: onRunCompany(name), onRunSector(name), onOpenCompanyView() for the
+//        "View all" link, and onPrefillSector(name) for trending-sector cards
+// does: renders the designed dashboard — split hero (pitch + live sector-scan
+//       preview card), curated deep dives, and trending sectors
 // returns: the dashboard overview element
 export default function DashboardHome({
   onRunCompany,
   onRunSector,
-  quick,
+  onOpenCompanyView,
+  onPrefillSector,
 }: {
   onRunCompany: (name: string) => void;
   onRunSector: (name: string) => void;
-  quick: Quick[];
+  onOpenCompanyView: () => void;
+  onPrefillSector: (name: string) => void;
 }) {
-  return (
-    <div className="px-6">
-      <h1 className="text-4xl font-light tracking-tight text-gray-900 mt-20 mb-8 text-center">
-        Welcome to Map.
-      </h1>
-
-      <CommandDeck onRunCompany={onRunCompany} onRunSector={onRunSector} />
-
-      <div className="grid grid-cols-3 gap-6 max-w-4xl mx-auto mt-16">
-        {quick.map((q) => (
-          <div
-            key={q.label}
-            onClick={q.onClick}
-            className="p-6 rounded-2xl bg-white/40 backdrop-blur-sm border border-white/10 hover:shadow-md hover:-translate-y-1 transition-all duration-300 cursor-pointer"
-          >
-            <p className="text-sm text-gray-500">{q.label}</p>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// takes: onRunCompany(name) and onRunSector(name) callbacks
-// does: renders the consolidated spotlight deck — a company search (with inline
-//       gray autocomplete) and a sector dropdown in one floating glass pill
-// returns: the command-deck element
-function CommandDeck({
-  onRunCompany,
-  onRunSector,
-}: {
-  onRunCompany: (name: string) => void;
-  onRunSector: (name: string) => void;
-}) {
-  const [company, setCompany] = useState("");
-  const [sector, setSector] = useState("");
-
-  const suggestion = getCompanySuggestion(company);
-  const ghostSuffix = suggestion ? suggestion.slice(company.length) : "";
-
-  const sectorSuggestion = getSectorSuggestion(sector);
-  const sectorGhost = sectorSuggestion ? sectorSuggestion.slice(sector.length) : "";
+  const [query, setQuery] = useState("");
 
   // takes: a form submit event
-  // does: scans the completed sector suggestion if one is showing, else the
-  //       typed text; clears the field afterward
+  // does: routes the query — known sectors go to Sector Scan, everything
+  //       else is treated as a company deep dive (completing a partial
+  //       sector name first, e.g. "onco" → "Oncology")
   // returns: nothing
-  function submitSector(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
-    const target = sectorSuggestion ?? sector;
-    if (target.trim()) {
-      onRunSector(target);
-      setSector("");
-    }
-  }
-
-  // takes: a keydown event on the sector input
-  // does: accepts the gray ghost sector on Tab or Right-arrow-at-end
-  // returns: nothing
-  function onSectorKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!sectorSuggestion) return;
-    const atEnd = e.currentTarget.selectionStart === sector.length;
-    if (e.key === "Tab" || (e.key === "ArrowRight" && atEnd)) {
-      e.preventDefault();
-      setSector(sectorSuggestion);
-    }
-  }
-
-  // takes: a form submit event
-  // does: runs the completed company suggestion if one is showing, else what
-  //       was typed; clears the field afterward
-  // returns: nothing
-  function submitCompany(e: React.FormEvent) {
-    e.preventDefault();
-    const target = suggestion ?? company;
-    if (target.trim()) {
-      onRunCompany(target);
-      setCompany("");
-    }
-  }
-
-  // takes: a keydown event on the company input
-  // does: accepts the gray ghost suggestion on Tab or Right-arrow-at-end
-  // returns: nothing
-  function onCompanyKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!suggestion) return;
-    const atEnd = e.currentTarget.selectionStart === company.length;
-    if (e.key === "Tab" || (e.key === "ArrowRight" && atEnd)) {
-      e.preventDefault();
-      setCompany(suggestion);
-    }
+    const completed = getSectorSuggestion(query) ?? query;
+    const target = completed.trim();
+    if (!target) return;
+    if (classifyQuery(target) === "sector") onRunSector(target);
+    else onRunCompany(target);
+    setQuery("");
   }
 
   return (
-    <div className="max-w-2xl mx-auto flex items-center gap-4 p-4 bg-white/70 backdrop-blur-md border border-white/20 rounded-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-      <form onSubmit={submitCompany} className="relative flex-1">
-        {ghostSuffix && (
-          <div
-            aria-hidden
-            className="absolute inset-0 flex items-center px-3 py-2 text-[15px] pointer-events-none overflow-hidden whitespace-pre"
-            style={{ fontFamily: "inherit", lineHeight: "normal" }}
-          >
-            <span style={{ color: "transparent" }}>{company}</span>
-            <span style={{ color: "#b6b6bc" }}>{ghostSuffix}</span>
-          </div>
-        )}
-        <input
-          value={company}
-          onChange={(e) => setCompany(e.target.value)}
-          onKeyDown={onCompanyKeyDown}
-          placeholder="Search a company…"
-          aria-label="Company or ticker"
-          autoComplete="off"
-          spellCheck={false}
-          className="relative w-full bg-transparent border-0 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none px-3 py-2"
-        />
-      </form>
-
-      <div className="h-6 w-px bg-gray-200" aria-hidden />
-
-      <form onSubmit={submitSector} className="flex items-center gap-3">
-        <div className="relative flex-1">
-          {sectorGhost && (
-            <div
-              aria-hidden
-              className="absolute inset-0 flex items-center px-3 py-2 text-[15px] pointer-events-none overflow-hidden whitespace-pre"
-              style={{ fontFamily: "inherit", lineHeight: "normal" }}
+    <div className="max-w-6xl mx-auto px-6 pb-8">
+      {/* ── Split hero ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-center mt-6">
+        {/* Left: pitch + combined search */}
+        <div>
+          <p className="text-[11px] font-semibold tracking-[0.22em] text-gray-500 uppercase mb-4">
+            UNC Research × Industry
+          </p>
+          <h1 className="text-[44px] leading-[1.08] font-semibold tracking-tight text-gray-900 mb-4">
+            Map the{" "}
+            <em
+              className="not-italic"
+              style={{
+                fontStyle: "italic",
+                background: "linear-gradient(90deg,#4f46e5,#7c3aed)",
+                WebkitBackgroundClip: "text",
+                backgroundClip: "text",
+                color: "transparent",
+              }}
             >
-              <span style={{ color: "transparent" }}>{sector}</span>
-              <span style={{ color: "#b6b6bc" }}>{sectorGhost}</span>
-            </div>
-          )}
-          <input
-            value={sector}
-            onChange={(e) => setSector(e.target.value)}
-            onKeyDown={onSectorKeyDown}
-            placeholder="Scan a sector…"
-            aria-label="Sector"
-            autoComplete="off"
-            spellCheck={false}
-            className="relative w-full bg-transparent border-0 text-[15px] text-gray-700 placeholder:text-gray-400 outline-none px-3 py-2"
-          />
+              partnership
+            </em>{" "}
+            landscape.
+          </h1>
+          <p className="text-[15px] text-gray-500 leading-relaxed mb-6 max-w-md">
+            Deep-dive any public company or scan an entire sector against UNC
+            research — sourced, scored, in about a minute.
+          </p>
+
+          <form
+            onSubmit={submit}
+            className="flex items-center gap-2 p-2 bg-white/80 backdrop-blur-md border border-black/[0.06] rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.05)] max-w-md"
+          >
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Company, ticker, or sector..."
+              aria-label="Company, ticker, or sector"
+              autoComplete="off"
+              spellCheck={false}
+              className="flex-1 bg-transparent border-0 text-[15px] text-gray-900 placeholder:text-gray-400 outline-none px-3 py-2"
+            />
+            <button
+              type="submit"
+              className="rounded-xl bg-gray-900 hover:bg-black text-white text-sm font-medium px-5 py-2.5 transition-colors whitespace-nowrap"
+            >
+              Map it
+            </button>
+          </form>
+
+          <div className="flex items-center gap-2 mt-4">
+            <span className="text-xs text-gray-400 mr-1">Try:</span>
+            {["Apple", "Oncology", "Semiconductors"].map((chip) => (
+              <button
+                key={chip}
+                onClick={() => setQuery(chip)}
+                className="text-xs text-gray-600 bg-white/70 border border-black/[0.06] rounded-full px-3 py-1.5 hover:bg-white hover:shadow-sm transition-all cursor-pointer"
+              >
+                {chip}
+              </button>
+            ))}
+          </div>
         </div>
-        <button
-          type="submit"
-          className="rounded-2xl bg-gray-900/90 hover:bg-gray-900 text-white text-sm font-medium px-5 py-2 transition-colors"
-        >
-          Scan
-        </button>
-      </form>
+
+        {/* Right: live sector-scan preview card */}
+        <div className="rounded-3xl bg-white/75 backdrop-blur-md border border-black/[0.06] shadow-[0_12px_40px_rgb(0,0,0,0.06)] p-6">
+          <div className="flex items-center justify-between mb-1">
+            <p className="flex items-center gap-2 text-[10.5px] font-semibold tracking-[0.18em] text-gray-500 uppercase">
+              <span
+                className="inline-block w-2 h-2 rounded-full bg-emerald-500"
+                style={{ animation: "pulse 1.6s ease-in-out infinite" }}
+                aria-hidden
+              />
+              Sector Scan · Live
+            </p>
+            <span className="text-xs text-gray-400 tabular-nums">14 of 18</span>
+          </div>
+          <h2 className="text-2xl font-semibold text-gray-900">Oncology</h2>
+          <p className="text-[13px] text-gray-500 mb-2">
+            Public companies × UNC research overlap
+          </p>
+
+          <OrbitNetwork points={SCAN_POINTS} centerLabel="UNC" height={420} />
+
+          <div className="grid grid-cols-3 gap-3 mt-3">
+            {[
+              { n: "18", label: "Companies" },
+              { n: "64", label: "Claims" },
+              { n: "7", label: "UNC Ties" },
+            ].map((s) => (
+              <div
+                key={s.label}
+                className="rounded-2xl bg-gray-50/80 border border-black/[0.04] px-3 py-3 text-center"
+              >
+                <p className="text-lg font-semibold text-gray-900 tabular-nums">{s.n}</p>
+                <p className="text-[10px] font-medium tracking-[0.14em] text-gray-400 uppercase">
+                  {s.label}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Curated deep dives ── */}
+      <div className="mt-14">
+        <div className="flex items-center justify-between mb-4">
+          <p className="text-[11px] font-semibold tracking-[0.2em] text-gray-500 uppercase">
+            Curated Deep Dives · Instant
+          </p>
+          <button
+            onClick={onOpenCompanyView}
+            className="text-[13px] text-indigo-600 hover:text-indigo-800 transition-colors"
+          >
+            View all →
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {DEEP_DIVES.map((c) => (
+            <button
+              key={c.name}
+              onClick={() => onRunCompany(c.name)}
+              className="text-left p-5 rounded-2xl bg-white/70 backdrop-blur-sm border border-black/[0.05] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
+            >
+              <div className="mb-3" style={{ width: 36, height: 36 }}>
+                <CompanyLogo name={c.name} domain={c.domain} accent={c.accent} />
+              </div>
+              <p className="text-[15px] font-semibold text-gray-900">{c.name}</p>
+              <p className="text-xs text-gray-400 mb-2">{c.ticker}</p>
+              <span className="text-[13px] text-indigo-600">Deep dive →</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Trending sectors ── */}
+      <div className="mt-12">
+        <p className="text-[11px] font-semibold tracking-[0.2em] text-gray-500 uppercase mb-4">
+          Trending Sectors
+        </p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {TRENDING.map((s) => (
+            <button
+              key={s.name}
+              onClick={() => onPrefillSector(s.name)}
+              className="text-left p-5 rounded-2xl bg-white/70 backdrop-blur-sm border border-black/[0.05] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-lg text-gray-700" aria-hidden>✳</span>
+                <span
+                  className={`text-sm ${s.up ? "text-emerald-600" : "text-rose-500"}`}
+                  aria-label={s.up ? "trending up" : "trending down"}
+                >
+                  {s.up ? "↗" : "↘"}
+                </span>
+              </div>
+              <p className="text-[15px] font-semibold text-gray-900">{s.name}</p>
+              <p className="text-xs text-gray-400">{s.count} cos</p>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
