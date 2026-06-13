@@ -148,8 +148,12 @@ function execSummary(
     if (gp) lines.push(`Gross margin was ${pct(gp / rev.val)} [1].`);
   }
   if (tenk?.employees) lines.push(`The company reports approximately ${tenk.employees} employees [4].`);
-  if (wiki?.description) lines.push(`It is ${lowerFirst(wiki.description)} [2].`);
-  if (wiki?.extract) lines.push(firstSentences(wiki.extract, 1) + " [2]");
+  // Wikipedia short descriptions are bare noun phrases ("American electric
+  // vehicle and clean energy company"), so give them an article and keep the
+  // original casing — lowercasing would mangle proper adjectives like
+  // "American". The full extract is shown in Company Overview, so it isn't
+  // repeated here.
+  if (wiki?.description) lines.push(`It is ${withArticle(wiki.description)} [2].`);
   if (lines.length === 1)
     lines.push(
       `${name} is a private company; detailed financials are not available through SEC EDGAR [1].`,
@@ -672,14 +676,14 @@ function titleCase(s: string): string {
     .join(" ");
 }
 
-function lowerFirst(s: string): string {
-  return s.charAt(0).toLowerCase() + s.slice(1);
-}
-
-function firstSentences(text: string, n: number): string {
-  const parts = text.match(/[^.!?]+[.!?]+/g);
-  if (!parts) return text;
-  return parts.slice(0, n).join(" ").trim();
+// given a noun phrase ("American electric vehicle and clean energy company")
+// return it prefixed with the right indefinite article ("an American …"),
+// leaving casing intact and skipping the prefix if one is already present
+function withArticle(s: string): string {
+  const trimmed = s.trim();
+  if (/^(a|an|the)\s/i.test(trimmed)) return trimmed;
+  const article = /^[aeiou]/i.test(trimmed) ? "an" : "a";
+  return `${article} ${trimmed}`;
 }
 
 function formatFye(mmdd: string): string {
