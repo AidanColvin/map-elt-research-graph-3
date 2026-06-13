@@ -8,7 +8,7 @@ import html as _html
 import re
 import time
 import requests
-from datetime import date
+from datetime import date, timedelta
 from typing import Optional, List
 
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
@@ -346,6 +346,113 @@ class SECEdgarClient:
                 "net_income": annual_series("NetIncomeLoss"),
             },
         }
+
+    def fetch_collaboration_8ks(self, cik: str) -> dict:
+        """Deal track record: distinct 8-Ks mentioning collaboration/licensing.
+
+        Runs two EDGAR full-text searches (same efts endpoint and HTTP
+        pattern as discovery) over the past two years, filtered to this CIK,
+        merges and dedupes hits by filing accession number. Returns safe
+        zero/None defaults on any failure — never raises.
+        """
+        empty = {
+            "collaboration_8k_count": 0,
+            "most_recent_8k_date": None,
+            "most_recent_8k_description": None,
+            "collaboration_8k_url": None,
+        }
+        if not cik:
+            return empty
+        cik10 = str(cik).zfill(10)
+        start = (date.today() - timedelta(days=730)).isoformat()
+        end = date.today().isoformat()
+
+        by_adsh: dict = {}
+        for q in ('"collaboration agreement"', '"sponsored research"'):
+            params = {"q": q, "forms": "8-K", "startdt": start,
+                      "enddt": end, "ciks": cik10}
+            try:
+                r = requests.get(self.search_url, headers=HEADERS,
+                                 timeout=8, params=params)
+                r.raise_for_status()
+                hits = r.json().get("hits", {}).get("hits", []) or []
+            except Exception as e:
+                print(f"8-K collaboration search error ({q}, CIK {cik}): {e}")
+                continue
+            for h in hits:
+                src = h.get("_source") or {}
+                adsh = src.get("adsh") or ""
+                if not adsh or adsh in by_adsh:
+                    continue
+                # _id is "adsh:filename" — resolves to the actual document.
+                fname = (h.get("_id") or "").split(":", 1)[-1]
+                url = (f"https://www.sec.gov/Archives/edgar/data/{int(cik)}/"
+                       f"{adsh.replace('-', '')}/{fname}") if fname else (
+                       f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}")
+                by_adsh[adsh] = {
+                    "date": src.get("file_date") or "",
+                    "description": src.get("file_description")
+                                   or src.get("file_type") or "8-K",
+                    "url": url,
+                }
+            time.sleep(0.35)  # be gentle: efts throttles rapid requests
+
+        if not by_adsh:
+            return empty
+        latest = max(by_adsh.values(), key=lambda f: f["date"])
+        return {
+            "collaboration_8k_count": len(by_adsh),
+            "most_recent_8k_date": latest["date"] or None,
+            "most_recent_8k_description": latest["description"] or None,
+            "collaboration_8k_url": latest["url"] or None,
+        }
+
+    def get_tenk_text(self, cik: str, filings_by_form: dict,
+                      max_bytes: int = 600_000) -> str:
+        """Plain text of the latest 10-K's narrative, for in-memory scoring.
+
+        Reuses the existing filing-directory resolution and capped streaming
+        fetch used for proxy statements. Returns '' on any failure.
+        """
+        try:
+            if not cik:
+                return ""
+            tenks = (filings_by_form or {}).get("10-K") or []
+            url = tenks[0].get("url", "") if tenks else ""
+            if not url:
+                # Heavy filers bury the last 10-K beyond the 40-filing slice
+                # used for filings_by_form — scan the full submissions index.
+                url = self._latest_tenk_url(cik)
+            if not url:
+                return ""
+            if not url or "browse-edgar" in url:
+                return ""
+            doc_url = self._resolve_proxy_doc_url(url)
+            if not doc_url or doc_url.lower().endswith(".pdf"):
+                return ""
+            raw = self._fetch_proxy_bytes(doc_url, max_bytes=max_bytes)
+            return _strip_proxy_html(raw) if raw else ""
+        except Exception as e:
+            print(f"10-K text fetch error for CIK {cik}: {e}")
+            return ""
+
+    def _latest_tenk_url(self, cik: str) -> str:
+        """Most recent 10-K document URL from the full submissions index."""
+        try:
+            url = self.submissions_url.format(cik=str(cik).zfill(10))
+            r = requests.get(url, headers=HEADERS, timeout=6)
+            r.raise_for_status()
+            recent = (r.json().get("filings") or {}).get("recent") or {}
+            forms = recent.get("form", []) or []
+            accessions = recent.get("accessionNumber", []) or []
+            docs = recent.get("primaryDocument", []) or []
+            for i, form in enumerate(forms):
+                if form == "10-K" and i < len(accessions):
+                    return _filing_url(cik, accessions[i],
+                                       docs[i] if i < len(docs) else "")
+        except Exception as e:
+            print(f"10-K lookup error for CIK {cik}: {e}")
+        return ""
 
     def get_unc_alumni_from_proxy(self, cik: str, proxy_filings: list) -> list:
         """Fetch DEF 14A proxy statements and return UNC-educated executives/directors.
