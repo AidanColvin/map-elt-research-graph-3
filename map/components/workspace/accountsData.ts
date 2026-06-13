@@ -3226,5 +3226,270 @@ export function getUniqueAccounts(
   return out;
 }
 
+// Fortune 500 technology companies added June 12, 2026. Every financial,
+// locational, and headcount field below was pulled live from the app's own
+// pipeline — SEC EDGAR (latest Form 10-K / XBRL company facts) and Wikipedia —
+// via scripts/fetch-accounts.mts, not hand-entered, so the figures reflect the
+// most recent filings. Companies already present above (e.g. AMD, Adobe, Cisco,
+// Dell, IBM, Intel, Meta, Oracle, Qualcomm, Salesforce, Supermicro, Uber,
+// Western Digital, Workday) are intentionally omitted; getUniqueAccounts also
+// drops any accidental name collision.
+const NEW_ACCOUNTS: AccountProfile[] = [
+  row({
+    account: "Amazon",
+    companyAliases: "Amazon.com, AWS",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Retail",
+    description:
+      "Amazon.com, Inc. is an American multinational technology company engaged in e-commerce, cloud computing (AWS), online advertising, digital streaming, and artificial intelligence. Founded in 1994 by Jeff Bezos, it expanded from an online bookstore into \"The Everything Store\" and one of the world's largest Big Tech companies.",
+    website: "amazon.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Seattle",
+    state: "WA",
+    country: "United States",
+    approximateRevenue: "$716.9B (FY2025)",
+    keyProducts: "Amazon.com Marketplace, Amazon Web Services (AWS), Prime, Alexa, Kindle",
+    businessSplit: "North America retail, International retail, AWS cloud",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Amazon.com, Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $716.9B, net income $77.7B, FY2025) • Wikipedia: Amazon (company)",
+  }),
+  row({
+    account: "Booking Holdings",
+    companyAliases: "Booking.com, Priceline",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Travel",
+    description:
+      "Booking Holdings Inc. is an American travel technology company that owns and operates several travel fare aggregators and metasearch engines, including Booking.com, Priceline, Agoda, Kayak, Cheapflights, Rentalcars.com, Momondo, and OpenTable, across about 40 languages and 200 countries.",
+    website: "bookingholdings.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Norwalk",
+    state: "CT",
+    country: "United States",
+    approximateEmployees: "24,300",
+    approximateRevenue: "$26.9B (FY2025)",
+    keyProducts: "Booking.com, Priceline, Agoda, Kayak, OpenTable",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Booking Holdings Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $26.9B, net income $527.5M, FY2025) • Wikipedia: Booking Holdings",
+  }),
+  row({
+    account: "Expedia Group",
+    companyAliases: "Expedia, Hotels.com, Vrbo",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Travel",
+    description:
+      "Expedia Group, Inc. is an American travel technology company that owns and operates travel fare aggregators and metasearch engines, including Expedia, Hotels.com, Vrbo, Travelocity, Hotwire, Orbitz, CheapTickets, and Trivago, with over 3.5 million lodging facilities bookable across its sites.",
+    website: "expediagroup.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Seattle",
+    state: "WA",
+    country: "United States",
+    approximateEmployees: "16,000",
+    approximateRevenue: "$14.7B (FY2025)",
+    keyProducts: "Expedia, Hotels.com, Vrbo, Orbitz, Trivago",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Expedia Group, Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $14.7B, net income $1.3B, FY2025) • Wikipedia: Expedia Group",
+  }),
+  row({
+    account: "Airbnb",
+    companyAliases: "ABNB",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Hospitality",
+    description:
+      "Airbnb, Inc. operates an online marketplace for short- and long-term homestays, experiences, and services in many countries. It acts as a broker, charging a commission on each booking. Founded in 2008 by Brian Chesky, Nathan Blecharczyk, and Joe Gebbia.",
+    website: "airbnb.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "San Francisco",
+    state: "CA",
+    country: "United States",
+    approximateEmployees: "8,200",
+    approximateRevenue: "$12.2B (FY2025)",
+    keyProducts: "Airbnb homestays, Airbnb Experiences, Airbnb Services",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Airbnb, Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $12.2B, net income $2.5B, FY2025) • Wikipedia: Airbnb",
+  }),
+  row({
+    account: "DoorDash",
+    companyAliases: "DASH",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Logistics",
+    description:
+      "DoorDash, Inc. operates an online food ordering and delivery platform and is the largest food delivery service in the United States by market share, also leading the convenience delivery category. It connects merchants, consumers, and delivery couriers through its marketplace and logistics platform.",
+    website: "doordash.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "San Francisco",
+    state: "CA",
+    country: "United States",
+    approximateRevenue: "$13.7B (FY2025)",
+    keyProducts: "DoorDash Marketplace, DashPass, Wolt, DoorDash Drive",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "DoorDash, Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $13.7B, net income $935.0M, FY2025) • Wikipedia: DoorDash",
+  }),
+  row({
+    account: "eBay",
+    companyAliases: "EBAY",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Retail",
+    description:
+      "eBay Inc. is an American multinational e-commerce company that lets users buy and sell items through online marketplaces in 190 markets worldwide, via online auctions or fixed-price \"Buy It Now\" sales, charging sellers a commission. Founded by Pierre Omidyar in 1995.",
+    website: "ebay.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "San Jose",
+    state: "CA",
+    country: "United States",
+    approximateEmployees: "12,300",
+    approximateRevenue: "$11.1B (FY2025)",
+    keyProducts: "eBay Marketplace, eBay Motors, managed payments, authentication services",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "eBay Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $11.1B, net income $2.0B, FY2025) • Wikipedia: eBay",
+  }),
+  row({
+    account: "HP Inc.",
+    companyAliases: "Hewlett-Packard, HPQ",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Hardware",
+    description:
+      "HP Inc. is an American multinational information technology company that develops personal computers, printers and related supplies, and 3D printing services. It is the world's second-largest PC vendor by unit sales after Lenovo and ahead of Dell as of 2024.",
+    website: "hp.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Palo Alto",
+    state: "CA",
+    country: "United States",
+    approximateEmployees: "55,000",
+    approximateRevenue: "$55.3B (FY2025)",
+    keyProducts: "HP laptops & desktops, printers & supplies, 3D printing, Poly peripherals",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "HP Inc. (2025). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $55.3B, net income $2.5B, FY2025) • Wikipedia: HP Inc.",
+  }),
+  row({
+    account: "Applied Materials",
+    companyAliases: "AMAT",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Semiconductors",
+    description:
+      "Applied Materials, Inc. supplies equipment, services, and software for the manufacture of semiconductor chips, flat-panel displays, and solar products. Headquartered in Santa Clara, it is the second-largest semiconductor equipment supplier in the world by revenue, behind ASML.",
+    website: "appliedmaterials.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Santa Clara",
+    state: "CA",
+    country: "United States",
+    approximateRevenue: "$28.4B (FY2025)",
+    keyProducts: "Deposition, etch & CMP systems, ion implantation, metrology, display equipment",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Applied Materials, Inc. (2025). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $28.4B, net income $7.0B, FY2025) • Wikipedia: Applied Materials",
+  }),
+  row({
+    account: "CDW",
+    companyAliases: "CDW Corporation",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "IT Services",
+    description:
+      "CDW Corporation is an American multi-brand provider of information technology solutions and services, serving business, government, education, and healthcare customers across the United States, the United Kingdom, and Canada.",
+    website: "cdw.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Vernon Hills",
+    state: "IL",
+    country: "United States",
+    approximateRevenue: "$22.4B (FY2025)",
+    keyProducts: "IT hardware & software reselling, cloud solutions, managed & professional services",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "CDW Corporation (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $22.4B, net income $1.1B, FY2025) • Wikipedia: CDW",
+  }),
+  row({
+    account: "Cognizant",
+    companyAliases: "Cognizant Technology Solutions, CTSH",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "IT Services",
+    description:
+      "Cognizant Technology Solutions Corporation is an American multinational IT consulting and outsourcing company headquartered in Teaneck, New Jersey. Originally founded in Chennai, India in 1994 as an in-house unit of Dun & Bradstreet, it went public in 1998 and now delivers digital engineering, AI, and operations services.",
+    website: "cognizant.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Teaneck",
+    state: "NJ",
+    country: "United States",
+    approximateEmployees: "351,600",
+    approximateRevenue: "$21.1B (FY2025)",
+    keyProducts: "IT consulting, digital engineering, AI & automation, business process outsourcing",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Cognizant Technology Solutions Corp. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $21.1B, net income $2.2B, FY2025) • Wikipedia: Cognizant",
+  }),
+  row({
+    account: "Kyndryl",
+    companyAliases: "Kyndryl Holdings, KD",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "IT Services",
+    description:
+      "Kyndryl Holdings, Inc. is an American multinational corporation headquartered in New York City that designs, builds, and manages IT infrastructure services and provides business advisory services. It was spun off from IBM in 2021.",
+    website: "kyndryl.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "New York",
+    state: "NY",
+    country: "United States",
+    approximateEmployees: "72,000",
+    approximateRevenue: "$15.1B (FY2026)",
+    keyProducts: "Managed infrastructure services, cloud, security & resiliency, mainframe modernization",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Kyndryl Holdings, Inc. (2026). Form 10-K FY2026, SEC EDGAR • SEC XBRL company facts (revenue $15.1B, FY2026) • Wikipedia: Kyndryl",
+  }),
+  row({
+    account: "Motorola Solutions",
+    companyAliases: "MSI, Motorola",
+    topIndustrySectorProfile: "Technology",
+    secondaryIndustrySectorProfile: "Networking",
+    description:
+      "Motorola Solutions, Inc. is an American technology company providing safety and security products and services — critical communications (land mobile radio), video security, and command-center software used by public-safety agencies and enterprises. Formed in 2011 from the split of Motorola, Inc.",
+    website: "motorolasolutions.com",
+    companyStructure: "C Corporation",
+    ownership: "Public",
+    city: "Chicago",
+    state: "IL",
+    country: "United States",
+    approximateEmployees: "23,000",
+    approximateRevenue: "$11.7B (FY2025)",
+    keyProducts: "APX land mobile radios, command center software, Avigilon video security, LMR networks",
+    researchBy: "Map live pipeline (SEC EDGAR + Wikipedia)",
+    dateOfResearch: "June 12, 2026",
+    resources:
+      "Motorola Solutions, Inc. (2026). Form 10-K FY2025, SEC EDGAR • SEC XBRL company facts (revenue $11.7B, net income $2.2B, FY2025) • Wikipedia: Motorola Solutions",
+  }),
+];
+
 // Deduplicated once at module load, then passed to the table as a single prop.
-export const ACCOUNTS: AccountProfile[] = getUniqueAccounts(CORE_ACCOUNTS, EXCEL_ACCOUNTS);
+// New Fortune-tech rows are appended after the source data so getUniqueAccounts
+// keeps any pre-existing row as the canonical one on a name collision.
+export const ACCOUNTS: AccountProfile[] = getUniqueAccounts(CORE_ACCOUNTS, [
+  ...EXCEL_ACCOUNTS,
+  ...NEW_ACCOUNTS,
+]);
