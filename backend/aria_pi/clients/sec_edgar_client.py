@@ -333,6 +333,9 @@ class SECEdgarClient:
             "revenue": revenue,
             "rd_expense": latest_annual("ResearchAndDevelopmentExpense", "USD"),
             "net_income": latest_annual("NetIncomeLoss", "USD"),
+            "cash": latest_annual("CashAndCashEquivalentsAtCarryingValue", "USD"),
+            "operating_cash_flow": latest_annual(
+                "NetCashProvidedByUsedInOperatingActivities", "USD"),
             "total_assets": latest_annual("Assets", "USD"),
             "stockholders_equity": latest_annual("StockholdersEquity", "USD"),
             "employees": latest_annual("EntityNumberOfEmployees", "pure", source=dei),

@@ -273,11 +273,11 @@ export default function MapHome() {
               scan.run(name);
               setView("sector");
             }}
-            quick={[
-              { label: "Recent Scan: Oncology", onClick: () => { setSectorDraft("Oncology"); scan.run("Oncology"); setView("sector"); } },
-              { label: "Top Account: Apple", onClick: () => { setCompanyDraft("Apple"); dive.run("Apple"); setView("company"); } },
-              { label: "Browse Companies →", onClick: () => setView("accounts") },
-            ]}
+            onOpenCompanyView={() => setView("company")}
+            onPrefillSector={(name) => {
+              setSectorDraft(name);
+              setView("sector");
+            }}
           />
         </div>
 

@@ -19,6 +19,7 @@ from datetime import datetime
 from typing import Dict, List, Any
 
 from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS
+from aria_pi.clients.clinicaltrials_client import summarize_phases, unc_site_stats
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
@@ -380,7 +381,27 @@ class ReportBuilder:
         if rd.get("value"):
             parts.append(f"R&D: {_fmt_usd(rd['value'])}.")
         parts.append(f"{len(trials)} active trials.")
+
+        # Phase breakdown derived from the trials already in memory.
+        phase_summary = summarize_phases(trials)
+        if phase_summary:
+            ordered = sorted(phase_summary.items(), key=_phase_sort_key, reverse=True)
+            parts.append("**Pipeline:** " +
+                         ", ".join(f"{n}× {ph}" for ph, n in ordered) + ".")
+
         overview_text = " ".join(parts)
+
+        # UNC facility flag — banner goes at the very top of the profile text.
+        unc_trial_site, unc_trial_count = unc_site_stats(trials)
+        if unc_trial_site:
+            overview_text = (
+                f"🔬 **Active UNC Trial Site** — {unc_trial_count} registered "
+                f"trial(s) located at UNC / Chapel Hill facilities. "
+            ) + overview_text
+
+        financial_flag = _financial_flag(facts.get("xbrl") or {})
+        if financial_flag:
+            overview_text += " " + financial_flag
 
         pipeline = []
         for t in trials[:8]:
@@ -511,6 +532,10 @@ class ReportBuilder:
         return {
             "company_name": c["name"],
             "sector_tag": sector_tag,
+            "phase_summary": phase_summary,
+            "unc_trial_site": unc_trial_site,
+            "unc_trial_count": unc_trial_count,
+            "financial_flag": financial_flag,
             "nc_based": nc_based,
             "trends": {
                 "revenue": xbrl_series.get("revenue") or [],
@@ -885,6 +910,36 @@ def _facts_table(facts, ticker, exchange, rev, rd, net, assets, emp, edgar_url) 
         add("employees", f"{int(emp['value']):,} (FY{emp.get('fy')})",
             emp.get("url", edgar_url))
     return rows
+
+
+def _phase_sort_key(item) -> tuple:
+    """Sort phase buckets highest phase first; 'Not Applicable' sinks last."""
+    label = item[0]
+    if not label.startswith("Phase") and not label.startswith("Early"):
+        return (-1.0, label)
+    if label.startswith("Early"):
+        return (0.5, label)
+    nums = [float(n) for n in label.replace("Phase", "").strip().split("/")
+            if n.replace(".", "").isdigit()]
+    return (max(nums) if nums else -1.0, label)
+
+
+def _financial_flag(xbrl: dict):
+    """Cash-runway warning from the XBRL facts already on the profile.
+
+    None unless both cash and operating cash flow are present, OCF is
+    negative, and runway (cash / |OCF|) is under 1.5 years.
+    """
+    cash = (xbrl.get("cash") or {}).get("value")
+    ocf = (xbrl.get("operating_cash_flow") or {}).get("value")
+    if not cash or not ocf:
+        return None
+    if ocf >= 0:
+        return None
+    if cash / abs(ocf) < 1.5:
+        return ("⚠️ **Verify financial stability before outreach** — estimated "
+                "cash runway under 18 months based on most recent annual filing.")
+    return None
 
 
 def _fmt_unc_org(org: str) -> str:
