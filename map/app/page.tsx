@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { onAuthStateChanged } from "firebase/auth";
 import Intro from "@/components/Intro";
-import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
+import AuthGate, { clearSession, getSession, roleForEmail, type MapUser } from "@/components/AuthGate";
+import { getFirebaseAuth } from "@/lib/firebase";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
@@ -206,6 +208,32 @@ function SubNav({ view, onChange }: { view: View; onChange: (v: View) => void })
 export default function MapHome() {
   const [showIntro, setShowIntro] = useState(true);
   const [user, setUser] = useState<MapUser | null>(null);
+
+  // Persistent login: restore a prior session on load so a signed-in account
+  // survives refresh instead of being re-shown the auth gate. We trust the
+  // device-local session first (covers email + guest), then fall back to a
+  // Firebase OAuth session (Google / Microsoft) the SDK persists itself.
+  useEffect(() => {
+    const saved = getSession();
+    if (saved) {
+      setUser(saved);
+      return;
+    }
+    const auth = getFirebaseAuth();
+    if (!auth) return;
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser && !getSession()) {
+        const email = fbUser.email || "";
+        setUser({
+          email: email || "user",
+          guest: false,
+          role: roleForEmail(email),
+          name: fbUser.displayName || undefined,
+        });
+      }
+    });
+    return unsub;
+  }, []);
   const [view, setView] = useState<View>("dashboard");
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
@@ -356,6 +384,9 @@ export default function MapHome() {
             user={user}
             onSignOut={() => {
               clearSession();
+              // Also end any Firebase OAuth session so the persistent-login
+              // listener doesn't immediately restore the user.
+              getFirebaseAuth()?.signOut().catch(() => {});
               setUser(null);
               setView("dashboard");
             }}
