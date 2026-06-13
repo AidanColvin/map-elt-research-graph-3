@@ -7,7 +7,9 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-const BACKEND_URL = process.env.BACKEND_API_URL || 'https://aria-pi-api.vercel.app';
+// See app/api/run-pipeline/route.ts for why this is the "map-backend" domain
+// and not the stale "aria-pi-api" project.
+const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.vercel.app';
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
 export async function POST(req: NextRequest) {

@@ -6,8 +6,28 @@ to catch UNC↔industry co-authored publications, which are the primary
 public signal of an existing research relationship.
 """
 import requests
+import time
+import threading
 from typing import List
 import xml.etree.ElementTree as ET
+
+# NCBI E-utilities cap keyless clients at ~3 requests/sec/IP. A process-wide
+# throttle (lock + min interval) keeps every PubMed request — even across the
+# concurrent threads the resolvers use — under that limit, so bursts no longer
+# get 429'd and silently return empty.
+_NCBI_LOCK = threading.Lock()
+_NCBI_MIN_INTERVAL = 0.35
+_ncbi_last = [0.0]
+
+
+def _ncbi_throttle() -> None:
+    """takes: nothing; does: blocks until >= _NCBI_MIN_INTERVAL has elapsed since
+    the previous NCBI request (process-wide); returns: nothing."""
+    with _NCBI_LOCK:
+        wait = _NCBI_MIN_INTERVAL - (time.monotonic() - _ncbi_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        _ncbi_last[0] = time.monotonic()
 
 ESEARCH = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
 ESUMMARY = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi"
@@ -106,6 +126,7 @@ class PubMedClient:
             params["api_key"] = self.api_key
 
         try:
+            _ncbi_throttle()
             r = requests.get(ESEARCH, params=params, timeout=self.timeout)
             r.raise_for_status()
             ids = (r.json().get("esearchresult") or {}).get("idlist") or []
@@ -128,6 +149,7 @@ class PubMedClient:
             sp["api_key"] = self.api_key
 
         try:
+            _ncbi_throttle()
             r = requests.get(ESUMMARY, params=sp, timeout=self.timeout)
             r.raise_for_status()
             result = r.json().get("result") or {}

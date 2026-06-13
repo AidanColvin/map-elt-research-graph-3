@@ -1,0 +1,42 @@
+rules_version = '2';
+
+// Cloud Firestore security rules for Map's per-user saved reports.
+//
+// Privacy model: a saved company/sector report belongs to exactly one signed-in
+// account and is stored under users/{uid}/savedReports/{id}. These rules make
+// that isolation enforceable server-side — a user can read and write ONLY their
+// own documents, and no client can ever reach another account's data. Guests
+// never write here at all (they have no uid; the app keeps their data device-
+// local in localStorage).
+//
+// Deploy with: `firebase deploy --only firestore:rules` (Firebase CLI), or paste
+// into Firebase console → Firestore Database → Rules. Until deployed, the app
+// still works: every Firestore call is best-effort and falls back to per-user
+// device-local storage (see lib/savedReports.ts), so nothing breaks.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // A user's own saved reports — readable and writable only by that user.
+    match /users/{userId}/savedReports/{reportId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+
+    // Project folders and the company report snapshots saved inside them —
+    // same per-user isolation: readable and writable only by their owner.
+    match /users/{userId}/projects/{projectId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+    match /users/{userId}/saved_profiles/{profileId} {
+      allow read, write: if request.auth != null
+                         && request.auth.uid == userId;
+    }
+
+    // Default deny: nothing else is accessible.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,6 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signInWithPopup,
+  GoogleAuthProvider,
+  OAuthProvider,
+} from "firebase/auth";
+import { firebaseEnabled, getFirebaseAuth } from "@/lib/firebase";
 
 /**
  * Keyless auth gate shown after the intro animation.
@@ -14,10 +22,36 @@ import { useState } from "react";
  * - "Continue as guest" sets a guest session and proceeds.
  */
 
-export type MapUser = { email: string; guest: boolean };
+export type MapRole = "developer" | "user";
+export type MapUser = {
+  email: string;
+  guest: boolean;
+  role: MapRole;
+  // Optional display name (e.g. from a Google profile).
+  name?: string;
+  // The plaintext password is held ONLY in memory for the current session so
+  // the account page can show/copy it; it is never written to storage.
+  password?: string;
+};
 
 const USERS_KEY = "map.users";
 const SESSION_KEY = "map.session";
+
+// Emails granted the "developer" role come from a public env var (kept out of
+// the source); every other account is a "user".
+const DEVELOPER_EMAILS = new Set<string>(
+  (process.env.NEXT_PUBLIC_DEVELOPER_EMAILS || "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase())
+    .filter(Boolean),
+);
+
+// takes: an email address (any case)
+// does: classifies the account — developer for listed emails, else user
+// returns: the account's MapRole
+export function roleForEmail(email: string): MapRole {
+  return DEVELOPER_EMAILS.has(email.trim().toLowerCase()) ? "developer" : "user";
+}
 
 export function getSession(): MapUser | null {
   try {
@@ -112,6 +146,17 @@ const S = {
   } as React.CSSProperties,
 };
 
+function MicrosoftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden>
+      <path fill="#F25022" d="M1 1h10v10H1z" />
+      <path fill="#7FBA00" d="M12 1h10v10H12z" />
+      <path fill="#00A4EF" d="M1 12h10v10H1z" />
+      <path fill="#FFB900" d="M12 12h10v10H12z" />
+    </svg>
+  );
+}
+
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
@@ -123,17 +168,6 @@ function GoogleIcon() {
   );
 }
 
-function MicrosoftIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden>
-      <rect x="1" y="1" width="10" height="10" fill="#F25022" />
-      <rect x="12" y="1" width="10" height="10" fill="#7FBA00" />
-      <rect x="1" y="12" width="10" height="10" fill="#00A4EF" />
-      <rect x="12" y="12" width="10" height="10" fill="#FFB900" />
-    </svg>
-  );
-}
-
 export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -141,14 +175,41 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
+  // takes: the signed-in MapUser (may include an in-memory password)
+  // does: persists a sanitized session (never the password) and hands the
+  //       full in-memory user to the app
+  // returns: nothing
   function finish(user: MapUser) {
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      const { password, ...safe } = user;
+      localStorage.setItem(SESSION_KEY, JSON.stringify(safe));
     } catch {}
     onDone(user);
   }
 
-  function submit(e: React.FormEvent) {
+  // takes: a Firebase auth error
+  // does: maps common Firebase error codes to a friendly message
+  // returns: a human-readable error string
+  function prettyError(err: any): string {
+    const code = err?.code || "";
+    if (code.includes("invalid-credential") || code.includes("wrong-password"))
+      return "Incorrect email or password.";
+    if (code.includes("email-already-in-use"))
+      return "An account already exists for this email. Log in instead.";
+    if (code.includes("user-not-found")) return "No account found. Create one first.";
+    if (code.includes("weak-password")) return "Password must be at least 6 characters.";
+    if (code.includes("popup-closed")) return "Sign-in was cancelled.";
+    if (code.includes("unauthorized-domain"))
+      return "This site isn't an authorized Firebase domain yet.";
+    return err?.message?.replace("Firebase:", "").trim() || "Authentication failed.";
+  }
+
+  // takes: a form submit event
+  // does: signs in / signs up via Firebase when configured (real, secure
+  //       accounts); otherwise uses the keyless browser-local fallback where a
+  //       new email registers and an existing one is password-verified
+  // returns: nothing (async)
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setNotice("");
@@ -156,26 +217,73 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     if (!/^\S+@\S+\.\S+$/.test(em)) return setError("Enter a valid email address.");
     if (password.length < 6) return setError("Password must be at least 6 characters.");
 
+    const auth = getFirebaseAuth();
+    if (auth) {
+      try {
+        const cred =
+          mode === "signup"
+            ? await createUserWithEmailAndPassword(auth, em, password)
+            : await signInWithEmailAndPassword(auth, em, password);
+        finish({
+          email: cred.user.email || em,
+          guest: false,
+          role: roleForEmail(em),
+          name: cred.user.displayName || undefined,
+          password,
+        });
+      } catch (err) {
+        setError(prettyError(err));
+      }
+      return;
+    }
+
+    // Keyless browser-local fallback.
     const users = loadUsers();
-    if (mode === "signup") {
-      if (users[em]) return setError("An account with this email already exists. Log in instead.");
+    const existing = users[em];
+    if (existing === undefined) {
       users[em] = password;
       try {
         localStorage.setItem(USERS_KEY, JSON.stringify(users));
       } catch {}
-      finish({ email: em, guest: false });
-    } else {
-      if (!users[em]) return setError("No account found for this email. Sign up first.");
-      if (users[em] !== password) return setError("Incorrect password.");
-      finish({ email: em, guest: false });
+      finish({ email: em, guest: false, role: roleForEmail(em), password });
+      return;
     }
+    if (existing !== password) {
+      return setError("Incorrect password for this account. Try again.");
+    }
+    finish({ email: em, guest: false, role: roleForEmail(em), password });
   }
 
-  function oauthNotice(provider: string) {
+  // takes: "Google" or "Microsoft"
+  // does: runs the real OAuth popup for the chosen provider via Firebase when
+  //       configured; otherwise shows the no-keys notice
+  // returns: nothing (async)
+  async function oauthSignIn(provider: "Google" | "Microsoft") {
     setError("");
-    setNotice(
-      `${provider} sign-in needs an OAuth app registration (client ID) to work — this deployment runs with no keys. Use email or continue as guest.`,
-    );
+    setNotice("");
+    const auth = getFirebaseAuth();
+    if (!auth) {
+      setNotice(
+        `${provider} sign-in needs Firebase configured (it isn't on this deployment yet). Use email or continue as guest.`,
+      );
+      return;
+    }
+    const p =
+      provider === "Microsoft"
+        ? new OAuthProvider("microsoft.com")
+        : new GoogleAuthProvider();
+    try {
+      const cred = await signInWithPopup(auth, p);
+      const em = (cred.user.email || "").toLowerCase();
+      finish({
+        email: cred.user.email || provider,
+        guest: false,
+        role: roleForEmail(em),
+        name: cred.user.displayName || undefined,
+      });
+    } catch (err) {
+      setError(prettyError(err));
+    }
   }
 
   return (
@@ -188,10 +296,11 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           </div>
         </div>
 
-        <button style={S.oauth} onClick={() => oauthNotice("Google")}>
+        <button style={S.oauth} onClick={() => oauthSignIn("Google")}>
           <GoogleIcon /> Continue with Google
         </button>
-        <button style={S.oauth} onClick={() => oauthNotice("Microsoft")}>
+
+        <button style={S.oauth} onClick={() => oauthSignIn("Microsoft")}>
           <MicrosoftIcon /> Continue with Microsoft
         </button>
 
@@ -256,13 +365,14 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           )}
         </div>
 
-        <button style={S.ghost} onClick={() => finish({ email: "guest", guest: true })}>
+        <button style={S.ghost} onClick={() => finish({ email: "guest", guest: true, role: "user" })}>
           Continue as guest →
         </button>
 
         <div style={{ color: "#a3a3a3", fontSize: 11.5, textAlign: "center", marginTop: 16, lineHeight: 1.5 }}>
-          Accounts are stored only in this browser (localStorage). No server,
-          no database, no API keys.
+          {firebaseEnabled
+            ? "Secured by Firebase Authentication — passwords are hashed and stored by Google, never by this app."
+            : "Accounts are stored only in this browser (localStorage). No server, no database, no API keys."}
         </div>
       </div>
     </main>

@@ -164,3 +164,52 @@ def test_collaborators_and_facilities_truncated_to_six():
         t = client.search_by_sponsor("Moderna")[0]
     assert len(t["collaborators"]) == 6
     assert len(t["facilities"]) == 6
+
+
+def test_summarize_phases_buckets_and_combines():
+    """
+    Takes: Trials with single, combined, NA, and missing phase data.
+    Does: Summarizes them.
+    Returns: Counts per display bucket; combined phases join their numbers.
+    """
+    from aria_pi.clients.clinicaltrials_client import summarize_phases
+    trials = [
+        {"phases": ["PHASE1"]},
+        {"phases": ["PHASE1", "PHASE2"]},
+        {"phases": ["PHASE3"]},
+        {"phases": ["NA"]},
+        {"phases": []},
+    ]
+    assert summarize_phases(trials) == {
+        "Phase 1": 1, "Phase 1/2": 1, "Phase 3": 1, "Not Applicable": 2,
+    }
+
+
+def test_summarize_phases_empty_and_legacy_phase_string():
+    """
+    Takes: An empty trial list, and a trial with only the joined phase string.
+    Does: Summarizes both.
+    Returns: {} for empty; the string form falls back to splitting on commas.
+    """
+    from aria_pi.clients.clinicaltrials_client import summarize_phases
+    assert summarize_phases([]) == {}
+    assert summarize_phases([{"phase": "PHASE2, PHASE3"}]) == {"Phase 2/3": 1}
+
+
+def test_unc_site_stats_counts_facility_matches_only():
+    """
+    Takes: Trials with UNC, non-UNC, and missing facility lists.
+    Does: Computes the UNC trial-site flag and count.
+    Returns: (True, 2) — only facility names count, missing data skipped.
+    """
+    from aria_pi.clients.clinicaltrials_client import unc_site_stats
+    trials = [
+        {"facilities": ["UNC Lineberger Comprehensive Cancer Center"]},
+        {"facilities": ["University of North Carolina at Chapel Hill"]},
+        {"facilities": ["Mayo Clinic"]},
+        {"facilities": []},
+        {},
+    ]
+    assert unc_site_stats(trials) == (True, 2)
+    assert unc_site_stats([{"facilities": ["Mayo Clinic"]}]) == (False, 0)
+    assert unc_site_stats([]) == (False, 0)

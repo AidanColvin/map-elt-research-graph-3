@@ -25,6 +25,7 @@ from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
 from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.nih_reporter_client import NIHReporterClient
+from aria_pi.clients.patents import fetch_patents, EMPTY as EMPTY_PATENTS
 from aria_pi.builders.report_builder import ReportBuilder
 from aria_pi.utils.source_tagger import SourceTagger
 from aria_pi.sectors import (
@@ -53,6 +54,11 @@ class PipelineRequest(BaseModel):
     sector: str
     companies: Optional[List[str]] = None
     company_override: Optional[str] = None  # legacy
+
+
+class PartnershipRequest(BaseModel):
+    query: str
+    type: str = "company"  # "company" | "sector"
 
 
 @app.get("/")
@@ -108,6 +114,28 @@ async def run_pipeline(req: PipelineRequest):
             headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/partnerships")
+async def partnerships(req: PartnershipRequest):
+    """Resolve verifiable UNC ↔ company/sector partnership evidence.
+
+    Accepts { query, type } and returns source-linked clinical (PubMed),
+    financial (verbatim SEC text), and university-ecosystem (unc.edu) data.
+    No AI summaries — every fact carries its primary source.
+    """
+    try:
+        from aria_pi.clients.partnership_resolver import resolve_partnerships
+        kind = req.type if req.type in ("company", "sector") else "company"
+        data = resolve_partnerships(req.query, kind)
+        return JSONResponse(
+            content={"status": "COMPLETED", "data": data},
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -250,7 +278,8 @@ def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
 def _empty_company(name: str) -> dict:
     return {"name": name, "facts": {"legal_name": name, "source": "https://www.sec.gov"},
             "trials": [], "unc_trials": [], "pubmed": [], "pubmed_coi": [],
-            "nih_grants": [], "unc_alumni": []}
+            "nih_grants": [], "unc_alumni": [],
+            "patents": dict(EMPTY_PATENTS), "collab_8ks": {}, "tenk_text": ""}
 
 
 def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
@@ -270,8 +299,9 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
     defaults = {
         "facts": {"legal_name": name, "source": "https://www.sec.gov"},
         "trials": [], "pubmed": [], "nih_grants": [],
+        "patents": dict(EMPTY_PATENTS),
     }
-    with ThreadPoolExecutor(max_workers=4) as pool:
+    with ThreadPoolExecutor(max_workers=5) as pool:
         futures = {
             "facts": pool.submit(safe,
                 lambda: sec.get_company_facts(name), "SEC", defaults["facts"]),
@@ -283,6 +313,8 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             "nih_grants": pool.submit(safe,
                 lambda: nih.unc_grants_mentioning(name, max_results=8),
                 "NIH Reporter", []),
+            "patents": pool.submit(safe,
+                lambda: fetch_patents(name), "Patents", defaults["patents"]),
         }
         results = {}
         for k, f in futures.items():
@@ -312,6 +344,17 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "Alumni-web", [],
     )
 
+    # CIK-dependent enrichment runs after facts, like the alumni fetches:
+    # 8-K collaboration track record + latest 10-K narrative text.
+    collab_8ks = safe(
+        lambda: sec.fetch_collaboration_8ks(cik), "Collab-8K", {},
+    ) if cik else {}
+    tenk_text = safe(
+        lambda: sec.get_tenk_text(
+            cik, results["facts"].get("filings_by_form") or {}),
+        "10-K text", "",
+    ) if cik else ""
+
     # Merge, deduplicating by lowercased name
     seen_names: set = {p["name"].lower().strip() for p in proxy_alumni}
     merged = list(proxy_alumni)
@@ -331,6 +374,9 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "pubmed_coi": [],
         "nih_grants": results["nih_grants"],
         "unc_alumni": unc_alumni,
+        "patents": results["patents"] or dict(EMPTY_PATENTS),
+        "collab_8ks": collab_8ks or {},
+        "tenk_text": tenk_text or "",
     }
 
 

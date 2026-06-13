@@ -1,6 +1,6 @@
 "use client";
 
-import { SECTORS } from "./sectors";
+import { getSectorSuggestion } from "./sectors";
 import { getCompanySuggestion } from "./companySuggestions";
 
 /**
@@ -99,9 +99,9 @@ export function CompanyActionBar({
   );
 }
 
-// takes: controlled value/onChange for the chosen sector, onRun(sector), busy
-// does: renders the Sector Scan command row — a clean sector dropdown with a
-//       refined tinted action trigger
+// takes: controlled value/onChange for the typed sector, onRun(sector), busy
+// does: renders the Sector Scan command row — a free-text sector input with an
+//       inline gray ghost-text prediction and a refined tinted trigger
 // returns: the sector action-bar element
 export function SectorActionBar({
   value,
@@ -114,30 +114,63 @@ export function SectorActionBar({
   onRun: (sector: string) => void;
   busy: boolean;
 }) {
+  const suggestion = getSectorSuggestion(value);
+  const ghostSuffix = suggestion ? suggestion.slice(value.length) : "";
+
   // takes: a form submit event
-  // does: prevents the default post and hands the chosen sector to onRun
+  // does: scans the completed suggestion if one is showing, else the typed
+  //       text — so pressing Enter on "tech" runs the full "Technology"
   // returns: nothing
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    if (!busy) onRun(value);
+    const target = suggestion ?? value;
+    if (!busy && target.trim()) {
+      if (suggestion) onChange(suggestion);
+      onRun(target);
+    }
+  }
+
+  // takes: a keydown event on the input
+  // does: accepts the ghost (without submitting) on Tab or Right-arrow-at-end
+  // returns: nothing
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!suggestion) return;
+    const atEnd = e.currentTarget.selectionStart === value.length;
+    if (e.key === "Tab" || (e.key === "ArrowRight" && atEnd)) {
+      e.preventDefault();
+      onChange(suggestion);
+    }
   }
 
   return (
     <form style={rowStyle} onSubmit={submit}>
-      <select
-        className="ws-input"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        aria-label="Sector"
-        style={{ flex: 1 }}
+      <div
+        style={{
+          position: "relative",
+          flex: 1,
+          background: "rgba(255,255,255,0.85)",
+          borderRadius: 14,
+        }}
       >
-        {SECTORS.map((s) => (
-          <option key={s} value={s}>
-            {s}
-          </option>
-        ))}
-      </select>
-      <button type="submit" className="ws-btn" disabled={busy}>
+        {ghostSuffix && (
+          <div className="ws-ghost" aria-hidden>
+            <span style={{ color: "transparent" }}>{value}</span>
+            <span style={{ color: "#b6b6bc" }}>{ghostSuffix}</span>
+          </div>
+        )}
+        <input
+          className="ws-input"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Search any sector — Technology, Oncology, Fintech…"
+          aria-label="Sector"
+          autoComplete="off"
+          spellCheck={false}
+          style={{ position: "relative", background: "transparent", width: "100%" }}
+        />
+      </div>
+      <button type="submit" className="ws-btn" disabled={busy || !value.trim()}>
         {busy ? "Scanning…" : "Scan"}
       </button>
     </form>
