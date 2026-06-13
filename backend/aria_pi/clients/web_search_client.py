@@ -44,3 +44,22 @@ class WebSearchClient:
         except Exception as e:
             print(f"Tavily Search error: {e}")
             return []
+
+    def search_unc_site_mentions(self, company_name: str) -> list[dict]:
+        """
+        Takes: company_name as a string.
+        Does: searches official UNC web pages (`site:unc.edu "<company>"`) for
+              press releases, lab pages, or partnership mentions. Returns an
+              empty list when no real search key is configured (no mock data, so
+              the University Ecosystem card only ever shows verifiable links).
+        Returns: a list of result dictionaries with title and URL.
+        """
+        if not self.client:
+            return []
+        try:
+            query = f'site:unc.edu "{company_name}"'
+            response = self.client.search(query=query, search_depth="basic", max_results=5)
+            return response.get("results", [])
+        except Exception as e:
+            print(f"Tavily UNC-site search error: {e}")
+            return []
