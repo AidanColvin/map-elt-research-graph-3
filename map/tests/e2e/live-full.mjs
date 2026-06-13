@@ -104,9 +104,12 @@ try {
     await view().locator('button:has-text("Excel"), button:has-text("PDF"), button:has-text("Download")').first().waitFor({ state: 'visible', timeout: 5000 });
   });
 
-  await check('partnerships: nav -> Company search Apple -> 3 cards', async () => {
+  await check('partnerships: nav -> Company search Apple -> 3 cards (no intro replay)', async () => {
     await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
-    await page.waitForURL('**/partnerships', { timeout: 15000 });
+    await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
+    const body = await page.locator('body').innerText();
+    if (body.includes('Click to skip') || body.includes('MAPPING ARCHITECTURE PLATFORM'))
+      throw new Error('intro splash replayed on Partnerships navigation');
     await page.getByRole('tab', { name: /company/i }).click();
     await page.getByLabel('Partnership search').fill('Apple');
     await page.getByRole('button', { name: /^Search$/ }).click();

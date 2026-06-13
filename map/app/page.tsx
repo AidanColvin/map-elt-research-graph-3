@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
@@ -9,6 +8,7 @@ import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
+import PartnershipsView from "@/components/workspace/PartnershipsView";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { useSavedReports } from "@/components/workspace/useSavedReports";
@@ -17,7 +17,7 @@ import { FONT } from "@/components/workspace/ui";
 const HEADER_H = 52;
 const SUBNAV_H = 44;
 
-type View = "dashboard" | "company" | "sector" | "accounts" | "account";
+type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "account";
 
 // The sub-nav routes (the "account" view is reached via the Profile button,
 // not the sub-nav, so it's intentionally not listed here). Display text for
@@ -28,6 +28,7 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "company", label: "Company Profile" },
   { key: "sector", label: "Sector Scan" },
   { key: "accounts", label: "Companies" },
+  { key: "partnerships", label: "Partnerships" },
 ];
 
 // takes: an optional pixel size
@@ -191,11 +192,6 @@ function SubNav({ view, onChange }: { view: View; onChange: (v: View) => void })
           {v.label}
         </button>
       ))}
-      {/* Partnerships is a dedicated route, so it navigates rather than toggling
-          a mounted view. Same nav styling as the workspace tabs. */}
-      <Link href="/partnerships" className="ws-nav-item">
-        Partnerships
-      </Link>
     </nav>
   );
 }
@@ -332,6 +328,20 @@ export default function MapHome() {
           }}
         >
           <AccountsCanvas />
+        </div>
+
+        {/* Partnerships is an in-app view (not a route), so switching to it
+            never reloads the page — the intro splash only plays on a genuine
+            page load (first open / hard refresh), never on navigation. */}
+        <div
+          className="ws-view"
+          style={{
+            display: view === "partnerships" ? "block" : "none",
+            maxWidth: 1100,
+            margin: "0 auto",
+          }}
+        >
+          <PartnershipsView />
         </div>
 
         <div
