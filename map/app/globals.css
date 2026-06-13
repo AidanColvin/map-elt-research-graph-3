@@ -1049,7 +1049,16 @@ select.ws-input {
   padding: 6px 14px;
   border-radius: 999px;
   cursor: pointer;
+  /* Nav items render as both <button> and <a> (the Partnerships route link);
+     anchors must never show the default underline, in any state. */
+  text-decoration: none;
   transition: color 0.18s ease, background 0.18s ease;
+}
+.ws-nav-item:hover,
+.ws-nav-item:focus,
+.ws-nav-item:active,
+.ws-nav-item:visited {
+  text-decoration: none;
 }
 .ws-nav-item:hover {
   color: #1d1d1f;
