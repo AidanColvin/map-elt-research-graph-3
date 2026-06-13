@@ -17,6 +17,40 @@ from typing import List
 
 ENDPOINT = "https://api.reporter.nih.gov/v2/projects/search"
 
+_UNC_ORG_KEYWORDS = ("north carolina", "unc", "chapel hill")
+
+
+def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
+    """Named UNC contacts from grants already fetched — no new query.
+
+    Filters the grants' PI/organization data (already extracted by
+    unc_grants_mentioning) to UNC-affiliated orgs, dedupes by PI name, and
+    returns up to `limit` contacts. Never raises — returns [] on bad input.
+    """
+    pis: List[dict] = []
+    seen: set = set()
+    try:
+        for g in grants or []:
+            name = (g.get("pi") or "").strip()
+            org = (g.get("organization") or g.get("department") or "").strip()
+            if not name or name.lower() in seen:
+                continue
+            if not any(kw in org.lower() for kw in _UNC_ORG_KEYWORDS):
+                continue
+            seen.add(name.lower())
+            pis.append({
+                "name": name,
+                "org": org,
+                "project_title": g.get("title") or "",
+                "grant_url": g.get("url") or "https://reporter.nih.gov",
+            })
+            if len(pis) >= limit:
+                break
+    except Exception as e:
+        print(f"UNC PI extraction error: {e}")
+        return []
+    return pis
+
 
 class NIHReporterClient:
     def __init__(self):

@@ -9,6 +9,7 @@ export type DeepDiveState = {
   markdown: string;
   status: DeepDiveStatus;
   run: (name: string) => void;
+  loadSaved: (company: string, markdown: string) => void;
 };
 
 // takes: nothing (React hook)
@@ -64,5 +65,16 @@ export function useDeepDive(): DeepDiveState {
     }
   }
 
-  return { company, markdown, status, run };
+  // takes: a company name and previously-saved markdown
+  // does: shows a saved report instantly without any network call, cancelling
+  //       any in-flight stream — the caller re-verifies freshness separately
+  // returns: nothing (updates hook state)
+  function loadSaved(name: string, saved: string) {
+    abortRef.current?.abort();
+    setCompany(name);
+    setMarkdown(saved);
+    setStatus("done");
+  }
+
+  return { company, markdown, status, run, loadSaved };
 }

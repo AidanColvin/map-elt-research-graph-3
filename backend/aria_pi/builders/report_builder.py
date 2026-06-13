@@ -19,6 +19,16 @@ from datetime import datetime
 from typing import Dict, List, Any
 
 from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS
+from aria_pi.clients.clinicaltrials_client import summarize_phases, unc_site_stats
+from aria_pi.clients.nih_reporter_client import unc_pis_from_grants
+
+# 10-K partnership-language scoring (Signal 4) — counted in memory over the
+# narrative text the orchestrator already fetched; no calls from the builder.
+PARTNERSHIP_TERMS = [
+    "collaboration", "license", "licensing", "research agreement",
+    "sponsored research", "university", "academic", "alliance",
+    "joint venture", "co-development", "partnership",
+]
 
 DATA_DIR = os.path.join(os.path.dirname(__file__), "..", "data")
 
@@ -380,7 +390,62 @@ class ReportBuilder:
         if rd.get("value"):
             parts.append(f"R&D: {_fmt_usd(rd['value'])}.")
         parts.append(f"{len(trials)} active trials.")
+
+        # Phase breakdown derived from the trials already in memory.
+        phase_summary = summarize_phases(trials)
+        if phase_summary:
+            ordered = sorted(phase_summary.items(), key=_phase_sort_key, reverse=True)
+            parts.append("**Pipeline:** " +
+                         ", ".join(f"{n}× {ph}" for ph, n in ordered) + ".")
+
         overview_text = " ".join(parts)
+
+        # UNC facility flag — banner goes at the very top of the profile text.
+        unc_trial_site, unc_trial_count = unc_site_stats(trials)
+        if unc_trial_site:
+            overview_text = (
+                f"🔬 **Active UNC Trial Site** — {unc_trial_count} registered "
+                f"trial(s) located at UNC / Chapel Hill facilities. "
+            ) + overview_text
+
+        financial_flag = _financial_flag(facts.get("xbrl") or {})
+        if financial_flag:
+            overview_text += " " + financial_flag
+
+        # ── Four optional data signals; each inserts nothing when absent ──
+        collab_8ks = c.get("collab_8ks") or {}
+        collab_count = collab_8ks.get("collaboration_8k_count") or 0
+        if collab_count > 0:
+            overview_text += (
+                f" **Deal track record:** {collab_count} collaboration or "
+                f"licensing filing(s) in the past 2 years. Most recent: "
+                f"{collab_8ks.get('most_recent_8k_date')}. "
+                f"[SEC filing →]({collab_8ks.get('collaboration_8k_url')})")
+
+        unc_pis = unc_pis_from_grants(c.get("nih_grants") or [])
+        for pi_contact in unc_pis:
+            overview_text += (
+                f" **Potential UNC contacts:** {pi_contact['name']} "
+                f"({pi_contact['org']}) — "
+                f"[{pi_contact['project_title']} →]({pi_contact['grant_url']})")
+
+        patents = c.get("patents") or {}
+        patent_count = patents.get("patent_count") or 0
+        if patent_count > 0:
+            overview_text += (
+                f" **IP portfolio:** {patent_count} patents "
+                f"({patents.get('recent_patent_count') or 0} filed in last 3 "
+                f"years). Top technology areas: "
+                f"{', '.join(patents.get('top_categories') or []) or 'n/a'}. "
+                f"[PatentsView →]({patents.get('patents_url')})")
+
+        partnership_language, partnership_term_count, top_term, top_term_n = (
+            _partnership_language(c.get("tenk_text") or ""))
+        if partnership_language:
+            overview_text += (
+                f" **Partnership language:** {partnership_language} — "
+                f"\"{top_term}\" appears {top_term_n} times in company's own "
+                f"10-K filing.")
 
         pipeline = []
         for t in trials[:8]:
@@ -511,6 +576,21 @@ class ReportBuilder:
         return {
             "company_name": c["name"],
             "sector_tag": sector_tag,
+            "phase_summary": phase_summary,
+            "unc_trial_site": unc_trial_site,
+            "unc_trial_count": unc_trial_count,
+            "financial_flag": financial_flag,
+            "collaboration_8k_count": collab_count,
+            "most_recent_8k_date": collab_8ks.get("most_recent_8k_date"),
+            "most_recent_8k_description": collab_8ks.get("most_recent_8k_description"),
+            "collaboration_8k_url": collab_8ks.get("collaboration_8k_url"),
+            "unc_pis": unc_pis,
+            "patent_count": patent_count,
+            "recent_patent_count": patents.get("recent_patent_count") or 0,
+            "top_categories": patents.get("top_categories") or [],
+            "patents_url": patents.get("patents_url") or "",
+            "partnership_language": partnership_language,
+            "partnership_term_count": partnership_term_count,
             "nc_based": nc_based,
             "trends": {
                 "revenue": xbrl_series.get("revenue") or [],
@@ -885,6 +965,58 @@ def _facts_table(facts, ticker, exchange, rev, rd, net, assets, emp, edgar_url) 
         add("employees", f"{int(emp['value']):,} (FY{emp.get('fy')})",
             emp.get("url", edgar_url))
     return rows
+
+
+def _phase_sort_key(item) -> tuple:
+    """Sort phase buckets highest phase first; 'Not Applicable' sinks last."""
+    label = item[0]
+    if not label.startswith("Phase") and not label.startswith("Early"):
+        return (-1.0, label)
+    if label.startswith("Early"):
+        return (0.5, label)
+    nums = [float(n) for n in label.replace("Phase", "").strip().split("/")
+            if n.replace(".", "").isdigit()]
+    return (max(nums) if nums else -1.0, label)
+
+
+def _partnership_language(text: str):
+    """Score partnership orientation of the company's own 10-K language.
+
+    Returns (classification, total_count, top_term, top_term_count) where
+    classification is None (<5 hits), "moderate" (5-14), or "strong" (15+).
+    Pure in-memory counting over already-fetched narrative text.
+    """
+    if not text:
+        return (None, 0, None, 0)
+    low = text.lower()
+    counts = {term: low.count(term) for term in PARTNERSHIP_TERMS}
+    # "license" is a prefix of "licensing" — remove the overlap so a single
+    # occurrence of "licensing" isn't counted under both terms.
+    counts["license"] = max(0, counts["license"] - counts["licensing"])
+    total = sum(counts.values())
+    if total < 5:
+        return (None, total, None, 0)
+    top_term = max(counts, key=lambda t: counts[t])
+    label = "strong" if total >= 15 else "moderate"
+    return (label, total, top_term, counts[top_term])
+
+
+def _financial_flag(xbrl: dict):
+    """Cash-runway warning from the XBRL facts already on the profile.
+
+    None unless both cash and operating cash flow are present, OCF is
+    negative, and runway (cash / |OCF|) is under 1.5 years.
+    """
+    cash = (xbrl.get("cash") or {}).get("value")
+    ocf = (xbrl.get("operating_cash_flow") or {}).get("value")
+    if not cash or not ocf:
+        return None
+    if ocf >= 0:
+        return None
+    if cash / abs(ocf) < 1.5:
+        return ("⚠️ **Verify financial stability before outreach** — estimated "
+                "cash runway under 18 months based on most recent annual filing.")
+    return None
 
 
 def _fmt_unc_org(org: str) -> str:

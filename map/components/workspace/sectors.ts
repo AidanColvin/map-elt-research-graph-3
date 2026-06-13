@@ -28,3 +28,18 @@ export const SECTORS = [
   "Insurance",
   "Industrial",
 ];
+
+// takes: the text currently typed into a sector input
+// does: finds the first sector (by list order) that begins with what was
+//       typed (case-insensitive), ignoring an already-complete exact match
+// returns: the full suggested sector name, or null when nothing predicts
+export function getSectorSuggestion(typed: string): string | null {
+  const v = typed.trim().toLowerCase();
+  if (!v) return null;
+  for (const s of SECTORS) {
+    const lower = s.toLowerCase();
+    if (lower === v) return null;
+    if (lower.startsWith(v)) return s;
+  }
+  return null;
+}

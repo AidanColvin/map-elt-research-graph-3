@@ -12,6 +12,7 @@ export type SectorScanState = {
   progress: { done: number; total: number } | null;
   error: string | null;
   run: (sector: string) => void;
+  loadSaved: (sector: string, data: ReportData) => void;
 };
 
 // takes: the accumulated text buffer plus the newly decoded chunk
@@ -154,5 +155,17 @@ export function useSectorScan(): SectorScanState {
     }
   }
 
-  return { sector, data, status, progress, error, run };
+  // takes: a sector name and a previously-saved report
+  // does: shows a saved sector scan instantly with no pipeline call — the
+  //       caller re-verifies freshness separately and re-runs if stale
+  // returns: nothing (updates hook state)
+  function loadSaved(name: string, savedData: ReportData) {
+    setSector(name);
+    setData(savedData);
+    setProgress(null);
+    setError(null);
+    setStatus("done");
+  }
+
+  return { sector, data, status, progress, error, run, loadSaved };
 }

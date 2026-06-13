@@ -86,6 +86,7 @@ class ClinicalTrialsClient:
                 "nct_id": nct_id,
                 "title": ident.get("briefTitle", ""),
                 "phase": ", ".join(design.get("phases") or []),
+                "phases": list(design.get("phases") or []),
                 "status": status_mod.get("overallStatus", ""),
                 "lead_sponsor": lead_sponsor,
                 "collaborators": collaborators[:6],
@@ -94,6 +95,52 @@ class ClinicalTrialsClient:
                 "url": f"https://clinicaltrials.gov/study/{nct_id}",
             })
         return trials
+
+
+def _phase_bucket(phases: List[str]) -> str:
+    """Map a trial's raw phases list to a display bucket.
+
+    Single phases map directly ("PHASE2" → "Phase 2"); combined designations
+    join their numbers ("PHASE1" + "PHASE2" → "Phase 1/2"). Missing, empty,
+    or "NA" phases bucket as "Not Applicable".
+    """
+    nums = sorted({p.replace("PHASE", "").strip()
+                   for p in (phases or [])
+                   if p and p.upper() not in ("NA", "NOT_APPLICABLE")
+                   and p.upper().startswith("PHASE")})
+    # EARLY_PHASE1 and any other non-PHASE* designations count as their own
+    # bucket only when nothing else is present.
+    if not nums:
+        early = [p for p in (phases or []) if (p or "").upper() == "EARLY_PHASE1"]
+        return "Early Phase 1" if early else "Not Applicable"
+    return "Phase " + "/".join(nums)
+
+
+def summarize_phases(trials: List[dict]) -> dict:
+    """Count trials per phase bucket. Empty trial list → {}.
+
+    Works from each trial's raw `phases` list when present, falling back to
+    splitting the joined `phase` display string for older records.
+    """
+    summary: dict = {}
+    for t in trials or []:
+        phases = t.get("phases")
+        if phases is None:
+            phases = [p.strip() for p in (t.get("phase") or "").split(",") if p.strip()]
+        bucket = _phase_bucket(phases)
+        summary[bucket] = summary.get(bucket, 0) + 1
+    return summary
+
+
+def unc_site_stats(trials: List[dict]) -> tuple:
+    """(unc_trial_site, unc_trial_count) from trial facility locations.
+
+    A trial counts when any listed facility looks UNC / Chapel Hill
+    affiliated (same heuristics as _detect_unc — facility names only, not
+    collaborators). Trials with no location data are skipped silently.
+    """
+    count = sum(1 for t in (trials or []) if _detect_unc(t.get("facilities") or []))
+    return (count > 0, count)
 
 
 def _detect_unc(strs: List[str]) -> str:

@@ -1,0 +1,55 @@
+"use client";
+
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
+
+/**
+ * Firebase web config, read from public NEXT_PUBLIC_* env vars. These are
+ * public client identifiers (not secrets). When the apiKey/appId/projectId
+ * are present the app uses real Firebase Auth; otherwise it falls back to the
+ * keyless browser-local gate so the site keeps working with no config.
+ */
+const config = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+};
+
+/** True when enough config is present to use real Firebase authentication. */
+export const firebaseEnabled = Boolean(config.apiKey && config.appId && config.projectId);
+
+// takes: nothing
+// does: lazily initializes the Firebase app once (reusing it on hot reloads)
+//       and returns its Auth instance, or null when Firebase isn't configured
+// returns: a Firebase Auth instance, or null
+export function getFirebaseAuth(): Auth | null {
+  // Firebase Auth is browser-only. Never initialize it during SSR / static
+  // prerender (the web SDK throws auth/invalid-api-key on the server), which
+  // would break `next build`.
+  if (typeof window === "undefined") return null;
+  if (!firebaseEnabled) return null;
+  const app = getApps().length ? getApp() : initializeApp(config);
+  return getAuth(app);
+}
+
+// takes: nothing
+// does: lazily returns the Cloud Firestore instance for the initialized app, or
+//       null when Firebase isn't configured. Callers must still tolerate a null
+//       return and any thrown error (Firestore may be unconfigured in the
+//       project), falling back to device-local storage so the site never breaks.
+// returns: a Firestore instance, or null
+export function getFirebaseDb(): Firestore | null {
+  // Browser-only, for the same reason as getFirebaseAuth above.
+  if (typeof window === "undefined") return null;
+  if (!firebaseEnabled) return null;
+  try {
+    const app = getApps().length ? getApp() : initializeApp(config);
+    return getFirestore(app);
+  } catch {
+    return null;
+  }
+}

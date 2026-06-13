@@ -17,11 +17,15 @@ export default function CompanyLogo({
   domain?: string;
   accent: string;
 }) {
+  // Clearbit's free logo API was retired, so it 404s on every request — its
+  // only effect now is a wasted round-trip and a console error before the real
+  // fallback. Lead with Google's favicon service, which returns a consistent
+  // 128px square for any domain (no tiny 16px favicons that look broken when
+  // scaled up), then DuckDuckGo as a second source, then a monogram.
   const sources = domain
     ? [
-        `https://logo.clearbit.com/${domain}`,
-        `https://icons.duckduckgo.com/ip3/${domain}.ico`,
         `https://www.google.com/s2/favicons?domain=${domain}&sz=128`,
+        `https://icons.duckduckgo.com/ip3/${domain}.ico`,
       ]
     : [];
 

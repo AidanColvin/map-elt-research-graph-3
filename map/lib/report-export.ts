@@ -556,6 +556,189 @@ export async function downloadDocx(rawData: any) {
   saveBlob(blob, `${reportFilename(rawData)}.docx`);
 }
 
+// ════════════════════════════════════════════════════════════════════════════
+// Generic Markdown exports — used by the Company Deep Dive, whose report is a
+// plain Markdown string (not the structured sector ReportData). These accept
+// any Markdown + a title and render directly to PDF / Word / .md, so the same
+// download row can serve any Markdown-based report without DOM capture.
+// ════════════════════════════════════════════════════════════════════════════
+
+// takes: a human title (e.g. a company name)
+// does: turns it into a filesystem-safe base filename
+// returns: a slug like "apple-deep-dive"
+export function markdownExportName(title: string): string {
+  const slug = (title || 'report')
+    .toString().toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'report';
+  return `${slug}-deep-dive`;
+}
+
+// takes: a single line of inline Markdown
+// does: strips inline markers (**bold**, *em*, `code`, [text](url)) down to the
+//       readable plain text used by the PDF/Word renderers
+// returns: the cleaned plain-text string
+function stripInline(s: string): string {
+  return s
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)') // links -> "text (url)"
+    .replace(/\*\*([^*]+)\*\*/g, '$1')               // bold
+    .replace(/\*([^*]+)\*/g, '$1')                   // italics
+    .replace(/`([^`]+)`/g, '$1')                     // inline code
+    .trim();
+}
+
+// takes: a Markdown document string
+// does: parses it into the format-neutral Block[] IR (headings, paragraphs,
+//       bullet lists, and GitHub-style pipe tables) so a single block list can
+//       be rendered to any output format
+// returns: the parsed Block[] list
+export function parseMarkdownBlocks(md: string): Block[] {
+  const lines = (md || '').replace(/\r\n/g, '\n').split('\n');
+  const blocks: Block[] = [];
+  let para: string[] = [];
+  let list: string[] = [];
+
+  const flushPara = () => {
+    if (para.length) { blocks.push({ t: 'p', text: stripInline(para.join(' ')) }); para = []; }
+  };
+  const flushList = () => {
+    if (list.length) { blocks.push({ t: 'list', items: list.map(stripInline) }); list = []; }
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i];
+    const line = raw.trimEnd();
+    const trimmed = line.trim();
+
+    // Pipe table: a header row followed by a |---|---| separator row.
+    if (trimmed.startsWith('|') && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1] || '')) {
+      flushPara(); flushList();
+      const toCells = (r: string) => r.trim().replace(/^\||\|$/g, '').split('|').map((c) => stripInline(c));
+      const headers = toCells(line);
+      const rows: string[][] = [];
+      i += 2; // skip header + separator
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        rows.push(toCells(lines[i])); i++;
+      }
+      i--; // step back; loop will advance
+      blocks.push({ t: 'table', headers, rows });
+      continue;
+    }
+
+    if (!trimmed) { flushPara(); flushList(); continue; }
+    if (/^#{1}\s+/.test(trimmed)) { flushPara(); flushList(); blocks.push({ t: 'h1', text: stripInline(trimmed.replace(/^#\s+/, '')) }); continue; }
+    if (/^#{2}\s+/.test(trimmed)) { flushPara(); flushList(); blocks.push({ t: 'h2', text: stripInline(trimmed.replace(/^#{2}\s+/, '')) }); continue; }
+    if (/^#{3,}\s+/.test(trimmed)) { flushPara(); flushList(); blocks.push({ t: 'h3', text: stripInline(trimmed.replace(/^#{3,}\s+/, '')) }); continue; }
+    if (/^[-*]{3,}$/.test(trimmed)) { flushPara(); flushList(); blocks.push({ t: 'pagebreak' }); continue; }
+    if (/^[-*+]\s+/.test(trimmed)) { flushPara(); list.push(trimmed.replace(/^[-*+]\s+/, '')); continue; }
+
+    flushList();
+    para.push(trimmed);
+  }
+  flushPara(); flushList();
+  return blocks;
+}
+
+// takes: a Markdown string and a display title
+// does: renders the Markdown to a paginated, text-based PDF (headings, body
+//       text, bullet lists, tables) and triggers a browser download
+// returns: nothing (saves "<title>-deep-dive.pdf")
+export async function downloadMarkdownPdf(markdown: string, title: string) {
+  const blocks = parseMarkdownBlocks(markdown);
+  const { jsPDF } = await import('jspdf');
+  const autoTable = (await import('jspdf-autotable')).default;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const margin = 48;
+  const contentW = pageW - margin * 2;
+  let y = margin;
+
+  const ensure = (need: number) => { if (y + need > pageH - margin) { doc.addPage(); y = margin; } };
+  const writeText = (text: string, size: number, bold: boolean, gap: number) => {
+    doc.setFont('helvetica', bold ? 'bold' : 'normal');
+    doc.setFontSize(size);
+    const wrapped = doc.splitTextToSize(text, contentW) as string[];
+    for (const ln of wrapped) { ensure(size + 4); doc.text(ln, margin, y); y += size + 4; }
+    y += gap;
+  };
+
+  // Title header.
+  writeText(title, 20, true, 10);
+
+  for (const b of blocks) {
+    switch (b.t) {
+      case 'h1': writeText(b.text, 18, true, 8); break;
+      case 'h2': writeText(b.text, 15, true, 6); break;
+      case 'h3': writeText(b.text, 13, true, 5); break;
+      case 'p': writeText(b.text, 10.5, false, 8); break;
+      case 'list':
+        for (const it of b.items) writeText(`•  ${it}`, 10.5, false, 2);
+        y += 6;
+        break;
+      case 'table':
+        autoTable(doc, {
+          head: [b.headers], body: b.rows, startY: y, margin: { left: margin, right: margin },
+          styles: { fontSize: 9, cellPadding: 4 }, headStyles: { fillColor: [20, 20, 20] },
+        });
+        y = (doc as any).lastAutoTable.finalY + 12;
+        break;
+      case 'pagebreak': doc.addPage(); y = margin; break;
+      default: break;
+    }
+  }
+  doc.save(`${markdownExportName(title)}.pdf`);
+}
+
+// takes: a Markdown string and a display title
+// does: renders the Markdown to a Word (.docx) document (headings, body text,
+//       bullet lists, tables) and triggers a browser download
+// returns: nothing (saves "<title>-deep-dive.docx")
+export async function downloadMarkdownDocx(markdown: string, title: string) {
+  const blocks = parseMarkdownBlocks(markdown);
+  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } = await import('docx');
+  const children: any[] = [
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: title, bold: true })] }),
+  ];
+
+  for (const b of blocks) {
+    switch (b.t) {
+      case 'h1': children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, text: b.text })); break;
+      case 'h2': children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, text: b.text })); break;
+      case 'h3': children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: b.text })); break;
+      case 'p': children.push(new Paragraph({ children: [new TextRun(b.text)] })); break;
+      case 'list':
+        for (const it of b.items) children.push(new Paragraph({ text: it, bullet: { level: 0 } }));
+        break;
+      case 'table':
+        children.push(new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [b.headers, ...b.rows].map((row, ri) =>
+            new TableRow({
+              children: row.map((cell) =>
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: cell, bold: ri === 0 })] })] })),
+            })),
+        }));
+        children.push(new Paragraph({ text: '' }));
+        break;
+      case 'pagebreak': children.push(new Paragraph({ children: [] })); break;
+      default: break;
+    }
+  }
+
+  const docFile = new Document({
+    sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children }],
+  });
+  const blob = await Packer.toBlob(docFile);
+  saveBlob(blob, `${markdownExportName(title)}.docx`);
+}
+
+// takes: a Markdown string and a display title
+// does: downloads the raw Markdown as a .md file
+// returns: nothing (saves "<title>-deep-dive.md")
+export function downloadMarkdownText(markdown: string, title: string) {
+  saveBlob(new Blob([markdown], { type: 'text/markdown;charset=utf-8' }), `${markdownExportName(title)}.md`);
+}
+
 // ── Renderer 3: PDF ─────────────────────────────────────────────────────────
 export async function downloadPdf(rawData: any) {
   // Capture the rendered report so the PDF matches the webpage pixel-for-pixel.

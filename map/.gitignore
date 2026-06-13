@@ -32,3 +32,7 @@ next-env.d.ts
 
 # working source (raw extracted PDFs)
 /_source
+
+# test artifacts
+/test-results/
+/playwright-report/
