@@ -233,3 +233,51 @@ def test_build_empty_companies_is_safe():
     report = builder.build("pasta", {"sector": "pasta", "companies": []})
     assert report["section4_profiles"] == []
     assert report["references"] == []
+
+
+def test_financial_flag_thresholds():
+    """
+    Takes: XBRL dicts across the runway decision matrix.
+    Does: Evaluates the cash-runway flag.
+    Returns: A warning only for negative OCF with runway under 1.5 years.
+    """
+    from aria_pi.builders.report_builder import _financial_flag
+    short = {"cash": {"value": 100}, "operating_cash_flow": {"value": -80}}
+    long_ = {"cash": {"value": 100}, "operating_cash_flow": {"value": -50}}
+    pos = {"cash": {"value": 100}, "operating_cash_flow": {"value": 50}}
+    assert "Verify financial stability" in _financial_flag(short)
+    assert _financial_flag(long_) is None
+    assert _financial_flag(pos) is None
+    assert _financial_flag({}) is None
+    assert _financial_flag({"cash": {"value": 0},
+                            "operating_cash_flow": {"value": -1}}) is None
+
+
+def test_profile_includes_phase_summary_and_unc_site_fields():
+    """
+    Takes: A company with UNC-sited and phased trials.
+    Does: Builds its profile.
+    Returns: phase_summary, unc_trial_site/count, and the overview banner.
+    """
+    builder = ReportBuilder()
+    company = {
+        "name": "TestCo",
+        "facts": {"legal_name": "TestCo Inc", "cik": "1", "xbrl": {}},
+        "trials": [
+            {"title": "T1", "phase": "PHASE2", "phases": ["PHASE2"],
+             "facilities": ["UNC Hospitals Chapel Hill"],
+             "url": "https://clinicaltrials.gov/study/NCT1"},
+            {"title": "T2", "phase": "PHASE1", "phases": ["PHASE1"],
+             "facilities": ["Duke University"],
+             "url": "https://clinicaltrials.gov/study/NCT2"},
+        ],
+        "unc_trials": [], "pubmed": [], "pubmed_coi": [],
+        "nih_grants": [], "unc_alumni": [],
+    }
+    profile = builder._profile(company, {}, set())
+    assert profile["phase_summary"] == {"Phase 2": 1, "Phase 1": 1}
+    assert profile["unc_trial_site"] is True
+    assert profile["unc_trial_count"] == 1
+    assert profile["financial_flag"] is None
+    assert "Active UNC Trial Site" in profile["overview"]["text"]
+    assert "**Pipeline:**" in profile["overview"]["text"]
