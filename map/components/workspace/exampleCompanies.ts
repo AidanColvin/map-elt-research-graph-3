@@ -27,7 +27,7 @@ export const EXAMPLE_CATEGORIES: ExampleCategory[] = [
     label: "Internet Services",
     companies: [
       { name: "Amazon", ticker: "AMZN", domain: "amazon.com", accent: "#ff9900" },
-      { name: "Alphabet (Google)", ticker: "GOOGL", domain: "abc.xyz", accent: "#4285f4" },
+      { name: "Alphabet (Google)", ticker: "GOOGL", domain: "google.com", accent: "#4285f4" },
       { name: "Meta Platforms", ticker: "META", domain: "meta.com", accent: "#0866ff" },
       { name: "Uber Technologies", ticker: "UBER", domain: "uber.com", accent: "#000000" },
       { name: "Booking Holdings", ticker: "BKNG", domain: "bookingholdings.com", accent: "#003580" },

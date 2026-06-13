@@ -11,7 +11,7 @@ const DEEP_DIVES = [
   { name: "Apple", ticker: "AAPL", domain: "apple.com", accent: "#1d1d1f" },
   { name: "NVIDIA", ticker: "NVDA", domain: "nvidia.com", accent: "#76b900" },
   { name: "Microsoft", ticker: "MSFT", domain: "microsoft.com", accent: "#0078d4" },
-  { name: "Alphabet", ticker: "GOOGL", domain: "abc.xyz", accent: "#4285f4" },
+  { name: "Alphabet", ticker: "GOOGL", domain: "google.com", accent: "#4285f4" },
   { name: "Anthropic", ticker: "Private", domain: "anthropic.com", accent: "#cc785c" },
 ];
 
@@ -206,7 +206,11 @@ export default function DashboardHome({
               onClick={() => onRunCompany(c.name)}
               className="text-left p-5 rounded-2xl bg-white/70 backdrop-blur-sm border border-black/[0.05] hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300 cursor-pointer"
             >
-              <div className="mb-3" style={{ width: 36, height: 36 }}>
+              {/* Size the shared CompanyLogo down from its 76px report-header
+                  default; without these overrides the global .company-logo CSS
+                  renders a 76px tile that overflows and collides with the name
+                  below. Matches the override pattern used in CompanyCanvas. */}
+              <div className="mb-3 [&_.company-logo]:w-[44px] [&_.company-logo]:h-[44px] [&_.company-logo]:rounded-xl [&_.company-logo]:shadow-none [&_.company-logo_img]:p-[7px] [&_.company-logo.monogram]:text-[20px]">
                 <CompanyLogo name={c.name} domain={c.domain} accent={c.accent} />
               </div>
               <p className="text-[15px] font-semibold text-gray-900">{c.name}</p>
