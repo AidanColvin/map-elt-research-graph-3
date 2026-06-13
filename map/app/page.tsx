@@ -10,6 +10,7 @@ import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
+import { useSavedReports } from "@/components/workspace/useSavedReports";
 import { FONT } from "@/components/workspace/ui";
 
 const HEADER_H = 52;
@@ -208,6 +209,9 @@ export default function MapHome() {
   const [sectorDraft, setSectorDraft] = useState("");
   const dive = useDeepDive();
   const scan = useSectorScan();
+  // Per-user saved reports (Firestore for signed-in accounts, device-local for
+  // guests). Lives at the page level so every view shares one synced list.
+  const saved = useSavedReports(user);
 
   // takes: a company name selected from a sector ticker card
   // does: triggers a deep dive and mirrors the choice into the draft input;
@@ -290,7 +294,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <CompanyCanvas dive={dive} draft={companyDraft} onDraftChange={setCompanyDraft} />
+          <CompanyCanvas dive={dive} draft={companyDraft} onDraftChange={setCompanyDraft} saved={saved} />
         </div>
 
         <div
@@ -308,6 +312,7 @@ export default function MapHome() {
             onDraftChange={setSectorDraft}
             onSelectCompany={selectCompany}
             activeCompany={dive.company}
+            saved={saved}
           />
         </div>
 
