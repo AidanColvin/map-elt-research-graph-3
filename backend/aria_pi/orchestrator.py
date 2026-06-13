@@ -26,6 +26,7 @@ from aria_pi.clients.sec_edgar_client import SECEdgarClient
 from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.nih_reporter_client import NIHReporterClient
 from aria_pi.clients.patents import fetch_patents, EMPTY as EMPTY_PATENTS
+from aria_pi.clients.partnership_resolver import PartnershipResolver
 from aria_pi.builders.report_builder import ReportBuilder
 from aria_pi.utils.source_tagger import SourceTagger
 from aria_pi.sectors import (
@@ -54,6 +55,11 @@ class PipelineRequest(BaseModel):
     sector: str
     companies: Optional[List[str]] = None
     company_override: Optional[str] = None  # legacy
+
+
+class PartnershipRequest(BaseModel):
+    query: str
+    type: str = "company"  # "company" | "sector"
 
 
 @app.get("/")
@@ -109,6 +115,29 @@ async def run_pipeline(req: PipelineRequest):
             headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/partnerships")
+async def partnerships(req: PartnershipRequest):
+    """takes: a JSON payload of {query, type:"company"|"sector"},
+    does: fans out to PubMed/SEC/web search via PartnershipResolver to gather
+          verifiable UNC↔company relationship evidence (verbatim quotes only),
+    returns: the resolver data — a single company result, or the Top 10 ranked
+             companies for a sector query."""
+    try:
+        resolver = PartnershipResolver()
+        if req.type == "sector":
+            data = resolver.resolve_sector(req.query)
+        else:
+            data = resolver.resolve_company(req.query)
+        return JSONResponse(
+            content=data,
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()
