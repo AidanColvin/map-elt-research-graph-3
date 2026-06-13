@@ -2,9 +2,10 @@
 
 import Report from "@/components/Report";
 import { SectorActionBar } from "./ActionBar";
+import SectorEmptyState from "./SectorEmptyState";
 import TickerGrid from "./TickerGrid";
 import type { SectorScanState } from "./useSectorScan";
-import { CanvasCard, EmptyGlyph, Loading } from "./ui";
+import { CanvasCard, Loading } from "./ui";
 
 // takes: the useSectorScan hook state, the lifted draft value/onChange, the
 //        onSelectCompany cross-tool callback, and the active deep-dive company
@@ -37,7 +38,7 @@ export default function SectorCanvas({
         />
       }
     >
-      {scan.status === "idle" && <EmptyGlyph />}
+      {scan.status === "idle" && <SectorEmptyState onRun={scan.run} />}
       {scan.status === "running" && (
         <Loading
           label={`Scanning ${scan.sector}…`}
