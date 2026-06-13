@@ -43,21 +43,24 @@ import type {
 export async function buildLiveReport(query: string): Promise<string> {
   const hit = await resolveCik(query);
 
-  const [profile, financials, filings, wiki, research] = await Promise.all([
+  const [profile, financials, filings, wiki] = await Promise.all([
     hit ? fetchProfile(hit.cik, hit.ticker, hit.title) : Promise.resolve(null),
     hit ? fetchFinancials(hit.cik) : Promise.resolve(null),
     hit ? fetchRecentFilings(hit.cik) : Promise.resolve([] as FilingRef[]),
     fetchWikiSummary(hit?.title ?? query),
-    fetchResearch(hit?.title ?? query),
   ]);
 
-  // the 10-K narrative, the insider-derived executives, and the legal
-  // subsidiaries all depend on the filing list, so fetch them after, in parallel
+  // the 10-K narrative, the insider-derived executives, the legal subsidiaries,
+  // and the research signal all run after the first batch in parallel. Research
+  // is here (not above) so it can be filtered by the company's actual industry,
+  // which kills false-positive papers for common-word names (see openalex.ts).
   const ref = filings.length ? findLatest10K(filings) : null;
-  const [tenk, form4Execs, subsidiaries] = await Promise.all([
+  const researchName = profile?.name ?? wiki?.title ?? hit?.title ?? query;
+  const [tenk, form4Execs, subsidiaries, research] = await Promise.all([
     hit && ref ? fetch10KSections(hit.cik, ref) : Promise.resolve(null),
     hit ? fetchExecutives(hit.cik, filings) : Promise.resolve([] as Executive[]),
     hit ? fetchSubsidiaries(hit.cik, filings) : Promise.resolve([] as Subsidiary[]),
+    fetchResearch(researchName, profile?.sicDescription),
   ]);
   const execs = form4Execs.length ? form4Execs : tenk?.executives ?? [];
 
@@ -137,6 +140,12 @@ function execSummary(
   const rev = fin ? latest(fin.revenue) : undefined;
   const ni = fin ? latest(fin.netIncome) : undefined;
 
+  // Lead with what the company says about itself in Item 1 (Business) of its
+  // 10-K — a board-ready, source-of-truth description — rather than a dry
+  // Wikipedia noun phrase. We fall back to Wikipedia only when no 10-K exists.
+  const overview = tenk?.business ? businessLede(tenk.business, name, 340) : "";
+  if (overview) lines.push(`${overview} [4]`);
+
   if (rev) {
     const prev = fin!.revenue.find((s) => s.fy === rev.fy - 1);
     const growth = prev ? ` (${yoy(rev.val, prev.val)} YoY)` : "";
@@ -148,17 +157,95 @@ function execSummary(
     if (gp) lines.push(`Gross margin was ${pct(gp / rev.val)} [1].`);
   }
   if (tenk?.employees) lines.push(`The company reports approximately ${tenk.employees} employees [4].`);
-  // Wikipedia short descriptions are bare noun phrases ("American electric
-  // vehicle and clean energy company"), so give them an article and keep the
-  // original casing — lowercasing would mangle proper adjectives like
-  // "American". The full extract is shown in Company Overview, so it isn't
-  // repeated here.
-  if (wiki?.description) lines.push(`It is ${withArticle(wiki.description)} [2].`);
+  // Wikipedia is only used as a fallback when the 10-K business overview is
+  // absent (private companies / no recent 10-K), so the brief stays grounded
+  // in primary filings when they exist.
+  if (!overview && wiki?.description) lines.push(`It is ${withArticle(wiki.description)} [2].`);
   if (lines.length === 1)
     lines.push(
       `${name} is a private company; detailed financials are not available through SEC EDGAR [1].`,
     );
   return lines.join(" ") + "\n";
+}
+
+// takes: prose text
+// does: splits into sentences without breaking on common abbreviations
+//       ("Inc.", "Corp.", "U.S.", etc.) that would otherwise sever a subject
+//       from its verb (e.g. "The Home Depot, Inc. is …")
+// returns: an array of sentences
+function splitSentences(text: string): string[] {
+  const SENT = "";
+  const guarded = text
+    .replace(/\b(Inc|Corp|Co|Ltd|LLC|PLC|L\.P|S\.A|N\.V|A\.G|Jr|Sr|Mr|Mrs|Ms|Dr|St|No|vs|etc)\./gi, `$1${SENT}`)
+    .replace(/\b(U\.S|U\.K|E\.U)\./gi, `$1${SENT}`)
+    .replace(/\b([A-Z])\./g, `$1${SENT}`); // single-letter initials
+  return guarded.split(/(?<=[.?!])\s+/).map((s) => s.replace(new RegExp(SENT, "g"), "."));
+}
+
+// takes: a company name
+// does: returns its first distinctive word (skipping a leading "The")
+// returns: a lowercase-safe token for matching, or "" if none
+function firstNameToken(name: string): string {
+  const w = name.split(/\s+/).filter((t) => t.length > 2 && !/^the$/i.test(t));
+  return (w[0] || "").replace(/[^A-Za-z]/g, "");
+}
+
+// takes: Item 1 (Business) prose, the company name, and a character budget
+// does: returns the first sentence that clearly DESCRIBES the company (names it
+//       or uses "is a / operates / world's largest …"), skipping in-section
+//       index fragments and risk/regulatory boilerplate; empty when none
+//       qualifies so the caller can fall back to the Wikipedia descriptor
+// returns: a board-ready company lede, or ""
+function businessLede(text: string, name: string, maxChars: number): string {
+  const clean = text.replace(/^[\s–—•·∙\-]+/, "").replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const sentences = splitSentences(clean);
+  const tok = firstNameToken(name);
+  const nameRe = tok ? new RegExp(`\\b${tok}`, "i") : null;
+  // Reject risk/forward-looking/cross-reference sentences outright.
+  const reject =
+    /\b(adversely|forward-looking|no assurance|could|would|legislativ|regulatory action|among others|risk|risks|challenging)\b/i;
+  // Accept only genuine company descriptors.
+  const accept =
+    /\b(is|are|was) (a|an|the|one of|among|engaged|focused|primarily)\b|\b(world'?s|global|globally) (largest|leading)\b|^(we|our) |\b(operates|provides|designs|develops|manufactures|markets|sells|offers|founded|incorporated|headquartered)\b/i;
+  let start = -1;
+  for (let i = 0; i < sentences.length && i < 8; i++) {
+    const s = sentences[i].trim();
+    if (s.length < 45) continue;
+    if (/section\.?$/i.test(s)) continue; // cross-reference fragment
+    if (/^[–—•·∙\-]/.test(s)) continue; // dash-prefixed index entry
+    if (reject.test(s)) continue;
+    if (!((nameRe && nameRe.test(s)) || accept.test(s))) continue;
+    start = i;
+    break;
+  }
+  if (start < 0) return ""; // no clean descriptor — caller uses Wikipedia
+  return firstSentences(sentences.slice(start).join(" "), maxChars);
+}
+
+// takes: a prose string, a max character budget, and an optional sentence cap
+// does: returns the first 1–2 complete sentences, ending on a hard boundary and
+//       never exceeding the budget by more than the final sentence
+// returns: a clean lead-in string (may be empty)
+function firstSentences(text: string, maxChars: number, maxSentences = 2): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return "";
+  const parts = splitSentences(clean);
+  let out = "";
+  let n = 0;
+  for (const p of parts) {
+    if (n >= maxSentences) break;
+    if (out && (out.length + 1 + p.length) > maxChars) break;
+    out = out ? `${out} ${p}` : p;
+    n++;
+  }
+  // Guard against a single very long sentence blowing past the budget.
+  if (out.length > maxChars + 60) {
+    const cut = out.slice(0, maxChars);
+    const stop = cut.lastIndexOf(". ");
+    out = (stop > maxChars * 0.5 ? cut.slice(0, stop + 1) : cut.replace(/\s+\S*$/, "")) + " …";
+  }
+  return out;
 }
 
 function companyOverview(
@@ -343,17 +430,20 @@ function businessModel(fin: Financials | null): string {
     ),
   );
 
-  // income statement
+  // income statement — only include columns that have data in ≥1 year, so a
+  // company that never reports R&D (e.g. a retailer) shows no empty R&D column.
+  const isCols = [
+    { h: "Revenue", series: fin.revenue },
+    { h: "Gross Profit", series: fin.grossProfit },
+    { h: "Operating Income", series: fin.opIncome },
+    { h: "Net Income", series: fin.netIncome },
+    { h: "R&D", series: fin.rnd },
+  ].filter((c) => yrs.some((fy) => valueFor(c.series, fy) !== undefined));
   lines.push("**Income Statement** [1]\n");
-  lines.push("| Fiscal Year | Revenue | Gross Profit | Operating Income | Net Income | R&D |");
-  lines.push("|---|---|---|---|---|---|");
+  lines.push(`| Fiscal Year | ${isCols.map((c) => c.h).join(" | ")} |`);
+  lines.push(`|---|${isCols.map(() => "---").join("|")}|`);
   for (const fy of yrs) {
-    lines.push(
-      `| FY${fy} | ${cell(fin.revenue, fy)} | ${cell(fin.grossProfit, fy)} | ${cell(
-        fin.opIncome,
-        fy,
-      )} | ${cell(fin.netIncome, fy)} | ${cell(fin.rnd, fy)} |`,
-    );
+    lines.push(`| FY${fy} | ${isCols.map((c) => cell(c.series, fy)).join(" | ")} |`);
   }
   lines.push("");
 
@@ -369,31 +459,31 @@ function businessModel(fin: Financials | null): string {
     ),
   );
 
-  // margins, if gross profit exists for any year
-  if (yrs.some((fy) => valueFor(fin.grossProfit, fy) !== undefined)) {
+  // margins — same column rule: only show a margin whose underlying metric
+  // exists for at least one year (net margin always does once revenue exists).
+  const mCols = [
+    { h: "Gross", series: fin.grossProfit, color: "#0071e3" },
+    { h: "Operating", series: fin.opIncome, color: "#f59e0b" },
+    { h: "Net", series: fin.netIncome, color: "#10b981" },
+  ].filter((c) => yrs.some((fy) => valueFor(c.series, fy) !== undefined));
+  if (mCols.length) {
     lines.push("**Margin Trend** [1]\n");
-    lines.push("| Fiscal Year | Gross | Operating | Net |");
-    lines.push("|---|---|---|---|");
+    lines.push(`| Fiscal Year | ${mCols.map((c) => c.h).join(" | ")} |`);
+    lines.push(`|---|${mCols.map(() => "---").join("|")}|`);
     for (const fy of yrs) {
       const r = valueFor(fin.revenue, fy);
-      lines.push(
-        `| FY${fy} | ${marg(fin.grossProfit, r, fy)} | ${marg(fin.opIncome, r, fy)} | ${marg(
-          fin.netIncome,
-          r,
-          fy,
-        )} |`,
-      );
+      lines.push(`| FY${fy} | ${mCols.map((c) => marg(c.series, r, fy)).join(" | ")} |`);
     }
     lines.push("");
     lines.push(
       lineChart(
         "Margin Trend (%)",
         xLabels,
-        [
-          { name: "Gross", values: yrs.map((fy) => marginPct(fin.grossProfit, fin.revenue, fy)), color: "#0071e3" },
-          { name: "Operating", values: yrs.map((fy) => marginPct(fin.opIncome, fin.revenue, fy)), color: "#f59e0b" },
-          { name: "Net", values: yrs.map((fy) => marginPct(fin.netIncome, fin.revenue, fy)), color: "#10b981" },
-        ],
+        mCols.map((c) => ({
+          name: c.h,
+          values: yrs.map((fy) => marginPct(c.series, fin.revenue, fy)),
+          color: c.color,
+        })),
         "%",
       ),
     );

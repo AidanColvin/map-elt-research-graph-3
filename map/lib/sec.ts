@@ -588,6 +588,11 @@ function htmlToText(html: string): string {
     .replace(/&mdash;/gi, "—")
     .replace(/&ndash;/gi, "–")
     .replace(/&[a-z]+;/gi, " ")
+    // Drop list-bullet glyphs and zero-width chars: once tags are gone these
+    // leave orphaned markers ("• W …") in extracted prose. Turning them into
+    // spaces lets the whitespace collapse below clean them up.
+    .replace(/[•▪●◦‣⁃∙·■○‧]/g, " ")
+    .replace(/[​‌‍﻿]/g, "")
     .replace(/[ \t ]+/g, " ")
     .replace(/\n[ \t]+/g, "\n")
     .replace(/\n{3,}/g, "\n\n")
@@ -625,9 +630,40 @@ function sliceItems(text: string): Record<string, string> {
 
   const out: Record<string, string> = {};
   for (const k of Object.keys(groups)) {
-    out[k] = groups[k].reduce((a, b) => (b.length > a.length ? b : a), "");
+    const segs = groups[k];
+    // The same "Item N" string appears in the table of contents (a short line
+    // ending in a page number) and again at the real section. Drop the ToC /
+    // index entries, then take the longest remaining block — the actual body.
+    const body = segs.filter((s) => !isIndexBoilerplate(s));
+    const pick = (body.length ? body : segs).reduce((a, b) => (b.length > a.length ? b : a), "");
+    out[k] = stripIndexLines(pick);
   }
   return out;
+}
+
+// takes: a candidate "Item N" segment
+// does: detects table-of-contents / index boilerplate — short blocks that name
+//       the ToC/index or end in dotted leaders or a page number
+// returns: true when the segment is index boilerplate, not real section prose
+function isIndexBoilerplate(seg: string): boolean {
+  const s = seg.trim();
+  if (s.length > 600) return false; // real Item bodies are long
+  if (/table of contents|index to (the\s+)?(consolidated\s+)?financial statements/i.test(s)) return true;
+  if (/\.{2,}\s*\d{1,4}\s*$/.test(s)) return true; // "Risk Factors ......... 15"
+  if (/^\s*Item\s+\d{1,2}[A-C]?\b[^.]*\s\d{1,4}\s*$/i.test(s) && s.length < 200) return true;
+  return false;
+}
+
+// takes: a section body
+// does: removes any leftover "Table of Contents" / "Index to Financial
+//       Statements" boilerplate lines so the section anchors to real prose
+// returns: the body with index boilerplate stripped
+function stripIndexLines(seg: string): string {
+  // Anchor to line starts (m flag) so we only remove boilerplate *headers*, not
+  // a legitimate sentence that happens to mention these phrases mid-prose.
+  return seg
+    .replace(/^[ \t]*(Table of Contents|Index to (the\s+)?(Consolidated\s+)?Financial Statements)\b[^.\n]*/gim, " ")
+    .replace(/[ \t]{2,}/g, " ");
 }
 
 /**
@@ -635,22 +671,53 @@ function sliceItems(text: string): Record<string, string> {
  * return a clean prose excerpt up to max chars, ending on a sentence boundary
  */
 function excerpt(seg: string, max: number): string {
-  const t = seg
-    .replace(/^\s*Item\s+\d{1,2}[A-C]?\b[.:\s\-—]*/i, "")
-    .replace(
-      /^(Business|Risk Factors|Management['’]s Discussion and Analysis[^.]*\.?|Overview|General)\b[.:\s\-—]*/i,
-      "",
-    )
-    .replace(/\s+/g, " ")
-    .trim();
-  let out: string;
-  if (t.length <= max) out = t;
-  else {
-    const cut = t.slice(0, max);
-    const stop = cut.lastIndexOf(". ");
-    out = (stop > max * 0.5 ? cut.slice(0, stop + 1) : cut) + " …";
+  let head = seg.replace(/^\s*Item\s+\d{1,2}[A-C]?\b[.:\s\-—]*/i, "");
+  // Strip consecutive leading section/subsection labels — a 10-K Item 1 often
+  // reads "Business" then "General" before the real prose, so one pass leaves
+  // an orphaned "General" at the front.
+  const label =
+    /^(Business|Risk Factors|Management['’]s Discussion and Analysis[^.]*\.?|Overview|General|Introduction|Background|The Company|Our Company|Company Overview|About(?: the Company| Us)?)\b[.:\s\-—]*/i;
+  // Safety net for other filers' headers (e.g. "INTRODUCTION", "BACKGROUND"):
+  // a single leading ALL-CAPS word immediately followed by Title-case prose.
+  const capsHeader = /^[A-Z]{4,20}\s+(?=[A-Z][a-z])/;
+  for (let i = 0; i < 4; i++) {
+    let next = head.replace(label, "");
+    if (next === head) next = head.replace(capsHeader, "");
+    if (next === head) break;
+    head = next;
   }
-  return sanitizeMd(out);
+  const t = stripArtifacts(head.replace(/\s+/g, " ").trim());
+  let out: string;
+  if (t.length <= max) {
+    out = t;
+  } else {
+    const cut = t.slice(0, max + 1);
+    // Prefer a hard sentence boundary so the excerpt never ends mid-clause.
+    const stop = Math.max(
+      cut.lastIndexOf(". "),
+      cut.lastIndexOf("? "),
+      cut.lastIndexOf("! "),
+    );
+    if (stop > max * 0.5) {
+      out = cut.slice(0, stop + 1);
+    } else {
+      // No nearby boundary: cut on a whole word and drop the orphaned fragment.
+      out = cut.slice(0, max).replace(/\s+\S*$/, "").replace(/[\s,;:•\-–—]+$/, "") + " …";
+    }
+  }
+  return sanitizeMd(stripArtifacts(out));
+}
+
+// takes: a prose string
+// does: removes stray list-bullet glyphs and the orphaned single-letter
+//       fragments HTML→text conversion can leave, then collapses whitespace
+// returns: the cleaned prose
+function stripArtifacts(s: string): string {
+  return s
+    .replace(/[•▪●◦‣⁃∙·■○]/g, " ")
+    .replace(/\s+/g, " ")
+    .replace(/\s+([.,;:])/g, "$1")
+    .trim();
 }
 
 /**
@@ -691,7 +758,11 @@ function riskHeadlines(riskSeg: string): string[] {
   for (const line of lines) {
     if (line.length < 16 || line.length > 130) continue;
     if (/[.;:]$/.test(line)) continue; // headers usually don't end in punctuation
-    if (/^(item|table of contents|page|the following|see |our |we )/i.test(line)) continue;
+    // Skip index/ToC boilerplate and other non-headline chrome.
+    if (/table of contents|index to (the\s+)?(consolidated\s+)?financial statements/i.test(line)) continue;
+    if (/^(item|index|table of contents|page|part [ivx]+|form 10-k|annual report|the following|see |our |we )/i.test(line))
+      continue;
+    if (/\.{2,}\s*\d{1,4}\s*$/.test(line) || /\s\d{1,4}\s*$/.test(line)) continue; // ToC page-number lines
     if (!/[a-z]/.test(line)) continue; // skip ALL-CAPS noise / numbers
     const words = line.split(/\s+/);
     if (words.length < 3 || words.length > 18) continue;
