@@ -20,6 +20,7 @@ from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
 from aria_pi.clients.web_search_client import WebSearchClient
 from aria_pi.sectors import seeds_for
+from aria_pi.utils.name_resolver import normalize_company_name
 
 _COI_WINDOW_YEARS = 5  # COI disclosures must be within the last N years
 
@@ -176,14 +177,21 @@ def resolve_pubmed_bundle(company_name: str, pubmed: PubMedClient) -> dict:
     }
 
 
-def resolve_company(company_name: str) -> dict:
+# takes: the user's company query (str) and an optional resolved official name
+#        (str) to feed the strict SEC/Web clients
+# does: fans out concurrently — PubMed gets the ORIGINAL query (it tolerates
+#       typos), while SEC EDGAR + web search get the resolved official name so a
+#       small typo no longer returns nothing from the exact-match clients
+# returns: the full company partnership record, including `resolved_name`
+def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
+    target = sec_web_name or company_name
     pubmed, sec, web = PubMedClient(), SECEdgarClient(), WebSearchClient()
     results = {}
     with ThreadPoolExecutor(max_workers=3) as ex:
         futures = {
             ex.submit(resolve_pubmed_bundle, company_name, pubmed): "pubmed",
-            ex.submit(resolve_sec_verbatim, company_name, sec): "financial",
-            ex.submit(resolve_ecosystem, company_name, web): "ecosystem",
+            ex.submit(resolve_sec_verbatim, target, sec): "financial",
+            ex.submit(resolve_ecosystem, target, web): "ecosystem",
         }
         for fut in as_completed(futures):
             results[futures[fut]] = fut.result()
@@ -198,8 +206,9 @@ def resolve_company(company_name: str) -> dict:
     ecosystem = results.get("ecosystem") or []
     return {
         "query": company_name,
+        "resolved_name": target,
         "type": "company",
-        "links": build_links(company_name, financial.get("cik", "")),
+        "links": build_links(target, financial.get("cik", "")),
         "clinical": clinical,
         "coi": coi,
         "unc_units": unc_units,
@@ -248,6 +257,7 @@ def resolve_sector(sector: str) -> dict:
 
     return {
         "query": sector,
+        "resolved_name": sector,
         "type": "sector",
         "links": build_links(sector),
         "companies": [{"name": r["query"], "mention_count": r["mention_count"]} for r in top],
@@ -273,10 +283,13 @@ def resolve_sector(sector: str) -> dict:
 def resolve_partnerships(query: str, type: str) -> dict:
     query = (query or "").strip()
     if not query:
-        return {"query": "", "type": type, "links": build_links(""),
+        return {"query": "", "resolved_name": "", "type": type, "links": build_links(""),
                 "clinical": {"count": 0, "top_authors": [], "papers": []},
                 "coi": {"count": 0, "papers": [], "window_years": _COI_WINDOW_YEARS},
                 "unc_units": [], "financial": {"quotes": [], "filing_url": ""}, "ecosystem": []}
     if type == "sector":
         return resolve_sector(query)
-    return resolve_company(query)
+    # Correct typos before the strict SEC/Web clients see the name; PubMed still
+    # receives the original query inside resolve_company.
+    resolved = normalize_company_name(query)
+    return resolve_company(query, sec_web_name=resolved)

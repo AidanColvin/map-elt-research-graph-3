@@ -16,6 +16,7 @@ interface Mention { title: string; url: string; company?: string; }
 interface Unit { unit: string; count: number; }
 interface PartnerData {
   query: string;
+  resolved_name?: string;
   type: PartnerType;
   links?: { pubmed?: string; edgar?: string; unc_web?: string };
   clinical: { count: number; top_authors: string[]; papers: Paper[] };
@@ -223,6 +224,15 @@ export default function PartnershipsPage() {
 
         {status === "done" && data && (
           <div data-testid="results-canvas" style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* Typo correction notice — shown only when the backend resolved the
+                query to a different official company name. */}
+            {data.resolved_name &&
+              data.resolved_name.trim().toLowerCase() !== data.query.trim().toLowerCase() && (
+                <p data-testid="resolved-notice" style={{ fontSize: 13.5, color: "#6b6b73", margin: 0 }}>
+                  Showing verifiable results for: <strong style={{ color: "#1d1d1f" }}>{data.resolved_name}</strong>
+                </p>
+              )}
+
             {/* Jump-to-source links — open the primary databases directly */}
             {data.links && (
               <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

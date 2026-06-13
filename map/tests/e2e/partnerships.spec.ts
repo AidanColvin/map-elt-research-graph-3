@@ -43,3 +43,41 @@ test('Partnerships tab is reachable and renders the three result cards', async (
   await expect(canvas).toContainText('Financial / Legal');
   await expect(canvas).toContainText('University Ecosystem');
 });
+
+test('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
+  test.setTimeout(120000);
+  await signInGuest(page);
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
+  await page.waitForURL('**/partnerships', { timeout: 15000 });
+  await page.getByRole('tab', { name: /company/i }).click();
+  await page.getByLabel('Partnership search').fill('Eli Lily');
+  await page.getByRole('button', { name: /^Search$/ }).click();
+
+  await page.getByTestId('results-canvas').waitFor({ state: 'visible', timeout: 90000 });
+  // The correction notice surfaces the official SEC name despite the typo.
+  const notice = page.getByTestId('resolved-notice');
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText('Showing verifiable results for');
+  await expect(notice).toContainText(/lilly/i);
+  // PubMed (typo-tolerant) still rendered clinical results.
+  await expect(page.getByTestId('card-clinical')).toBeVisible();
+});
+
+test('typo fix lets the strict SEC client surface verbatim text (Liquidia)', async ({ page }) => {
+  test.setTimeout(120000);
+  await signInGuest(page);
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
+  await page.waitForURL('**/partnerships', { timeout: 15000 });
+  await page.getByRole('tab', { name: /company/i }).click();
+  // Liquidia is a UNC-Chapel Hill spinout whose 10-K names UNC verbatim; the
+  // resolver maps it to the official "Liquidia Corp" so the SEC client finds it.
+  await page.getByLabel('Partnership search').fill('Liquidia');
+  await page.getByRole('button', { name: /^Search$/ }).click();
+
+  await page.getByTestId('results-canvas').waitFor({ state: 'visible', timeout: 90000 });
+  await expect(page.getByTestId('resolved-notice')).toContainText(/liquidia corp/i);
+  // The Financial/Legal card shows verbatim SEC text, not the empty state.
+  const financial = page.getByTestId('card-financial');
+  await expect(financial).toContainText(/University of North Carolina/i);
+  await expect(financial).not.toContainText('No verbatim SEC mentions found');
+});
