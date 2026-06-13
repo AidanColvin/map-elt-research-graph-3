@@ -1,10 +1,10 @@
 # Map
 
-One web app that merges two report engines and an accounts database behind a single sign in.
+One web app that merges two report engines and a partner companies database behind a single sign in.
 
-* **Company Deep Dive** (from *deep-dive-gen*): board ready intelligence reports on any public company. Full financial statements, narrative lifted from the company's own SEC filings, leadership org charts, streamed charts.
+* **Company Profile** (from *deep-dive-gen*): board ready intelligence reports on any public company. Full financial statements, narrative lifted from the company's own SEC filings, leadership org charts, streamed charts.
 * **Sector Scan** (from *map / ARIA PI*): partnership intelligence for university technology transfer. Type a sector, get a fully sourced report mapping public companies to overlapping research at UNC Chapel Hill, scored and citation checked, in about a minute.
-* **Accounts**: a database of 142 partner accounts with researched, source cited profiles and Excel, PDF, and Markdown downloads.
+* **Companies**: a database of 154 partner companies with researched, source cited profiles and Excel, PDF, and Markdown downloads.
 
 The hard constraint behind every design decision in both engines: **completely free to run.**
 
@@ -18,9 +18,9 @@ The hard constraint behind every design decision in both engines: **completely f
 1. [What it does](#what-it-does)
 2. [How it stays free](#how-it-stays-free)
 3. [System architecture](#system-architecture)
-4. [Engine 1: Company Deep Dive](#engine-1-company-deep-dive)
+4. [Engine 1: Company Profile](#engine-1-company-profile)
 5. [Engine 2: Sector Scan](#engine-2-sector-scan)
-6. [Accounts database](#accounts-database)
+6. [Companies database](#companies-database)
 7. [Authentication](#authentication)
 8. [Data sources](#data-sources)
 9. [Repository layout](#repository-layout)
@@ -36,28 +36,28 @@ The hard constraint behind every design decision in both engines: **completely f
 
 The app has three surfaces.
 
-**The workspace at `/`** sits behind an auth gate and exposes four views from one top nav:
+**The workspace at `/`** sits behind an auth gate and exposes its views from one top nav:
 
 | View | What it shows |
 |---|---|
 | Dashboard | Launchpad. Greeting, a floating command deck that runs either engine, quick access cards, live ticker grid. |
-| Company | Deep Dive embedded as a canvas card. Search any public company, the report streams in. |
-| Sector | Sector Scan embedded as a canvas card. Live progress ("N of M companies"), ticker grid, full report. Clicking a ticker cross loads that company into the Company view. |
-| Accounts | The 142 account database table with Excel, PDF, and Markdown downloads. |
+| Company Profile | The Company Profile engine embedded as a canvas card. Search any public company, the report streams in. |
+| Sector Scan | Sector Scan embedded as a canvas card. Live progress ("N of M companies"), ticker grid, full report. Clicking a ticker cross loads that company into the Company Profile view. |
+| Companies | The 154 partner companies database table with Excel, PDF, and Markdown downloads. |
 
 **The standalone pages** carry the two source apps over whole:
 
 | Route | What it is |
 |---|---|
-| `/deep-dive` | The full Deep Dive app: search, streaming markdown reader, table of contents, intro splash. |
+| `/deep-dive` | The full Company Profile app: search, streaming markdown reader, table of contents, intro splash. |
 | `/sector-scan` | The full Sector Scan workspace with five views over one generated report: Report, Visualize, Trends, Excel, Slide Deck. |
 
 ## How it stays free
 
 A normal "AI report generator" calls an LLM, which costs money and needs a key. Map replaces the LLM with two ideas:
 
-1. **Curated reports.** Seven marquee companies (Apple, NVIDIA, Microsoft, Alphabet, AWS, Anthropic, OpenAI) are hand written deep dives, grounded in real SEC numbers and stored as Markdown in the repo. They render instantly with zero network calls.
-2. **Live reports.** Any other public company, and every sector scan, is assembled on demand from free, keyless public APIs (SEC EDGAR, Wikipedia, OpenAlex, ClinicalTrials.gov, PubMed, NIH RePORTER). No synthesis model. The deep dive narrative is the company's *own* words, lifted from its latest 10-K. The sector report is assembled deterministically by `ReportBuilder`.
+1. **Curated reports.** Seven marquee companies (Apple, NVIDIA, Microsoft, Alphabet, AWS, Anthropic, OpenAI) are hand written Company Profiles, grounded in real SEC numbers and stored as Markdown in the repo. They render instantly with zero network calls.
+2. **Live reports.** Any other public company, and every sector scan, is assembled on demand from free, keyless public APIs (SEC EDGAR, Wikipedia, OpenAlex, ClinicalTrials.gov, PubMed, NIH RePORTER). No synthesis model. The Company Profile narrative is the company's *own* words, lifted from its latest 10-K. The sector report is assembled deterministically by `ReportBuilder`.
 
 The only "AI shaped" thing missing is original prose for arbitrary companies, which is exactly the part that is not free. Everything else (financials, risk factors, strategy, competition, leadership, trials, grants, charts) is real public data, rendered well.
 
@@ -70,7 +70,7 @@ flowchart TB
     B[Browser]
     FB[(Firebase Auth)]
     subgraph FE["Map frontend (Next.js, one Vercel project)"]
-        W["/ workspace<br/>AuthGate + 4 views"]
+        W["/ workspace<br/>AuthGate + workspace views"]
         DD["/deep-dive"]
         SS["/sector-scan"]
         G["/api/generate<br/>streaming route handler"]
@@ -105,12 +105,12 @@ flowchart TB
 
 Two independently deployed Vercel projects:
 
-* **Frontend** (`map/`): the Next.js app. The deep dive engine runs *inside* it as the `/api/generate` streaming route handler, calling only public APIs and streaming Markdown back in roughly 220 character chunks so the report renders progressively. The `/api/run-pipeline` and `/api/run-pipeline-stream` routes are server side proxies to the backend, so the browser never calls it directly (same origin, no CORS) and no stale cache is served.
+* **Frontend** (`map/`): the Next.js app. The Company Profile engine runs *inside* it as the `/api/generate` streaming route handler, calling only public APIs and streaming Markdown back in roughly 220 character chunks so the report renders progressively. The `/api/run-pipeline` and `/api/run-pipeline-stream` routes are server side proxies to the backend, so the browser never calls it directly (same origin, no CORS) and no stale cache is served.
 * **Backend** (`backend/`): FastAPI on the `@vercel/python` runtime. Resolves the company set for a sector, fans out to the four public data APIs concurrently within a hard time budget, and assembles the report deterministically.
 
 The frontend to backend connection is one env var, `BACKEND_API_URL`. Nothing else is shared.
 
-## Engine 1: Company Deep Dive
+## Engine 1: Company Profile
 
 ### The two report paths
 
@@ -194,7 +194,7 @@ This keeps charts in the same streaming pipeline as the rest of the report. Whil
 
 Given a sector (for example `Oncology`, `Semiconductors`, or a free text term like `Energy Minerals`), the backend:
 
-1. Resolves the sector to a company set: 24 curated sectors (top global plus NC based seeds) or live SEC EDGAR full text discovery for niche terms, with a clear `resolution` label (`curated` / `discovered` / `default`).
+1. Resolves the sector to a company set: 27 curated sectors (top global plus NC based seeds) or live SEC EDGAR full text discovery for niche terms, with a clear `resolution` label (`curated` / `discovered` / `default`).
 2. Pulls primary source data per company, in parallel, from SEC EDGAR, ClinicalTrials.gov, PubMed, and NIH RePORTER.
 3. Builds a deterministic 7 section report plus a one page executive summary, every claim backed by at least two citable URLs.
 4. Streams real progress to the browser as each company resolves.
@@ -282,9 +282,9 @@ A top nav turns one report's data into five sector customized views, each downlo
 
 The analytics behind Visualize, Trends, and Excel live in `map/lib/report-analytics.ts`: HHI concentration, Pearson correlation matrix, quartile and five number summaries, CAGR, a 0 to 100 partnership priority score, percentile ranks, Lorenz curve, and segment analysis. All charts are hand rolled inline SVG; no chart library.
 
-## Accounts database
+## Companies database
 
-The Accounts view renders 142 partner accounts parsed from the UNC industry company load template and enriched by research: public companies verified against SEC EDGAR (FY2025 Form 10-K or latest filings), private companies, nonprofits, and government agencies verified against official websites. Each profile carries aliases, parent account, sector profiles, description, structure, ownership, address, employees, revenue, and an auth gated link to the source report.
+The Companies view renders 154 partner companies parsed from the UNC industry company load template and enriched by research: public companies verified against SEC EDGAR (FY2025 Form 10-K or latest filings), private companies, nonprofits, and government agencies verified against official websites. Each profile carries aliases, parent account, sector profiles, description, structure, ownership, address, employees, revenue, and an auth gated link to the source report.
 
 * Data lives in `map/components/workspace/accountsData.ts`; full citations in `ACCOUNTS_DATA.md` at the repo root.
 * Duplicate companies between the core and template sets are merged by `getUniqueAccounts()`.
@@ -300,18 +300,18 @@ All free, all primary source, no API keys. SEC asks for a descriptive `User-Agen
 
 | Source | Used by | Provides | Endpoint |
 |---|---|---|---|
-| SEC ticker DB | deep dive | name/ticker to CIK resolution | `sec.gov/files/company_tickers.json` |
+| SEC ticker DB | Company Profile | name/ticker to CIK resolution | `sec.gov/files/company_tickers.json` |
 | SEC submissions | both | HQ, industry, exchange, filing history | `data.sec.gov/submissions/` |
 | SEC company facts | both | multi year XBRL financials | `data.sec.gov/api/xbrl/companyfacts/` |
 | SEC archives | both | 10-K (HTML), Form 4 (XML), DEF 14A | `sec.gov/Archives/edgar/data/` |
 | SEC full text search | sector scan | live sector discovery | `efts.sec.gov` |
-| Wikipedia REST | deep dive | narrative company overview | `en.wikipedia.org/api/rest_v1/` |
-| OpenAlex | deep dive | recent research output | `api.openalex.org/works` |
+| Wikipedia REST | Company Profile | narrative company overview | `en.wikipedia.org/api/rest_v1/` |
+| OpenAlex | Company Profile | recent research output | `api.openalex.org/works` |
 | ClinicalTrials.gov v2 | sector scan | sponsor matched trials, phases, collaborators | `clinicaltrials.gov/api/v2/studies` |
 | PubMed (Entrez) | sector scan | UNC coauthored publications by school | `eutils.ncbi.nlm.nih.gov` |
 | NIH RePORTER | sector scan | active grants mentioning a company plus UNC | `api.reporter.nih.gov/v2/projects/search` |
-| ui-avatars | deep dive (client) | executive initials avatars | `ui-avatars.com` |
-| Favicons | deep dive (client) | company logos with fallback chain | Clearbit / DuckDuckGo / Google |
+| ui-avatars | Company Profile (client) | executive initials avatars | `ui-avatars.com` |
+| Favicons | Company Profile (client) | company logos with fallback chain | Clearbit / DuckDuckGo / Google |
 
 HTTP responses are cached at the edge via Next's `revalidate` (for example the 1 MB ticker file for a day) to keep cold start latency and request volume low.
 
@@ -320,10 +320,10 @@ HTTP responses are cached at the edge via Next's `revalidate` (for example the 1
 ```
 map/                                the merged app (Next.js, one Vercel project)
   app/
-    page.tsx                        AuthGate + the 4 view workspace
-    deep-dive/page.tsx              standalone Deep Dive app
+    page.tsx                        AuthGate + the workspace views
+    deep-dive/page.tsx              standalone Company Profile app
     sector-scan/page.tsx            standalone 5 view Sector Scan workspace
-    api/generate/route.ts           deep dive streaming route (curated vs live)
+    api/generate/route.ts           Company Profile streaming route (curated vs live)
     api/run-pipeline/route.ts       JSON proxy to backend
     api/run-pipeline-stream/route.ts  SSE proxy to backend
     components/                     MarkdownArticle (chart interceptor), Charts,
@@ -341,7 +341,7 @@ map/                                the merged app (Next.js, one Vercel project)
     Intro.tsx                       animated network graph splash
   lib/
     registry.ts / curated.ts        curated company list, resolver, C suite
-    generate.ts                     live deep dive assembler (sections + charts)
+    generate.ts                     live Company Profile assembler (sections + charts)
     sec.ts                          EDGAR: CIK, profile, XBRL, 10-K, Form 4
     wikipedia.ts / openalex.ts
     charts.ts / leadership.ts       chart block builders, leadership section
@@ -351,7 +351,7 @@ map/                                the merged app (Next.js, one Vercel project)
     report-export.ts                Markdown / PDF / Word exporters
     accounts.ts                     account profile types + columns
     format.ts / http.ts / types.ts
-  content/reports/*.md              the 7 curated deep dives
+  content/reports/*.md              the 7 curated Company Profiles
   src/                              standalone Firebase auth portal
 backend/                            Sector Scan FastAPI service
   api/index.py                      Vercel ASGI entry point
@@ -415,7 +415,7 @@ The suite covers every client (SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORT
 | `ANTHROPIC_API_KEY` | No | Enables the optional legacy Claude synthesis path. Omitted = deterministic builder (default). |
 | `ANTHROPIC_MODEL` | No | Overrides the default model when the key is set. |
 
-The deep dive engine needs no env vars at all. Firebase web config is checked in (`map/src/firebase/config.js`).
+The Company Profile engine needs no env vars at all. Firebase web config is checked in (`map/src/firebase/config.js`).
 
 ## Deployment
 
@@ -438,7 +438,7 @@ Set `BACKEND_API_URL` on the frontend project to the backend's deployed URL. Cur
 ## Performance and limits
 
 * **Concurrency budget.** Up to 22 companies are fetched in parallel under a hard time budget of about 44 seconds so the backend function stays within Vercel's 60 second cap. Companies that miss the deadline keep an SEC only stub; the report still renders.
-* **Streaming cadence.** Deep dive reports stream in roughly 220 character chunks; sector scan progress events fire as each company resolves.
+* **Streaming cadence.** Company Profile reports stream in roughly 220 character chunks; sector scan progress events fire as each company resolves.
 * **Export size.** PDF and Word capture the rendered DOM as paginated page images, so large sector reports (20 plus companies) can run 70 to 95 pages and take about 20 seconds to build. Markdown stays lightweight and linked; Excel and PowerPoint are generated from data and stay small.
 * **Mobile.** The UI is responsive on phones and tablets. The image based PDF and Word capture is memory heavy, so large captures are best done on a laptop; Markdown, Excel, and PowerPoint exports are light and fine on mobile. The floating table of contents hides below 1380 px.
 
@@ -447,17 +447,17 @@ Set `BACKEND_API_URL` on the frontend project to the backend's deployed URL. Cur
 * **Two source rule.** Every sector scan claim needs at least two independent citable URLs or it is flagged for analyst review instead of guessed. Each report shows its verification counts.
 * **Source blocklist.** Wikipedia, aggregators, and unattributed news are rejected as citations; SEC, ClinicalTrials.gov, PubMed, NIH RePORTER, and peer reviewed journals are accepted.
 * **Sponsor matching.** Clinical trials are matched on sponsor and collaborator fields, not free text, so unrelated trials are never attributed to a company.
-* **Own words only.** Deep dive narrative comes from the company's filings, not generated prose.
+* **Own words only.** Company Profile narrative comes from the company's filings, not generated prose.
 
 ## Limitations
 
 These follow directly from the no paid APIs rule, and the UI is honest about them:
 
-* Private companies (no SEC filings) get lighter profiles: Wikipedia grounded in the deep dive, trials plus publications plus grants in the sector scan.
+* Private companies (no SEC filings) get lighter profiles: Wikipedia grounded in the Company Profile, trials plus publications plus grants in the sector scan.
 * LinkedIn links are prefilled search URLs, not exact profile links (no free API returns those).
 * Executive avatars are generated initials, not photos.
 * UNC alumni detection reads DEF 14A proxy statements and public leadership pages; it covers board members and named executives, not every employee.
-* Live deep dive narrative is the company's own 10-K text, not original analysis. That is the one thing an LLM would add, and the one thing that is not free.
+* Live Company Profile narrative is the company's own 10-K text, not original analysis. That is the one thing an LLM would add, and the one thing that is not free.
 * Reports are drafts for human verification before any outreach. The tool removes mechanical labor; it does not replace analyst judgment.
 
 ## License
