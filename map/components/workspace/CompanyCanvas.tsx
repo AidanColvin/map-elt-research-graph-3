@@ -1,9 +1,13 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import MarkdownArticle from "@/app/components/MarkdownArticle";
 import CompanyLogo from "@/app/components/CompanyLogo";
 import { CompanyActionBar } from "./ActionBar";
 import type { DeepDiveState } from "./useDeepDive";
+import type { SavedReportsState } from "./useSavedReports";
+import { SavedStrip, SaveControl, VerifyPill } from "./SavedReports";
+import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
 
 // The five popular companies offered as one-click starting points. Each is a
@@ -59,11 +63,17 @@ function CompanyHero({
   onDraftChange,
   onRun,
   busy,
+  savedItems,
+  onOpenSaved,
+  onRemoveSaved,
 }: {
   draft: string;
   onDraftChange: (v: string) => void;
   onRun: (name: string) => void;
   busy: boolean;
+  savedItems: SavedReport[];
+  onOpenSaved: (r: SavedReport) => void;
+  onRemoveSaved: (id: string) => void;
 }) {
   return (
     <div
@@ -122,6 +132,17 @@ function CompanyHero({
             </button>
           ))}
         </div>
+
+        {savedItems.length > 0 && (
+          <div style={{ marginTop: 26 }}>
+            <SavedStrip
+              items={savedItems}
+              onOpen={onOpenSaved}
+              onRemove={onRemoveSaved}
+              label="Saved profiles"
+            />
+          </div>
+        )}
       </div>
 
       {/* ── Right panel (~40%) — lavender sample-output card ── */}
@@ -252,14 +273,72 @@ export default function CompanyCanvas({
   dive,
   draft,
   onDraftChange,
+  saved,
 }: {
   dive: DeepDiveState;
   draft: string;
   onDraftChange: (v: string) => void;
+  saved: SavedReportsState;
 }) {
   // The H1 is replaced by the card's own title row, like every other module.
   const body = dive.markdown.replace(/^#\s+.*\n?/, "");
   const busy = dive.status === "loading" || dive.status === "streaming";
+
+  const companyItems = saved.saved.filter((r) => r.kind === "company");
+  const [verifyNote, setVerifyNote] = useState("");
+  // When a reopened-but-stale report is regenerating, remember the subject so
+  // the fresh stream can be re-saved the moment it finishes.
+  const resaveRef = useRef<{ query: string; sig: string } | null>(null);
+
+  // takes: a saved company report
+  // does: shows the saved copy instantly, then re-verifies it against the
+  //       latest SEC signature — if the source has new filings it regenerates
+  //       live; otherwise it just bumps the "verified" time. Never serves a
+  //       stale report silently.
+  async function openSaved(r: SavedReport) {
+    onDraftChange(r.query);
+    dive.loadSaved(r.query, r.content);
+    setVerifyNote("Checking for updates…");
+    const sig = await fetchSignature("company", r.query);
+    if (sig && r.sig && sig !== r.sig) {
+      setVerifyNote("New filings found — refreshing…");
+      resaveRef.current = { query: r.query, sig };
+      dive.run(r.query);
+    } else {
+      setVerifyNote("Verified current");
+      await saved.save({ ...r, verifiedAt: Date.now() });
+      window.setTimeout(() => setVerifyNote(""), 2600);
+    }
+  }
+
+  // After a staleness-triggered regeneration finishes streaming, persist the
+  // fresh content + signature over the saved copy.
+  useEffect(() => {
+    const pending = resaveRef.current;
+    if (dive.status === "done" && pending && pending.query === dive.company) {
+      resaveRef.current = null;
+      const now = Date.now();
+      saved
+        .save({
+          id: savedId("company", pending.query),
+          kind: "company",
+          query: pending.query,
+          title: pending.query,
+          content: dive.markdown,
+          sig: pending.sig,
+          savedAt: now,
+          verifiedAt: now,
+        })
+        .finally(() => {
+          setVerifyNote("Updated to latest");
+          window.setTimeout(() => setVerifyNote(""), 2600);
+        });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dive.status, dive.company]);
+
+  const showReport =
+    dive.status === "streaming" || dive.status === "done" || dive.status === "error";
 
   return (
     <CanvasCard
@@ -273,23 +352,54 @@ export default function CompanyCanvas({
       }
     >
       {dive.status === "idle" && (
-        <CompanyHero draft={draft} onDraftChange={onDraftChange} onRun={dive.run} busy={busy} />
+        <CompanyHero
+          draft={draft}
+          onDraftChange={onDraftChange}
+          onRun={dive.run}
+          busy={busy}
+          savedItems={companyItems}
+          onOpenSaved={openSaved}
+          onRemoveSaved={saved.remove}
+        />
       )}
       {dive.status === "loading" && <Loading label={`Gathering public data on ${dive.company}…`} />}
-      {(dive.status === "streaming" || dive.status === "done" || dive.status === "error") && (
+      {showReport && (
         <div style={{ padding: "24px 28px 36px" }}>
-          <h2
+          <div
             style={{
-              fontFamily: FONT,
-              fontSize: 26,
-              fontWeight: 700,
-              letterSpacing: "-0.02em",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              flexWrap: "wrap",
               margin: "0 0 6px",
-              color: "#1d1d1f",
             }}
           >
-            {dive.company}
-          </h2>
+            <h2
+              style={{
+                fontFamily: FONT,
+                fontSize: 26,
+                fontWeight: 700,
+                letterSpacing: "-0.02em",
+                margin: 0,
+                color: "#1d1d1f",
+              }}
+            >
+              {dive.company}
+            </h2>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <VerifyPill note={verifyNote} />
+              {dive.status === "done" && dive.markdown.length > 200 && (
+                <SaveControl
+                  saved={saved}
+                  kind="company"
+                  query={dive.company}
+                  title={dive.company}
+                  getContent={() => dive.markdown}
+                />
+              )}
+            </div>
+          </div>
           <div className={`workspace-md ${dive.status === "streaming" ? "streaming" : ""}`}>
             <MarkdownArticle markdown={body} />
             {dive.status === "streaming" && <span className="cursor" />}

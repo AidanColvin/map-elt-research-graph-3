@@ -2,6 +2,7 @@
 
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, type Auth } from "firebase/auth";
+import { getFirestore, type Firestore } from "firebase/firestore";
 
 /**
  * Firebase web config, read from public NEXT_PUBLIC_* env vars. These are
@@ -29,4 +30,20 @@ export function getFirebaseAuth(): Auth | null {
   if (!firebaseEnabled) return null;
   const app = getApps().length ? getApp() : initializeApp(config);
   return getAuth(app);
+}
+
+// takes: nothing
+// does: lazily returns the Cloud Firestore instance for the initialized app, or
+//       null when Firebase isn't configured. Callers must still tolerate a null
+//       return and any thrown error (Firestore may be unconfigured in the
+//       project), falling back to device-local storage so the site never breaks.
+// returns: a Firestore instance, or null
+export function getFirebaseDb(): Firestore | null {
+  if (!firebaseEnabled) return null;
+  try {
+    const app = getApps().length ? getApp() : initializeApp(config);
+    return getFirestore(app);
+  } catch {
+    return null;
+  }
 }
