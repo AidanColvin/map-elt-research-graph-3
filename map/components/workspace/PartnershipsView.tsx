@@ -75,20 +75,22 @@ export default function PartnershipsView() {
   const [data, setData] = useState<PartnerData | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
-  // takes: a form submit event
-  // does: posts the query+type to /api/partnerships and stores the result
+  // takes: a query string and a search type
+  // does: posts to /api/partnerships and stores the result, syncing the visible
+  //       toggle/input to what was searched
   // returns: nothing (updates state)
-  async function search(e: React.FormEvent) {
-    e.preventDefault();
-    const q = query.trim();
-    if (!q) return;
+  async function runSearch(q: string, t: PartnerType) {
+    const trimmed = q.trim();
+    if (!trimmed) return;
+    setType(t);
+    setQuery(trimmed);
     setStatus("loading");
     setData(null);
     try {
       const res = await fetch("/api/partnerships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: q, type }),
+        body: JSON.stringify({ query: trimmed, type: t }),
       });
       const json = await res.json();
       if (!res.ok || !json.data) { setStatus("error"); return; }
@@ -97,6 +99,14 @@ export default function PartnershipsView() {
     } catch {
       setStatus("error");
     }
+  }
+
+  // takes: a form submit event
+  // does: runs the search for the current input + toggle
+  // returns: nothing
+  function search(e: React.FormEvent) {
+    e.preventDefault();
+    runSearch(query, type);
   }
 
   return (
@@ -152,6 +162,59 @@ export default function PartnershipsView() {
           {status === "loading" ? "Searching…" : "Search"}
         </button>
       </form>
+
+      {/* Populated idle state — popular starting points + a guide to the three
+          source-linked panels a search produces. */}
+      {status === "idle" && (
+        <div style={{ marginTop: 26 }}>
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: "0 0 12px" }}>
+            Try a company
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {["Liquidia", "Merck", "Pfizer", "GSK", "Gilead Sciences", "Eli Lilly"].map((c) => (
+              <button
+                key={c}
+                onClick={() => runSearch(c, "company")}
+                className="rounded-full bg-white/80 border border-black/[0.06] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                style={{ padding: "6px 14px", fontSize: 13.5, fontWeight: 500, color: "#1d1d1f" }}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+
+          <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: "22px 0 12px" }}>
+            …or a whole sector
+          </p>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+            {["Oncology", "Gene Therapy", "Biotech"].map((s) => (
+              <button
+                key={s}
+                onClick={() => runSearch(s, "sector")}
+                className="rounded-full bg-white/80 border border-black/[0.06] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+                style={{ padding: "6px 14px", fontSize: 13.5, fontWeight: 500, color: "#1d1d1f" }}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* What a search returns — three source-linked panels. */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16, marginTop: 30 }}>
+            {[
+              { t: "Clinical / Research", d: "Co-authored UNC ↔ company papers, with PMIDs and the UNC schools involved.", src: "PubMed" },
+              { t: "Conflict of Interest", d: "Disclosed financial ties (consulting, equity, funding) from the last 5 years.", src: "PubMed disclosures" },
+              { t: "Financial / Legal", d: "Verbatim sentences naming UNC, pulled straight from the company's SEC filings.", src: "SEC EDGAR" },
+            ].map((p) => (
+              <div key={p.t} style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 20 }}>
+                <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.14em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>{p.t}</p>
+                <p style={{ fontSize: 13.5, color: "#3a3a40", lineHeight: 1.5, margin: "10px 0 12px" }}>{p.d}</p>
+                <span style={{ fontSize: 11.5, color: "#5b6cff", background: "#eef0ff", borderRadius: 999, padding: "3px 10px" }}>{p.src}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {status === "error" && (
         <p style={{ marginTop: 22, color: "#b91c1c", fontSize: 14 }}>Couldn&apos;t reach the partnership service. Try again.</p>
