@@ -6,7 +6,7 @@ import CompanyLogo from "@/app/components/CompanyLogo";
 import { CompanyActionBar } from "./ActionBar";
 import type { DeepDiveState } from "./useDeepDive";
 import type { SavedReportsState } from "./useSavedReports";
-import { SavedStrip, SaveControl, VerifyPill } from "./SavedReports";
+import { SaveControl, VerifyPill } from "./SavedReports";
 import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
 import { CompanyExportBar } from "./CompanyExportBar";
@@ -22,7 +22,7 @@ const POPULAR = [
   { name: "Apple", domain: "apple.com", accent: "#1d1d1f" },
   { name: "NVIDIA", domain: "nvidia.com", accent: "#76b900" },
   { name: "Microsoft", domain: "microsoft.com", accent: "#0078d4" },
-  { name: "Alphabet", domain: "abc.xyz", accent: "#4285f4" },
+  { name: "Alphabet", domain: "google.com", accent: "#4285f4" },
   { name: "Amazon", domain: "amazon.com", accent: "#ff9900" },
 ];
 
@@ -91,7 +91,6 @@ function CompanyHero({
     >
       {/* ── Left panel (~60%) ── */}
       <div className="md:w-3/5">
-        <Eyebrow>Company Deep Dive</Eyebrow>
         <h1
           style={{
             fontSize: 38,
@@ -142,16 +141,6 @@ function CompanyHero({
           ))}
         </div>
 
-        {savedItems.length > 0 && (
-          <div style={{ marginTop: 26 }}>
-            <SavedStrip
-              items={savedItems}
-              onOpen={onOpenSaved}
-              onRemove={onRemoveSaved}
-              label="Saved profiles"
-            />
-          </div>
-        )}
 
         {projectSnapshots.length > 0 && (
           <div style={{ marginTop: 26 }}>
