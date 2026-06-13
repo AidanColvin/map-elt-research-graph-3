@@ -56,6 +56,11 @@ class PipelineRequest(BaseModel):
     company_override: Optional[str] = None  # legacy
 
 
+class PartnershipRequest(BaseModel):
+    query: str
+    type: str = "company"  # "company" | "sector"
+
+
 @app.get("/")
 async def root():
     return {"service": "ARIA-PI", "version": "0.3.0",
@@ -109,6 +114,28 @@ async def run_pipeline(req: PipelineRequest):
             headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
 
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/partnerships")
+async def partnerships(req: PartnershipRequest):
+    """Resolve verifiable UNC ↔ company/sector partnership evidence.
+
+    Accepts { query, type } and returns source-linked clinical (PubMed),
+    financial (verbatim SEC text), and university-ecosystem (unc.edu) data.
+    No AI summaries — every fact carries its primary source.
+    """
+    try:
+        from aria_pi.clients.partnership_resolver import resolve_partnerships
+        kind = req.type if req.type in ("company", "sector") else "company"
+        data = resolve_partnerships(req.query, kind)
+        return JSONResponse(
+            content={"status": "COMPLETED", "data": data},
+            headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()

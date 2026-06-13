@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
@@ -190,6 +191,11 @@ function SubNav({ view, onChange }: { view: View; onChange: (v: View) => void })
           {v.label}
         </button>
       ))}
+      {/* Partnerships is a dedicated route, so it navigates rather than toggling
+          a mounted view. Same nav styling as the workspace tabs. */}
+      <Link href="/partnerships" className="ws-nav-item">
+        Partnerships
+      </Link>
     </nav>
   );
 }
