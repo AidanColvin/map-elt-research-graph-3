@@ -7,14 +7,16 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-// Live FastAPI backend (Vercel project "aria-pi-api"), clean public alias —
-// NOT behind Deployment Protection, so the proxy reaches it without a token.
+// Live FastAPI backend (Vercel project "map-backend"), public domain — NOT
+// behind Deployment Protection, so the proxy reaches it without a token. This
+// is the backend that carries the current feature set (incl. the four data
+// signals); the older "aria-pi-api" project is stale and must not be used.
 //
 // IMPORTANT: we deliberately do NOT read NEXT_PUBLIC_API_URL here. A stale
 // NEXT_PUBLIC_API_URL in .env.production used to point this proxy at an old
 // backend (every sector returned pharma). Only an explicit BACKEND_API_URL
-// server var may override; otherwise we always use the live alias.
-const BACKEND_URL = process.env.BACKEND_API_URL || 'https://aria-pi-api.vercel.app';
+// server var may override; otherwise we always use the live domain.
+const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.vercel.app';
 
 // If the backend project keeps Vercel Deployment Protection ON, set this env
 // to the project's protection-bypass token so the server-side proxy can reach

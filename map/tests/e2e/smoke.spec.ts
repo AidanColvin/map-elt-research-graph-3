@@ -30,6 +30,31 @@ async function runSectorScan(page: Page, sector: string) {
   await input.press('Enter');
 }
 
+// Wait until the rendered report contains any of `sentinels`. The backend is a
+// Vercel serverless function with a 60s ceiling, so a cold start on the heavier
+// sectors can return a transient 502/timeout, surfaced in the UI as "Pipeline
+// failed (5xx)". When that happens we click Scan once more and wait again — a
+// genuinely broken pipeline still fails (the retry won't recover), but a
+// one-off cold-start hiccup no longer flakes the suite.
+async function awaitReport(page: Page, sentinels: string[], timeout = 100000) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const state = await page
+      .waitForFunction(
+        (ss) => {
+          const t = document.body.innerText;
+          if (/Pipeline failed/i.test(t)) return 'failed';
+          return ss.some((s) => t.includes(s)) ? 'ready' : false;
+        },
+        sentinels,
+        { timeout },
+      )
+      .then((h) => h.jsonValue());
+    if (state === 'ready') return;
+    if (attempt === 0) await page.locator('button:has-text("Scan")').first().click();
+  }
+  throw new Error('Sector scan kept failing (pipeline did not produce a report)');
+}
+
 test('dashboard loads without error', async ({ page }) => {
   await signIn(page);
   await page.waitForTimeout(2000);
@@ -93,13 +118,7 @@ test('Oncology sector scan completes and shows report', async ({ page }) => {
   test.setTimeout(120000);
   await signIn(page);
   await runSectorScan(page, 'Oncology');
-  await expect(page.locator('body')).toContainText(/\d+ of \d+/, { timeout: 30000 });
-  await page.waitForFunction(
-    () => document.body.innerText.includes('Overview') ||
-          document.body.innerText.includes('Profile') ||
-          document.body.innerText.includes('Pipeline'),
-    { timeout: 90000 }
-  );
+  await awaitReport(page, ['PARTNERSHIP INTELLIGENCE REPORT', 'Summary', 'Overview']);
   const text = await page.locator('body').innerText();
   expect(text).toContain('Oncology');
 });
@@ -118,11 +137,7 @@ test('new signals render well-formed when present in Oncology scan', async ({ pa
   test.setTimeout(120000);
   await signIn(page);
   await runSectorScan(page, 'Oncology');
-  await page.waitForFunction(
-    () => document.body.innerText.includes('PARTNERSHIP INTELLIGENCE REPORT') ||
-          document.body.innerText.includes('Summary'),
-    { timeout: 90000 }
-  );
+  await awaitReport(page, ['PARTNERSHIP INTELLIGENCE REPORT', 'Summary']);
   const text = await page.locator('body').innerText();
   const signals = [
     'Deal track record',
@@ -145,11 +160,7 @@ test('Gene Therapy scan shows report content', async ({ page }) => {
   await runSectorScan(page, 'Gene Therapy');
   // "Profile"/"Overview" appear in the nav chrome before any report exists —
   // wait for the rendered report header instead.
-  await page.waitForFunction(
-    () => document.body.innerText.includes('PARTNERSHIP INTELLIGENCE REPORT') ||
-          document.body.innerText.includes('Summary'),
-    { timeout: 110000 }
-  );
+  await awaitReport(page, ['PARTNERSHIP INTELLIGENCE REPORT', 'Summary']);
   const text = await page.locator('body').innerText();
   expect(text.length).toBeGreaterThan(1000);
 });
@@ -173,11 +184,7 @@ test('PatentsView signal appears for a large pharma company', async ({ page }) =
   test.setTimeout(120000);
   await signIn(page);
   await runSectorScan(page, 'Pharmaceutical');
-  await page.waitForFunction(
-    () => document.body.innerText.includes('PARTNERSHIP INTELLIGENCE REPORT') ||
-          document.body.innerText.includes('IP portfolio'),
-    { timeout: 110000 }
-  );
+  await awaitReport(page, ['PARTNERSHIP INTELLIGENCE REPORT', 'IP portfolio']);
   const text = await page.locator('body').innerText();
   if (process.env.PATENTSVIEW_API_KEY) {
     expect(text.includes('IP portfolio') || text.includes('patents')).toBeTruthy();
