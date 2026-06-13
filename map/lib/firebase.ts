@@ -27,6 +27,10 @@ export const firebaseEnabled = Boolean(config.apiKey && config.appId && config.p
 //       and returns its Auth instance, or null when Firebase isn't configured
 // returns: a Firebase Auth instance, or null
 export function getFirebaseAuth(): Auth | null {
+  // Firebase Auth is browser-only. Never initialize it during SSR / static
+  // prerender (the web SDK throws auth/invalid-api-key on the server), which
+  // would break `next build`.
+  if (typeof window === "undefined") return null;
   if (!firebaseEnabled) return null;
   const app = getApps().length ? getApp() : initializeApp(config);
   return getAuth(app);
@@ -39,6 +43,8 @@ export function getFirebaseAuth(): Auth | null {
 //       project), falling back to device-local storage so the site never breaks.
 // returns: a Firestore instance, or null
 export function getFirebaseDb(): Firestore | null {
+  // Browser-only, for the same reason as getFirebaseAuth above.
+  if (typeof window === "undefined") return null;
   if (!firebaseEnabled) return null;
   try {
     const app = getApps().length ? getApp() : initializeApp(config);

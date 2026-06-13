@@ -9,6 +9,11 @@ import type { SavedReportsState } from "./useSavedReports";
 import { SavedStrip, SaveControl, VerifyPill } from "./SavedReports";
 import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
+import { CompanyExportBar } from "./CompanyExportBar";
+import { ProjectSaveControl } from "./ProjectSaveControl";
+import { SnapshotBadge } from "./SnapshotBadge";
+import { getFirebaseAuth } from "@/lib/firebase";
+import { listSavedProfiles, type SavedProfile } from "@/src/firebase/db";
 
 // The five popular companies offered as one-click starting points. Each is a
 // curated name so the chip resolves to an instant report; CompanyLogo handles
@@ -66,6 +71,8 @@ function CompanyHero({
   savedItems,
   onOpenSaved,
   onRemoveSaved,
+  projectSnapshots,
+  onOpenSnapshot,
 }: {
   draft: string;
   onDraftChange: (v: string) => void;
@@ -74,6 +81,8 @@ function CompanyHero({
   savedItems: SavedReport[];
   onOpenSaved: (r: SavedReport) => void;
   onRemoveSaved: (id: string) => void;
+  projectSnapshots: SavedProfile[];
+  onOpenSnapshot: (p: SavedProfile) => void;
 }) {
   return (
     <div
@@ -141,6 +150,27 @@ function CompanyHero({
               onRemove={onRemoveSaved}
               label="Saved profiles"
             />
+          </div>
+        )}
+
+        {projectSnapshots.length > 0 && (
+          <div style={{ marginTop: 26 }}>
+            <p className="text-[11px] font-semibold tracking-[0.18em] text-gray-500 uppercase mb-3">
+              Project snapshots
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {projectSnapshots.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => onOpenSnapshot(p)}
+                  className="rounded-full bg-white/80 border border-black/[0.06] hover:shadow-md transition-all cursor-pointer"
+                  style={{ padding: "5px 13px", fontSize: 13, fontWeight: 500, color: "#1d1d1f" }}
+                  title="Open frozen snapshot"
+                >
+                  {p.companyName}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -286,6 +316,48 @@ export default function CompanyCanvas({
 
   const companyItems = saved.saved.filter((r) => r.kind === "company");
   const [verifyNote, setVerifyNote] = useState("");
+  // Saved project snapshots (Phase 2/3). Loaded from Firestore for signed-in
+  // users; empty for guests. `snapshot` marks the currently-displayed report as
+  // a frozen copy so the badge + Rerun control appear (Phase 3 "flag").
+  const [profiles, setProfiles] = useState<SavedProfile[]>([]);
+  const [snapshot, setSnapshot] = useState<{ lastUpdated: number; company: string } | null>(null);
+
+  // takes: nothing
+  // does: reloads the user's saved project snapshots from Firestore
+  // returns: nothing (updates state)
+  async function reloadProfiles() {
+    try {
+      const uid = getFirebaseAuth()?.currentUser?.uid ?? null;
+      setProfiles(uid ? await listSavedProfiles(uid) : []);
+    } catch {
+      setProfiles([]);
+    }
+  }
+
+  useEffect(() => {
+    reloadProfiles();
+  }, [saved.ready]);
+
+  // takes: a saved project snapshot
+  // does: renders the frozen Markdown statically (no auto-refresh) and flags it
+  //       with its snapshot date — the "freeze" half of Freeze & Flag
+  // returns: nothing (updates state)
+  function openSnapshot(p: SavedProfile) {
+    onDraftChange(p.companyName);
+    dive.loadSaved(p.companyName, p.reportMarkdown);
+    setVerifyNote("");
+    setSnapshot({ lastUpdated: p.lastUpdated, company: p.companyName });
+  }
+
+  // takes: nothing
+  // does: drops the frozen snapshot flag and triggers a fresh /api/generate run
+  //       that overwrites the canvas with current data
+  // returns: nothing
+  function rerunSnapshot() {
+    const company = dive.company;
+    setSnapshot(null);
+    dive.run(company);
+  }
   // When a reopened-but-stale report is regenerating, remember the subject so
   // the fresh stream can be re-saved the moment it finishes.
   const resaveRef = useRef<{ query: string; sig: string } | null>(null);
@@ -295,7 +367,16 @@ export default function CompanyCanvas({
   //       latest SEC signature — if the source has new filings it regenerates
   //       live; otherwise it just bumps the "verified" time. Never serves a
   //       stale report silently.
+  // takes: a company name
+  // does: clears any frozen-snapshot flag, then runs a fresh deep dive
+  // returns: nothing
+  function runCompany(name: string) {
+    setSnapshot(null);
+    dive.run(name);
+  }
+
   async function openSaved(r: SavedReport) {
+    setSnapshot(null);
     onDraftChange(r.query);
     dive.loadSaved(r.query, r.content);
     setVerifyNote("Checking for updates…");
@@ -347,7 +428,7 @@ export default function CompanyCanvas({
       // top toolbar is omitted; every other state keeps it.
       toolbar={
         dive.status === "idle" ? undefined : (
-          <CompanyActionBar value={draft} onChange={onDraftChange} onRun={dive.run} busy={busy} />
+          <CompanyActionBar value={draft} onChange={onDraftChange} onRun={runCompany} busy={busy} />
         )
       }
     >
@@ -355,11 +436,13 @@ export default function CompanyCanvas({
         <CompanyHero
           draft={draft}
           onDraftChange={onDraftChange}
-          onRun={dive.run}
+          onRun={runCompany}
           busy={busy}
           savedItems={companyItems}
           onOpenSaved={openSaved}
           onRemoveSaved={saved.remove}
+          projectSnapshots={profiles}
+          onOpenSnapshot={openSnapshot}
         />
       )}
       {dive.status === "loading" && <Loading label={`Gathering public data on ${dive.company}…`} />}
@@ -387,19 +470,29 @@ export default function CompanyCanvas({
             >
               {dive.company}
             </h2>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <VerifyPill note={verifyNote} />
               {dive.status === "done" && dive.markdown.length > 200 && (
-                <SaveControl
-                  saved={saved}
-                  kind="company"
-                  query={dive.company}
-                  title={dive.company}
-                  getContent={() => dive.markdown}
-                />
+                <>
+                  <CompanyExportBar markdown={dive.markdown} title={dive.company} />
+                  <ProjectSaveControl
+                    companyName={dive.company}
+                    getMarkdown={() => dive.markdown}
+                  />
+                  <SaveControl
+                    saved={saved}
+                    kind="company"
+                    query={dive.company}
+                    title={dive.company}
+                    getContent={() => dive.markdown}
+                  />
+                </>
               )}
             </div>
           </div>
+          {snapshot && snapshot.company === dive.company && dive.status === "done" && (
+            <SnapshotBadge lastUpdated={snapshot.lastUpdated} busy={busy} onRerun={rerunSnapshot} />
+          )}
           <div className={`workspace-md ${dive.status === "streaming" ? "streaming" : ""}`}>
             <MarkdownArticle markdown={body} />
             {dive.status === "streaming" && <span className="cursor" />}
