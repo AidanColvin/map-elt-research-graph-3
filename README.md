@@ -1,10 +1,9 @@
 # Map
 
-One web app that merges two report engines and an accounts database behind a single sign in.
+One web app with two report engines behind a single sign in.
 
-* **Company Deep Dive** (from *deep-dive-gen*): board ready intelligence reports on any public company. Full financial statements, narrative lifted from the company's own SEC filings, leadership org charts, streamed charts.
+* **Company Profile**: board ready intelligence reports on any public company. Full financial statements, narrative lifted from the company's own SEC filings, leadership org charts, streamed charts.
 * **Sector Scan** (from *map / ARIA PI*): partnership intelligence for university technology transfer. Type a sector, get a fully sourced report mapping public companies to overlapping research at UNC Chapel Hill, scored and citation checked, in about a minute.
-* **Accounts**: a database of 142 partner accounts with researched, source cited profiles and Excel, PDF, and Markdown downloads.
 
 The hard constraint behind every design decision in both engines: **completely free to run.**
 
