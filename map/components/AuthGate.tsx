@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithPopup,
   GoogleAuthProvider,
+  OAuthProvider,
 } from "firebase/auth";
 import { firebaseEnabled, getFirebaseAuth } from "@/lib/firebase";
 
@@ -145,6 +146,17 @@ const S = {
   } as React.CSSProperties,
 };
 
+function MicrosoftIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 23 23" aria-hidden>
+      <path fill="#F25022" d="M1 1h10v10H1z" />
+      <path fill="#7FBA00" d="M12 1h10v10H12z" />
+      <path fill="#00A4EF" d="M1 12h10v10H1z" />
+      <path fill="#FFB900" d="M12 12h10v10H12z" />
+    </svg>
+  );
+}
+
 function GoogleIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 48 48" aria-hidden>
@@ -242,11 +254,11 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
     finish({ email: em, guest: false, role: roleForEmail(em), password });
   }
 
-  // takes: "Google"
-  // does: runs the real Google OAuth popup via Firebase when configured;
-  //       otherwise shows the no-keys notice
+  // takes: "Google" or "Microsoft"
+  // does: runs the real OAuth popup for the chosen provider via Firebase when
+  //       configured; otherwise shows the no-keys notice
   // returns: nothing (async)
-  async function oauthSignIn(provider: "Google") {
+  async function oauthSignIn(provider: "Google" | "Microsoft") {
     setError("");
     setNotice("");
     const auth = getFirebaseAuth();
@@ -256,7 +268,10 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       );
       return;
     }
-    const p = new GoogleAuthProvider();
+    const p =
+      provider === "Microsoft"
+        ? new OAuthProvider("microsoft.com")
+        : new GoogleAuthProvider();
     try {
       const cred = await signInWithPopup(auth, p);
       const em = (cred.user.email || "").toLowerCase();
@@ -283,6 +298,10 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
 
         <button style={S.oauth} onClick={() => oauthSignIn("Google")}>
           <GoogleIcon /> Continue with Google
+        </button>
+
+        <button style={S.oauth} onClick={() => oauthSignIn("Microsoft")}>
+          <MicrosoftIcon /> Continue with Microsoft
         </button>
 
         <div
