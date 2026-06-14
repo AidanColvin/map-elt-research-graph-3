@@ -11,6 +11,7 @@ import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
 import { CompanyExportBar } from "./CompanyExportBar";
 import { ProjectSaveControl } from "./ProjectSaveControl";
+import { ShareControl } from "./ShareControl";
 import { SnapshotBadge } from "./SnapshotBadge";
 import { getFirebaseAuth } from "@/lib/firebase";
 import { listSavedProfiles, type SavedProfile } from "@/src/firebase/db";
@@ -471,6 +472,12 @@ export default function CompanyCanvas({
                   />
                   <SaveControl
                     saved={saved}
+                    kind="company"
+                    query={dive.company}
+                    title={dive.company}
+                    getContent={() => dive.markdown}
+                  />
+                  <ShareControl
                     kind="company"
                     query={dive.company}
                     title={dive.company}

@@ -8,6 +8,7 @@ import TickerGrid from "./TickerGrid";
 import type { SectorScanState } from "./useSectorScan";
 import type { SavedReportsState } from "./useSavedReports";
 import { SavedStrip, SaveControl, VerifyPill } from "./SavedReports";
+import { ShareControl } from "./ShareControl";
 import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
 
@@ -260,6 +261,12 @@ export default function SectorCanvas({
               kind="sector"
               query={scan.sector}
               title={scan.sector}
+              getContent={() => JSON.stringify(scan.data)}
+            />
+            <ShareControl
+              kind="sector"
+              query={scan.sector}
+              title={`Sector Scan — ${scan.sector}`}
               getContent={() => JSON.stringify(scan.data)}
             />
           </div>
