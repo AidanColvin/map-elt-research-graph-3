@@ -1,34 +1,5 @@
 "use client";
 
-import { useState } from "react";
-import { OrbitNetwork } from "@/components/Chart3D";
-import { SECTORS, getSectorSuggestion } from "./sectors";
-
-// Apple blue
-const BLUE = "#007aff";
-
-const SCAN_POINTS = [
-  { label: "Merck",       size: 0.9,  highlight: true,  weight: 2 },
-  { label: "Pfizer",      size: 0.8,  highlight: true,  weight: 2 },
-  { label: "AstraZeneca", size: 0.7,  weight: 1 },
-  { label: "Novartis",    size: 0.65, weight: 1 },
-  { label: "Amgen",       size: 0.6,  highlight: true,  weight: 1 },
-  { label: "Gilead",      size: 0.5,  weight: 1 },
-  { label: "BioNTech",    size: 0.45, weight: 1 },
-  { label: "Moderna",     size: 0.5,  weight: 1 },
-  { label: "Regeneron",   size: 0.4,  highlight: true,  weight: 1 },
-  { label: "Vertex",      size: 0.35, weight: 1 },
-  { label: "Illumina",    size: 0.3,  weight: 1 },
-];
-
-const SECTORS_QUICK = ["Clean Energy", "Biotech", "Quantum", "Gene Therapy"];
-
-function classifyQuery(q: string): "sector" | "company" {
-  const v = q.trim().toLowerCase();
-  if (SECTORS.some((s) => s.toLowerCase() === v)) return "sector";
-  return "company";
-}
-
 export default function DashboardHome({
   onRunCompany,
   onRunSector,
@@ -40,208 +11,75 @@ export default function DashboardHome({
   onOpenCompanyView: () => void;
   onPrefillSector:   (name: string) => void;
 }) {
-  const [query, setQuery] = useState("");
-
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const completed = getSectorSuggestion(query) ?? query;
-    const target = completed.trim();
-    if (!target) return;
-    if (classifyQuery(target) === "sector") onRunSector(target);
-    else onRunCompany(target);
-    setQuery("");
-  }
-
   return (
     <div style={{
-      maxWidth: 1120,
+      maxWidth: 680,
       margin: "0 auto",
-      padding: "0 32px",
-      height: "calc(100vh - 54px)",
+      padding: "48px 32px 32px",
+      minHeight: "calc(100vh - 54px)",
       display: "flex",
       flexDirection: "column",
-      justifyContent: "center",
-      gap: 0,
     }}>
+      {/* Eyebrow */}
+      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", color: "#8e8e93", textTransform: "uppercase", marginBottom: 24 }}>
+        A Research Workspace · Est. 2026
+      </p>
 
-      {/* ── Two-column hero ── */}
+      {/* Headline */}
+      <h1 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, marginBottom: 20 }}>
+        <span style={{ color: "#1d1d1f" }}>Board-ready intelligence,{"\n"}</span>
+        <span style={{ color: "#007aff" }}>assembled from primary sources.</span>
+      </h1>
+
+      {/* Body */}
+      <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.65, marginBottom: 40, maxWidth: 560 }}>
+        No LLM in the request path. No API keys. Every number, sentence, and citation traces to a free, keyless public data source — SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER.
+      </p>
+
+      {/* Canvas card */}
       <div style={{
-        display: "grid",
-        gridTemplateColumns: "1fr 1.1fr",
-        gap: 56,
-        alignItems: "center",
+        border: "1px solid #e5e5ea",
+        borderRadius: 20,
+        overflow: "hidden",
+        marginBottom: "auto",
       }}>
-
-        {/* LEFT */}
-        <div>
-          <h1 style={{
-            fontSize: "clamp(34px, 4vw, 52px)",
-            lineHeight: 1.1,
-            fontWeight: 700,
-            letterSpacing: "-0.025em",
-            color: "#1d1d1f",
-            marginBottom: 16,
-          }}>
-            Map the{" "}
-            <span style={{ color: BLUE }}>partnership</span>
-            {" "}landscape.
-          </h1>
-
-          <p style={{
-            fontSize: 17,
-            color: "#6e6e73",
-            lineHeight: 1.6,
-            marginBottom: 32,
-            maxWidth: 400,
-          }}>
-            Discover the research behind every deal. Search any company or sector and get a full intelligence report in about a minute.
-          </p>
-
-          {/* Search */}
-          <form onSubmit={submit} style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "6px 6px 6px 18px",
-            background: "#ffffff",
-            border: "1px solid #d1d1d6",
-            borderRadius: 14,
-            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
-            maxWidth: 440,
-            marginBottom: 14,
-          }}>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Company, ticker, or sector…"
-              aria-label="Company, ticker, or sector"
-              autoComplete="off"
-              spellCheck={false}
-              style={{
-                flex: 1,
-                background: "transparent",
-                border: "none",
-                fontSize: 16,
-                color: "#1d1d1f",
-                outline: "none",
-                padding: "7px 0",
-              }}
-            />
-            <button type="submit" style={{
-              borderRadius: 10,
-              background: BLUE,
-              color: "#fff",
-              fontSize: 15,
-              fontWeight: 600,
-              padding: "10px 22px",
-              border: "none",
-              cursor: "pointer",
-              whiteSpace: "nowrap",
-              transition: "opacity 0.12s",
-            }}
-              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.86")}
-              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-            >
-              Map it
-            </button>
-          </form>
-
-          {/* Try chips */}
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 40 }}>
-            <span style={{ fontSize: 13, color: "#8e8e93" }}>Try:</span>
-            {["Apple", "Oncology", "Semiconductors"].map((chip) => (
-              <button key={chip} onClick={() => setQuery(chip)} style={{
-                fontSize: 13,
-                color: "#1d1d1f",
-                background: "#f2f2f7",
-                border: "none",
-                borderRadius: 999,
-                padding: "5px 14px",
-                cursor: "pointer",
-                transition: "background 0.12s",
-              }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#e5e5ea")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#f2f2f7")}
-              >
-                {chip}
-              </button>
-            ))}
-          </div>
-
-          {/* Sector pills */}
-          <div>
-            <p style={{ fontSize: 12, fontWeight: 600, color: "#8e8e93", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 12 }}>
-              Trending Sectors
-            </p>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-              {SECTORS_QUICK.map((s) => (
-                <button key={s} onClick={() => onPrefillSector(s)} style={{
-                  fontSize: 13,
-                  color: BLUE,
-                  background: "rgba(0,122,255,0.08)",
-                  border: "1px solid rgba(0,122,255,0.18)",
-                  borderRadius: 999,
-                  padding: "6px 16px",
-                  cursor: "pointer",
-                  fontWeight: 500,
-                  transition: "background 0.12s",
-                }}
-                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,122,255,0.14)")}
-                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(0,122,255,0.08)")}
-                >
-                  {s}
-                </button>
-              ))}
-              <button onClick={onOpenCompanyView} style={{
-                fontSize: 13,
-                color: "#8e8e93",
-                background: "#f2f2f7",
-                border: "none",
-                borderRadius: 999,
-                padding: "6px 16px",
-                cursor: "pointer",
-                transition: "background 0.12s",
-              }}
-                onMouseEnter={(e) => (e.currentTarget.style.background = "#e5e5ea")}
-                onMouseLeave={(e) => (e.currentTarget.style.background = "#f2f2f7")}
-              >
-                All companies →
-              </button>
+        <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", color: "#8e8e93", textTransform: "uppercase", padding: "14px 20px 10px", borderBottom: "1px solid #f2f2f7" }}>
+          Open a canvas
+        </p>
+        {[
+          { label: "Company Profile", sub: "Live SEC filings, charts, leadership", action: () => onOpenCompanyView() },
+          { label: "Sector Scan", sub: "Trials + grants + filings, parallel pull", action: () => onRunSector("") },
+          { label: "Accounts", sub: "Partner database, exportable", action: () => onOpenCompanyView() },
+        ].map((row, i, arr) => (
+          <button key={row.label} onClick={row.action} style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            width: "100%", padding: "18px 20px",
+            background: "#fff", border: "none",
+            borderBottom: i < arr.length - 1 ? "1px solid #f2f2f7" : "none",
+            cursor: "pointer", textAlign: "left",
+            transition: "background 0.12s",
+          }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#f9f9f9")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#fff")}
+          >
+            <div>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "#1d1d1f", marginBottom: 2 }}>{row.label}</p>
+              <p style={{ fontSize: 12.5, color: "#8e8e93" }}>{row.sub}</p>
             </div>
-          </div>
-        </div>
-
-        {/* RIGHT — orbit card */}
-        <div style={{
-          borderRadius: 24,
-          background: "#ffffff",
-          border: "1px solid #e5e5ea",
-          boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
-          padding: "20px 20px 16px",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
-            <p style={{
-              display: "flex", alignItems: "center", gap: 7,
-              fontSize: 11, fontWeight: 600, letterSpacing: "0.08em",
-              color: "#8e8e93", textTransform: "uppercase",
-            }}>
-              <span style={{
-                display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                background: "#30d158",
-                animation: "pulse 1.6s ease-in-out infinite",
-              }} aria-hidden />
-              Sector Scan · Live
-            </p>
-            <span style={{ fontSize: 11, color: "#aeaeb2", fontVariantNumeric: "tabular-nums" }}>14 of 18</span>
-          </div>
-
-          <h2 style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.015em", marginBottom: 2 }}>Oncology</h2>
-          <p style={{ fontSize: 13, color: "#aeaeb2", marginBottom: 6 }}>Live sector intelligence scan</p>
-
-          <OrbitNetwork points={SCAN_POINTS} centerLabel="map" height={400} baseColor={BLUE} />
-        </div>
+            <span style={{ fontSize: 18, color: "#007aff", fontWeight: 400 }}>→</span>
+          </button>
+        ))}
       </div>
 
+      {/* Footer */}
+      <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #f2f2f7" }}>
+        <p style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 8 }}>
+          Independent project. Not affiliated with UNC Chapel Hill. For information only — not investment advice.
+        </p>
+        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase" }}>
+          Free · Keyless · Primary-Source
+        </p>
+      </div>
     </div>
   );
 }

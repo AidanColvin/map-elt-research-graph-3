@@ -27,36 +27,21 @@ type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "
 // the accounts route is "Companies"; its view key stays "accounts" so nothing
 // that references the route breaks.
 const VIEWS: { key: View; label: string }[] = [
-  { key: "company", label: "Company Profile" },
-  { key: "sector", label: "Sector Scan" },
-  // DEACTIVATED — hidden from the public app. The "Companies" (accounts) and
-  // "Partnerships" views are intentionally removed from the sub-nav so they
-  // are unreachable in the live build. All of their code (the render blocks
-  // below, AccountsCanvas, PartnershipsView, and the /api routes) is kept in
-  // the repo. To REACTIVATE, uncomment the two lines below:
-  // { key: "accounts", label: "Companies" },
-  // { key: "partnerships", label: "Partnerships" },
+  { key: "dashboard", label: "Dashboard" },
+  { key: "company", label: "Company" },
+  { key: "sector", label: "Sector" },
+  { key: "accounts", label: "Accounts" },
 ];
 
 // takes: an optional pixel size
 // does: draws the node-graph brand glyph used in the header
 // returns: the logo SVG element
-function LogoMark({ size = 22 }: { size?: number }) {
+function LogoMark() {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="3.2" fill="#1d1d1f" />
-      {[0, 60, 120, 180, 240, 300].map((deg) => {
-        const r = (deg * Math.PI) / 180;
-        const x = 12 + 8.5 * Math.cos(r);
-        const y = 12 + 8.5 * Math.sin(r);
-        return (
-          <g key={deg}>
-            <line x1="12" y1="12" x2={x} y2={y} stroke="#1d1d1f" strokeWidth="1.1" />
-            <circle cx={x} cy={y} r="1.9" fill="#1d1d1f" />
-          </g>
-        );
-      })}
-    </svg>
+    <div style={{
+      width: 28, height: 28, borderRadius: "50%",
+      background: "#007aff", flexShrink: 0,
+    }} />
   );
 }
 
@@ -70,17 +55,13 @@ function LogoMark({ size = 22 }: { size?: number }) {
 //       tab group stays optically centered like apple.com.
 // returns: the global header element
 function GlobalHeader({
-  user,
   view,
   onHome,
   onChange,
-  onProfile,
 }: {
-  user: MapUser;
   view: View;
   onHome: () => void;
   onChange: (v: View) => void;
-  onProfile: () => void;
 }) {
   // Equal-width flank zones keep the centered tab group from drifting when the
   // logo and Profile button differ in width.
@@ -102,10 +83,8 @@ function GlobalHeader({
         display: "flex",
         alignItems: "center",
         padding: "0 22px",
-        background: "rgba(250,249,247,0.82)",
-        backdropFilter: "saturate(180%) blur(20px)",
-        WebkitBackdropFilter: "saturate(180%) blur(20px)",
-        borderBottom: "1px solid rgba(0,0,0,0.05)",
+        background: "#ffffff",
+        borderBottom: "1px solid #e5e5ea",
         fontFamily: FONT,
       }}
     >
@@ -129,14 +108,14 @@ function GlobalHeader({
           <LogoMark />
           <span
             style={{
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: 600,
-              letterSpacing: "0.32em",
+              letterSpacing: 0,
               color: "#1d1d1f",
               userSelect: "none",
             }}
           >
-            map 3
+            Map 3
           </span>
         </button>
       </div>
@@ -147,7 +126,7 @@ function GlobalHeader({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: 8,
           flexShrink: 0,
         }}
       >
@@ -163,43 +142,17 @@ function GlobalHeader({
         ))}
       </nav>
 
-      {/* Right zone — Profile button → account view. */}
+      {/* Right zone — live status pill. */}
       <div style={{ ...flank, justifyContent: "flex-end" }}>
-        <button
-          onClick={onProfile}
-          aria-label="Open account"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            border: "1px solid rgba(0,0,0,0.08)",
-            borderRadius: 999,
-            padding: "5px 14px 5px 6px",
-            background: "rgba(255,255,255,0.8)",
-            cursor: "pointer",
-            fontFamily: FONT,
-            fontSize: 13.5,
-            color: "#1d1d1f",
-          }}
-        >
-          <span
-            style={{
-              width: 26,
-              height: 26,
-              borderRadius: "50%",
-              background: "#1d1d1f",
-              color: "#fff",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: 12,
-              fontWeight: 600,
-            }}
-          >
-            {user.guest ? "G" : user.email[0].toUpperCase()}
-          </span>
-          Profile
-        </button>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          border: "1px solid #e5e5ea", borderRadius: 999,
+          padding: "5px 14px", fontSize: 13.5, color: "#6e6e73",
+          background: "#fff",
+        }}>
+          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#30d158", display: "inline-block" }} />
+          live
+        </div>
       </div>
     </header>
   );
@@ -284,11 +237,9 @@ export default function MapHome() {
       }}
     >
       <GlobalHeader
-        user={user}
         view={view}
         onHome={() => setView("dashboard")}
         onChange={setView}
-        onProfile={() => setView("account")}
       />
 
       {/* All three views stay mounted; toggling display from none re-runs the
