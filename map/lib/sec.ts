@@ -826,14 +826,96 @@ function isExecName(s: string): boolean {
   const words = s.split(/\s+/);
   if (words.length < 2 || words.length > 4) return false;
   if (/^(mr|ms|mrs|dr|messrs)\b/i.test(s)) return false; // bio honorific, not the roster name
-  // Reject strings that are actually titles / table headers.
+  // A leading word ending in a period that isn't an initial ("Directors.",
+  // "Palantir.", "Inc.") is document chrome bleeding into the name.
+  const first = words[0];
+  if (/\.$/.test(first) && first.replace(/\./g, "").length > 1) return false;
+  // Reject strings that are actually titles, table headers, or document chrome.
   if (
-    /\b(name|office|offices|age|position|title|officer|officers|chief|president|vice|chair|director|executive|senior|treasurer|secretary|counsel|controller|principal|department|division|board|since)\b/i.test(
+    /\b(name|office|offices|age|position|title|officer|officers|chief|president|vice|chair|directors?|executive|senior|treasurer|secretary|counsel|controller|principal|department|division|board|since|proxy|statement|ownership|requirement|current|general|manager|experience|compensation|table|summary|annual|report|notice|meeting|committee|founder|former|independent|remarks|named|continued|nominee|elected)\b/i.test(
       s,
     )
   )
     return false;
   return true;
+}
+
+const PROXY_TITLE =
+  "(?:Chair(?:man|woman)?(?: and| &) )?(?:President(?: and| &) )?Chief (?:Executive|Financial|Operating(?: and Financial)?|Technology|Legal|Product|Revenue|Accounting|Marketing) Officer";
+// A company name immediately after a title => a director's role at ANOTHER firm.
+const COMPANY_AFTER =
+  /^\s*,?\s*(of\s+)?[A-Z][A-Za-z.&,'\- ]*?\b(Inc|Corp|Corporation|Company|Co|LLC|L\.P|Ltd|plc|Group|Holdings|Technologies|Systems|Bancorp|Airlines|Stores|Bank|Partners|Capital|Ventures|Foundation|University)\b/;
+
+// takes: a raw matched name span (which may carry leading document noise)
+// does: returns the cleanest trailing person-name (full, last-3, or last-2 words)
+//       that validates as a real name
+// returns: the person name, or null
+function bestExecName(raw: string): string | null {
+  const w = raw.split(/\s+/);
+  const candidates = w.length >= 3 ? [raw, w.slice(-3).join(" "), w.slice(-2).join(" ")] : [raw];
+  for (const c of candidates) if (isExecName(c)) return c;
+  return null;
+}
+
+// takes: proxy (or 10-K) plain text
+// does: extracts the company's OWN executive officers via "<Name>, <C-suite
+//       title>", guarded against former officers and directors who hold exec
+//       roles at OTHER companies, and requiring the surname to recur (real
+//       officers are cited many times; a one-off director mention is dropped)
+// returns: validated executives, most senior first
+function extractExecsByTitle(text: string): Executive[] {
+  const re = new RegExp(`(${NAME})\\s*,?\\s+(?:our |the )?(${PROXY_TITLE})\\b`, "g");
+  const cand = new Map<string, { name: string; title: string }>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text))) {
+    const pre = text.slice(Math.max(0, m.index - 14), m.index);
+    const post = text.slice(re.lastIndex, re.lastIndex + 60);
+    if (/former/i.test(pre)) continue; // former officer
+    if (/^\s+of\b/.test(post) || COMPANY_AFTER.test(post)) continue; // role at another company
+    const name = bestExecName(m[1].trim());
+    if (!name) continue;
+    const surname = name.split(/\s+/).pop() as string;
+    const freq = (text.match(new RegExp("\\b" + escapeRegExp(surname), "g")) || []).length;
+    const title = m[2].trim();
+    // Officers recur throughout the filing; the CEO/Chair slot is the one a
+    // board member who runs ANOTHER company can spoof, and that director is
+    // mentioned far less than the real CEO — so demand pervasive mentions for
+    // a top-rank title (real CEOs score 48-148; a one-off director ~14).
+    const minFreq = seniority(title) === 0 ? 25 : 3;
+    if (freq < minFreq) continue;
+    const key = name.toLowerCase();
+    const prev = cand.get(key);
+    if (!prev || seniority(title) < seniority(prev.title)) cand.set(key, { name, title });
+  }
+  return [...cand.values()]
+    .map((c) => ({ name: c.name, title: cleanTitle(c.title) }))
+    .sort((a, b) => seniority(a.title) - seniority(b.title))
+    .slice(0, 6);
+}
+
+/**
+ * given a CIK and the recent filing list
+ * return executive officers parsed from the latest DEF 14A proxy — the fallback
+ * for companies that omit the officer table from their 10-K (incorporating it by
+ * reference). Returns [] on any failure.
+ */
+export async function fetchProxyExecutives(
+  cik: string,
+  filings: FilingRef[],
+): Promise<Executive[]> {
+  try {
+    const proxy = filings.find((f) => f.form === "DEF 14A");
+    if (!proxy?.primaryDoc) return [];
+    const cikInt = parseInt(cik, 10);
+    const acc = proxy.accession.replace(/-/g, "");
+    const url = `https://www.sec.gov/Archives/edgar/data/${cikInt}/${acc}/${proxy.primaryDoc}`;
+    const html = await getText(url, { revalidate: 86400 });
+    if (!html) return [];
+    return extractExecsByTitle(htmlToText(html));
+  } catch (e) {
+    console.error("proxy exec fetch error", e);
+    return [];
+  }
 }
 
 /**
