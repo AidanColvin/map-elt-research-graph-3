@@ -9,6 +9,7 @@
  */
 import type { ReportData, CitationIndex } from '@/components/Report';
 import { normalize, buildCitationIndex, parseMoney, fmtUsd } from '@/components/Report';
+import { PdfDoc, wrapText, textWidth } from '@/lib/pdf-writer';
 
 // ── Block intermediate representation ──────────────────────────────────────
 export type ChartSeries = { label: string; value: number; color?: string };
@@ -326,156 +327,190 @@ function saveBlob(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-// ── Capture the rendered report DOM into letter-page-sized PNG slices ────────
-// This is what makes the PDF / Word look exactly like the webpage: we snapshot
-// the live report element (real charts, tiles, tables, spacing) and slice it
-// into page-height pieces for pagination.
-//
-// Reports can be very tall (a 20-company report is ~70,000 px). A single canvas
-// that big exceeds the browser limit (~16,384 px) and silently fails, breaking
-// the download. So we capture in BANDS that each stay well under the limit,
-// then slice every band into page-height pieces.
-async function captureReportSlices(): Promise<{ dataUrl: string; w: number; h: number }[]> {
-  const el = document.getElementById('report-article');
-  if (!el) throw new Error('Report element not found');
+// ── Color helper ─────────────────────────────────────────────────────────────
+// Parse a "#rrggbb" hex string into a [r,g,b] tuple in 0..1 for the PDF writer.
+function hexRgb(hex: string | undefined, fallback: [number, number, number] = [0.6, 0.6, 0.6]): [number, number, number] {
+  if (!hex) return fallback;
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
+  if (!m) return fallback;
+  const n = parseInt(m[1], 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
 
-  // Capture each marked block individually. Every block is small enough to stay
-  // under the browser canvas limit, and capturing the whole (small) element
-  // avoids html2canvas's unreliable y-crop. We then flow the block images down
-  // onto letter-page canvases, splitting any block taller than a page.
-  const blocks = Array.from(el.querySelectorAll<HTMLElement>('[data-export-block]'));
-  if (!blocks.length) throw new Error('No export blocks found');
+// ── Native vector PDF renderer for the Block IR ──────────────────────────────
+// Renders a Block[] to a paginated, vector PDF using PdfDoc. A top-down `y`
+// cursor is tracked and a new page is started whenever content would overflow,
+// so memory stays flat regardless of report length (no DOM rasterization).
+function renderBlocksToPdf(doc: PdfDoc, blocks: Block[], titleOverride?: string): void {
+  const margin = 48;
+  const contentW = doc.width - margin * 2;
+  // y measured from the TOP of the page; converted to PDF coords on write.
+  let y = margin;
 
-  const { default: html2canvas } = await import('html2canvas');
-  const scale = 2;
-  const pageW = Math.round(el.clientWidth * scale);
-  const pagePx = Math.round(el.clientWidth * (11 / 8.5) * scale);
-  const gap = Math.round(10 * scale);
-
-  const pages: HTMLCanvasElement[] = [];
-  let page: HTMLCanvasElement | null = null;
-  let pageCtx: CanvasRenderingContext2D | null = null;
-  let cursorY = 0;
-
-  const startPage = () => {
-    page = document.createElement('canvas');
-    page.width = pageW;
-    page.height = pagePx;
-    pageCtx = page.getContext('2d')!;
-    pageCtx.fillStyle = '#ffffff';
-    pageCtx.fillRect(0, 0, pageW, pagePx);
-    pages.push(page);
-    cursorY = 0;
+  // Convert top-down y to PDF bottom-up baseline coordinate.
+  const baseline = (topY: number, size: number) => doc.height - topY - size;
+  // Ensure `need` points of vertical space remain; else start a new page.
+  const ensure = (need: number) => {
+    if (y + need > doc.height - margin) { doc.addPage(); y = margin; }
   };
-  startPage();
-
-  for (const block of blocks) {
-    const bc = await html2canvas(block, {
-      scale, backgroundColor: '#ffffff', useCORS: true, logging: false,
-      windowWidth: el.scrollWidth,
-    });
-    // Center/scale the block to page width (blocks already ~page width).
-    const drawW = pageW;
-    const ratio = drawW / bc.width;
-    const drawH = Math.round(bc.height * ratio);
-
-    // If the block won't fit in the remaining space and the page already has
-    // content, move to a fresh page (keeps a block from starting at the bottom).
-    if (cursorY > 0 && cursorY + Math.min(drawH, pagePx) > pagePx) startPage();
-
-    let srcY = 0;
-    while (srcY < bc.height) {
-      const availPx = pagePx - cursorY;
-      const srcAvail = Math.floor(availPx / ratio);
-      const srcTake = Math.min(srcAvail, bc.height - srcY);
-      const dstH = Math.round(srcTake * ratio);
-      pageCtx!.drawImage(bc, 0, srcY, bc.width, srcTake, 0, cursorY, drawW, dstH);
-      cursorY += dstH;
-      srcY += srcTake;
-      if (cursorY >= pagePx - 1 && srcY < bc.height) startPage();
+  // Emit wrapped text at the current cursor, advancing y. `gap` is trailing space.
+  const writeText = (
+    text: string, size: number, bold: boolean, gap: number,
+    color: [number, number, number] = [0, 0, 0], indent = 0,
+  ) => {
+    const lines = wrapText(text, size, contentW - indent);
+    const lineH = size + 4;
+    for (const ln of lines) {
+      ensure(lineH);
+      doc.text(ln, margin + indent, baseline(y, size), { size, bold, color });
+      y += lineH;
     }
-    cursorY += gap;
-  }
+    y += gap;
+  };
 
-  return pages.map((p) => ({ dataUrl: p.toDataURL('image/png'), w: p.width, h: p.height }));
+  if (titleOverride) writeText(titleOverride, 20, true, 12);
+
+  for (const b of blocks) {
+    switch (b.t) {
+      case 'h1': y += 4; writeText(b.text, 20, true, 10); break;
+      case 'h2': y += 8; writeText(b.text, 15, true, 7); break;
+      case 'h3': y += 5; writeText(b.text, 12.5, true, 5); break;
+      case 'p': writeText(b.text, 10.5, false, 8); break;
+      case 'meta':
+        for (const [k, v] of b.pairs) writeText(`${k}: ${v}`, 10, false, 2, [0.25, 0.25, 0.25]);
+        y += 6;
+        break;
+      case 'list':
+        for (const it of b.items) writeText(`•  ${it}`, 10.5, false, 3, [0, 0, 0], 8);
+        y += 6;
+        break;
+      case 'refs':
+        for (const r of b.items) writeText(`${r.id}. ${r.text} ${r.url}`, 9, false, 3, [0.2, 0.2, 0.2], 8);
+        y += 6;
+        break;
+      case 'pagebreak': doc.addPage(); y = margin; break;
+      case 'table': renderPdfTable(doc, b, margin, contentW, () => y, (v) => { y = v; }, ensure, baseline); break;
+      case 'chart': renderPdfChart(doc, b, margin, contentW, () => y, (v) => { y = v; }, ensure, baseline); break;
+    }
+  }
 }
 
-// ── Chart -> PNG (for Word & PDF) ───────────────────────────────────────────
-// Draw a chart Block on an offscreen canvas and return a PNG data URL. Runs in
-// the browser only (download handlers are client-side).
-async function renderChartPng(blk: Extract<Block, { t: 'chart' }>): Promise<{ dataUrl: string; w: number; h: number }> {
-  const scale = 2;
-  const fmtVal = (n: number) => (blk.money ? fmtUsd(n) : String(n));
+// Render a table block with a filled header row, wrapped cell text, and row
+// rules. Long tables paginate: the header is repeated on each continuation page.
+function renderPdfTable(
+  doc: PdfDoc, b: Extract<Block, { t: 'table' }>,
+  margin: number, contentW: number,
+  getY: () => number, setY: (v: number) => void,
+  ensure: (n: number) => void,
+  baseline: (topY: number, size: number) => number,
+): void {
+  const size = 8.5, pad = 4, lineH = size + 3;
+  const cols = b.headers.length || 1;
+  // Equal column widths is simple and robust for arbitrary content.
+  const colW = contentW / cols;
 
-  if (blk.chartKind === 'donut') {
-    const W = 360, H = 150;
-    const canvas = document.createElement('canvas');
-    canvas.width = W * scale; canvas.height = H * scale;
-    const ctx = canvas.getContext('2d')!;
-    ctx.scale(scale, scale);
-    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
-    const total = blk.series.reduce((s, x) => s + x.value, 0) || 1;
-    const cx = 75, cy = 75, rOuter = 55, rInner = 33;
-    let start = -Math.PI / 2;
-    blk.series.forEach((s) => {
+  const drawRow = (cells: string[], header: boolean) => {
+    const wrapped = cells.map((c) => wrapText(String(c ?? ''), size, colW - pad * 2));
+    const rows = Math.max(1, ...wrapped.map((w) => w.length));
+    const rowH = rows * lineH + pad * 2;
+    let y = getY();
+    if (y + rowH > doc.height - margin) { doc.addPage(); setY(margin); y = margin; }
+    if (header) doc.rect(margin, doc.height - y - rowH, contentW, rowH, [0.08, 0.08, 0.08]);
+    for (let c = 0; c < cols; c++) {
+      const x = margin + c * colW + pad;
+      const lines = wrapped[c] || [];
+      for (let li = 0; li < lines.length; li++) {
+        const ty = y + pad + li * lineH;
+        doc.text(lines[li], x, baseline(ty, size), {
+          size, bold: header, color: header ? [1, 1, 1] : [0.1, 0.1, 0.1],
+        });
+      }
+    }
+    const bottom = doc.height - (y + rowH);
+    doc.line(margin, bottom, margin + contentW, bottom, 0.4, [0.85, 0.85, 0.85]);
+    setY(y + rowH);
+  };
+
+  setY(getY() + 2);
+  drawRow(b.headers, true);
+  for (const r of b.rows) drawRow(r, false);
+  setY(getY() + 10);
+}
+
+// Render a chart block as native vector graphics: horizontal bars for 'bars',
+// and a pie/donut of filled sectors plus a legend for 'donut'.
+function renderPdfChart(
+  doc: PdfDoc, b: Extract<Block, { t: 'chart' }>,
+  margin: number, contentW: number,
+  getY: () => number, setY: (v: number) => void,
+  ensure: (n: number) => void,
+  baseline: (topY: number, size: number) => number,
+): void {
+  const fmtVal = (n: number) => (b.money ? fmtUsd(n) : String(n));
+
+  // Title + subtitle.
+  setY(getY() + 6);
+  let y = getY();
+  ensure(16);
+  doc.text(b.title, margin, baseline(y, 11), { size: 11, bold: true });
+  y += 15;
+  if (b.subtitle) {
+    ensure(12);
+    doc.text(b.subtitle, margin, baseline(y, 8.5), { size: 8.5, color: [0.45, 0.45, 0.45] });
+    y += 13;
+  }
+  setY(y);
+
+  if (b.chartKind === 'donut') {
+    const total = b.series.reduce((s, x) => s + x.value, 0) || 1;
+    const r = 36;
+    const needH = r * 2 + 12;
+    if (getY() + needH > doc.height - margin) { doc.addPage(); setY(margin); }
+    y = getY();
+    const cx = margin + r;
+    const cy = doc.height - (y + r);
+    let a0 = Math.PI / 2; // start at top, go clockwise
+    for (const s of b.series) {
       const ang = (s.value / total) * Math.PI * 2;
-      ctx.beginPath(); ctx.moveTo(cx, cy);
-      ctx.arc(cx, cy, rOuter, start, start + ang); ctx.closePath();
-      ctx.fillStyle = s.color || '#999999'; ctx.fill();
-      start += ang;
-    });
-    if (!blk.solid) { ctx.beginPath(); ctx.arc(cx, cy, rInner, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill(); }
-    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    ctx.font = '13px Calibri, Arial, sans-serif';
-    let ly = 58;
-    blk.series.forEach((s) => {
-      ctx.fillStyle = s.color || '#999999';
-      ctx.fillRect(160, ly - 6, 12, 12);
-      ctx.fillStyle = '#1f2937';
-      ctx.fillText(`${s.label}: ${s.value}`, 178, ly);
-      ly += 24;
-    });
-    return { dataUrl: canvas.toDataURL('image/png'), w: W, h: H };
+      doc.sector(cx, cy, r, a0 - ang, a0, hexRgb(s.color), b.solid ? 0 : r * 0.58);
+      a0 -= ang;
+    }
+    // Legend to the right of the donut.
+    let ly = y + 4;
+    const lx = margin + r * 2 + 18;
+    for (const s of b.series) {
+      doc.rect(lx, doc.height - ly - 9, 9, 9, hexRgb(s.color));
+      doc.text(`${s.label}: ${s.value}`, lx + 14, baseline(ly, 9), { size: 9, color: [0.12, 0.12, 0.12] });
+      ly += 16;
+    }
+    setY(Math.max(y + needH, ly) + 8);
+    return;
   }
 
-  // Horizontal bars
-  const rows = blk.series.filter((d) => d.value > 0);
-  const rowH = 26, padT = 8, padB = 8, W = 520;
-  const H = padT + padB + Math.max(1, rows.length) * rowH;
-  const canvas = document.createElement('canvas');
-  canvas.width = W * scale; canvas.height = H * scale;
-  const ctx = canvas.getContext('2d')!;
-  ctx.scale(scale, scale);
-  ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+  // Horizontal bars.
+  const rows = b.series.filter((d) => d.value > 0);
   const max = Math.max(...rows.map((d) => d.value), 1);
-  const labelW = 150, barX0 = 158, barX1 = 452, valX = 458;
-  ctx.textBaseline = 'middle';
-  rows.forEach((d, i) => {
-    const y = padT + i * rowH + rowH / 2;
-    ctx.textAlign = 'left';
-    ctx.font = '12px Calibri, Arial, sans-serif';
-    ctx.fillStyle = '#374151';
+  const rowH = 16, labelW = 120, barX = margin + labelW + 4;
+  const barMax = contentW - labelW - 70;
+  for (const d of rows) {
+    if (getY() + rowH > doc.height - margin) { doc.addPage(); setY(margin); }
+    y = getY();
+    const midTop = y + rowH / 2 - 4.5;
+    // Label (truncate to fit).
     let label = d.label;
-    while (ctx.measureText(label).width > labelW - 6 && label.length > 4) label = label.slice(0, -2);
-    if (label !== d.label) label = label + '…';
-    ctx.fillText(label, 4, y);
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillRect(barX0, y - 5, barX1 - barX0, 10);
-    const w = Math.max(3, (d.value / max) * (barX1 - barX0));
-    ctx.fillStyle = '#0a0a0a';
-    ctx.fillRect(barX0, y - 5, w, 10);
-    ctx.font = 'bold 12px Calibri, Arial, sans-serif';
-    ctx.fillText(fmtVal(d.value), valX, y);
-  });
-  return { dataUrl: canvas.toDataURL('image/png'), w: W, h: H };
-}
-
-function dataUrlToBytes(dataUrl: string): Uint8Array {
-  const b64 = dataUrl.split(',')[1] || '';
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
+    while (textWidth(label, 8.5) > labelW - 4 && label.length > 4) label = label.slice(0, -2);
+    if (label !== d.label) label += '…';
+    doc.text(label, margin, baseline(midTop, 8.5), { size: 8.5, color: [0.2, 0.2, 0.2] });
+    // Track + bar.
+    const trackY = doc.height - (y + rowH / 2 + 4);
+    doc.rect(barX, trackY, barMax, 8, [0.93, 0.93, 0.93]);
+    const w = Math.max(2, (d.value / max) * barMax);
+    doc.rect(barX, trackY, w, 8, [0.04, 0.04, 0.04]);
+    // Value.
+    doc.text(fmtVal(d.value), barX + barMax + 6, baseline(midTop, 8.5), { size: 8.5, bold: true });
+    setY(y + rowH);
+  }
+  setY(getY() + 10);
 }
 
 // ── Renderer 1: Markdown ────────────────────────────────────────────────────
@@ -530,29 +565,75 @@ export function downloadMarkdown(rawData: any) {
 }
 
 // ── Renderer 2: Word (.docx) ────────────────────────────────────────────────
+// takes: a Block[] IR and the loaded `docx` module exports
+// does: appends native docx children (headings, paragraphs, tables, lists,
+//       meta pairs, references, and charts-as-data-tables) for each block
+// returns: nothing (mutates `children`)
+function blocksToDocxChildren(blocks: Block[], dx: any, children: any[]): void {
+  const { Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType, PageBreak } = dx;
+  const makeTable = (headers: string[], rows: string[][]) =>
+    new Table({
+      width: { size: 100, type: WidthType.PERCENTAGE },
+      rows: [headers, ...rows].map((row, ri) =>
+        new TableRow({
+          children: row.map((cell) =>
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: String(cell ?? ''), bold: ri === 0 })] })] })),
+        })),
+    });
+
+  for (const b of blocks) {
+    switch (b.t) {
+      case 'h1': children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, text: b.text })); break;
+      case 'h2': children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, text: b.text })); break;
+      case 'h3': children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: b.text })); break;
+      case 'p': children.push(new Paragraph({ children: [new TextRun(b.text)] })); break;
+      case 'meta':
+        for (const [k, v] of b.pairs)
+          children.push(new Paragraph({ children: [new TextRun({ text: `${k}: `, bold: true }), new TextRun(v)] }));
+        children.push(new Paragraph({ text: '' }));
+        break;
+      case 'list':
+        for (const it of b.items) children.push(new Paragraph({ text: it, bullet: { level: 0 } }));
+        break;
+      case 'refs':
+        for (const r of b.items) children.push(new Paragraph({ text: `${r.id}. ${r.text} ${r.url}` }));
+        break;
+      case 'table':
+        children.push(makeTable(b.headers, b.rows));
+        children.push(new Paragraph({ text: '' }));
+        break;
+      case 'chart':
+        // Charts render as a titled data table in Word.
+        children.push(new Paragraph({ children: [new TextRun({ text: b.title + (b.subtitle ? ` (${b.subtitle})` : ''), bold: true })] }));
+        children.push(makeTable(
+          [b.chartKind === 'donut' ? 'Segment' : 'Company', 'Value'],
+          b.series.map((s) => [s.label, b.money ? fmtUsd(s.value) : String(s.value)]),
+        ));
+        children.push(new Paragraph({ text: '' }));
+        break;
+      case 'pagebreak': children.push(new Paragraph({ children: [new PageBreak()] })); break;
+    }
+  }
+}
+
+// takes: the structured sector ReportData (raw)
+// does: builds the Block IR and renders it natively to a Word (.docx) document —
+//       headings, paragraphs, tables, lists, and charts as data tables — with no
+//       DOM capture, then triggers a browser download
+// returns: nothing (saves "<sector>-partnership-report.docx")
 export async function downloadDocx(rawData: any) {
-  // Capture the rendered report so the .docx looks exactly like the webpage.
-  const slices = await captureReportSlices();
-  const { Document, Packer, Paragraph, ImageRun, PageBreak } = await import('docx');
-
-  // Letter content width at ~96dpi minus 0.5in margins each side (= 7.5in).
-  const targetW = 720;
+  const { blocks } = buildBlocks(rawData);
+  const dx = await import('docx');
   const children: any[] = [];
-  slices.forEach((s, i) => {
-    if (i > 0) children.push(new Paragraph({ children: [new PageBreak()] }));
-    const h = Math.round(targetW * (s.h / s.w));
-    children.push(new Paragraph({
-      children: [new ImageRun({ type: 'png', data: dataUrlToBytes(s.dataUrl), transformation: { width: targetW, height: h } })],
-    }));
-  });
+  blocksToDocxChildren(blocks, dx, children);
 
-  const doc = new Document({
+  const doc = new dx.Document({
     sections: [{
-      properties: { page: { margin: { top: 360, bottom: 360, left: 360, right: 360 } } },
+      properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } },
       children,
     }],
   });
-  const blob = await Packer.toBlob(doc);
+  const blob = await dx.Packer.toBlob(doc);
   saveBlob(blob, `${reportFilename(rawData)}.docx`);
 }
 
@@ -644,49 +725,9 @@ export function parseMarkdownBlocks(md: string): Block[] {
 // returns: nothing (saves "<title>-deep-dive.pdf")
 export async function downloadMarkdownPdf(markdown: string, title: string) {
   const blocks = parseMarkdownBlocks(markdown);
-  const { jsPDF } = await import('jspdf');
-  const autoTable = (await import('jspdf-autotable')).default;
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const margin = 48;
-  const contentW = pageW - margin * 2;
-  let y = margin;
-
-  const ensure = (need: number) => { if (y + need > pageH - margin) { doc.addPage(); y = margin; } };
-  const writeText = (text: string, size: number, bold: boolean, gap: number) => {
-    doc.setFont('helvetica', bold ? 'bold' : 'normal');
-    doc.setFontSize(size);
-    const wrapped = doc.splitTextToSize(text, contentW) as string[];
-    for (const ln of wrapped) { ensure(size + 4); doc.text(ln, margin, y); y += size + 4; }
-    y += gap;
-  };
-
-  // Title header.
-  writeText(title, 20, true, 10);
-
-  for (const b of blocks) {
-    switch (b.t) {
-      case 'h1': writeText(b.text, 18, true, 8); break;
-      case 'h2': writeText(b.text, 15, true, 6); break;
-      case 'h3': writeText(b.text, 13, true, 5); break;
-      case 'p': writeText(b.text, 10.5, false, 8); break;
-      case 'list':
-        for (const it of b.items) writeText(`•  ${it}`, 10.5, false, 2);
-        y += 6;
-        break;
-      case 'table':
-        autoTable(doc, {
-          head: [b.headers], body: b.rows, startY: y, margin: { left: margin, right: margin },
-          styles: { fontSize: 9, cellPadding: 4 }, headStyles: { fillColor: [20, 20, 20] },
-        });
-        y = (doc as any).lastAutoTable.finalY + 12;
-        break;
-      case 'pagebreak': doc.addPage(); y = margin; break;
-      default: break;
-    }
-  }
-  doc.save(`${markdownExportName(title)}.pdf`);
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, blocks, title);
+  saveBlob(doc.save(), `${markdownExportName(title)}.pdf`);
 }
 
 // takes: a Markdown string and a display title
@@ -695,40 +736,16 @@ export async function downloadMarkdownPdf(markdown: string, title: string) {
 // returns: nothing (saves "<title>-deep-dive.docx")
 export async function downloadMarkdownDocx(markdown: string, title: string) {
   const blocks = parseMarkdownBlocks(markdown);
-  const { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } = await import('docx');
+  const dx = await import('docx');
   const children: any[] = [
-    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun({ text: title, bold: true })] }),
+    new dx.Paragraph({ heading: dx.HeadingLevel.TITLE, children: [new dx.TextRun({ text: title, bold: true })] }),
   ];
+  blocksToDocxChildren(blocks, dx, children);
 
-  for (const b of blocks) {
-    switch (b.t) {
-      case 'h1': children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, text: b.text })); break;
-      case 'h2': children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, text: b.text })); break;
-      case 'h3': children.push(new Paragraph({ heading: HeadingLevel.HEADING_3, text: b.text })); break;
-      case 'p': children.push(new Paragraph({ children: [new TextRun(b.text)] })); break;
-      case 'list':
-        for (const it of b.items) children.push(new Paragraph({ text: it, bullet: { level: 0 } }));
-        break;
-      case 'table':
-        children.push(new Table({
-          width: { size: 100, type: WidthType.PERCENTAGE },
-          rows: [b.headers, ...b.rows].map((row, ri) =>
-            new TableRow({
-              children: row.map((cell) =>
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: cell, bold: ri === 0 })] })] })),
-            })),
-        }));
-        children.push(new Paragraph({ text: '' }));
-        break;
-      case 'pagebreak': children.push(new Paragraph({ children: [] })); break;
-      default: break;
-    }
-  }
-
-  const docFile = new Document({
+  const docFile = new dx.Document({
     sections: [{ properties: { page: { margin: { top: 720, bottom: 720, left: 720, right: 720 } } }, children }],
   });
-  const blob = await Packer.toBlob(docFile);
+  const blob = await dx.Packer.toBlob(docFile);
   saveBlob(blob, `${markdownExportName(title)}.docx`);
 }
 
@@ -740,19 +757,14 @@ export function downloadMarkdownText(markdown: string, title: string) {
 }
 
 // ── Renderer 3: PDF ─────────────────────────────────────────────────────────
+// takes: the structured sector ReportData (raw)
+// does: builds the Block IR and renders it to a paginated, vector PDF natively
+//       (headings, paragraphs, tables, lists, and native vector charts) with no
+//       DOM rasterization, keeping memory flat for long reports
+// returns: nothing (saves "<sector>-partnership-report.pdf")
 export async function downloadPdf(rawData: any) {
-  // Capture the rendered report so the PDF matches the webpage pixel-for-pixel.
-  const slices = await captureReportSlices();
-  const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const margin = 24;
-  const w = pageW - margin * 2;
-  slices.forEach((s, i) => {
-    if (i > 0) doc.addPage();
-    const h = w * (s.h / s.w);
-    doc.addImage(s.dataUrl, 'PNG', margin, margin, w, Math.min(h, pageH - margin * 2));
-  });
-  doc.save(`${reportFilename(rawData)}.pdf`);
+  const { blocks } = buildBlocks(rawData);
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, blocks);
+  saveBlob(doc.save(), `${reportFilename(rawData)}.pdf`);
 }

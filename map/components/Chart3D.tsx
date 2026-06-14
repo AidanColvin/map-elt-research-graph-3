@@ -3,6 +3,22 @@
 import React from 'react';
 import { relaxLabels, truncate } from '@/lib/chart-labels';
 
+// Detect a device/preference that should NOT run the continuous orbit animation:
+// users who asked for reduced motion, or low-power hardware (few CPU cores or
+// little memory) where a 60fps SVG re-render would stutter and drain battery.
+// On those, the orbit renders one crisp static frame instead. SSR-safe.
+function prefersStaticMotion(): boolean {
+  if (typeof window === 'undefined') return true;
+  try {
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true;
+    const cores = (navigator as any).hardwareConcurrency;
+    const mem = (navigator as any).deviceMemory;
+    if (typeof cores === 'number' && cores > 0 && cores <= 2) return true;
+    if (typeof mem === 'number' && mem > 0 && mem <= 2) return true;
+  } catch { /* fall through to animated */ }
+  return false;
+}
+
 // Lighten (amt>0) or darken (amt<0) a hex color by mixing toward white/black.
 export function shade(hex: string, amt: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -139,15 +155,31 @@ export function OrbitNetwork({ points, centerLabel = 'UNC', height = 580, baseCo
 }) {
   const [angle, setAngle] = React.useState(0);
   const paused = React.useRef(false);
+  // Decided once on mount (client only) so SSR and the first paint agree.
+  const [animate, setAnimate] = React.useState(false);
 
   React.useEffect(() => {
-    let raf = 0, last = 0;
-    const reduce = typeof window !== 'undefined' && window.matchMedia
-      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches : false;
+    if (prefersStaticMotion()) {
+      setAnimate(false);
+      return; // one static frame — graceful drop on low-power / reduced-motion
+    }
+    setAnimate(true);
+
+    let raf = 0, last = 0, acc = 0;
+    const FRAME = 1000 / 60; // cap to 60fps so 120Hz displays don't do 2× work
     const tick = (t: number) => {
-      if (last && !paused.current && !reduce) setAngle((a) => (a + (t - last) * 0.00035) % (Math.PI * 2));
-      last = t;
       raf = requestAnimationFrame(tick);
+      if (!last) { last = t; return; }
+      const dt = t - last;
+      last = t;
+      // Skip work when hidden or hovered; accumulate time and only commit a
+      // React update once a 60fps frame's worth has elapsed for steady motion.
+      if (paused.current || document.hidden) return;
+      acc += dt;
+      if (acc < FRAME) return;
+      const step = acc;
+      acc = 0;
+      setAngle((a) => (a + step * 0.00035) % (Math.PI * 2));
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
@@ -210,7 +242,8 @@ export function OrbitNetwork({ points, centerLabel = 'UNC', height = 580, baseCo
   const front = nodes.filter((nd) => nd.z2 >= 0);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={svgStyle}
+    <svg viewBox={`0 0 ${W} ${H}`}
+      style={{ ...svgStyle, shapeRendering: animate ? 'optimizeSpeed' : 'geometricPrecision' }}
       onMouseEnter={() => { paused.current = true; }}
       onMouseLeave={() => { paused.current = false; }}>
       <defs>

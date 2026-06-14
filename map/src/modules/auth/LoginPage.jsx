@@ -48,16 +48,19 @@ export default function LoginPage() {
 
   return (
     <div style={styles.wrap}>
+      {/* Local keyframes so the spinner matches the main workspace without
+          depending on the Next app's global stylesheet. */}
+      <style>{"@keyframes mapspin{to{transform:rotate(360deg)}}"}</style>
       <div style={styles.card}>
         <h1 style={styles.title}>Map</h1>
         <p style={styles.subtitle}>
           {mode === "login" ? "Sign in to continue" : "Create your account"}
         </p>
 
-        <button style={styles.oauth} disabled={busy} onClick={() => run(signInWithGoogle)}>
+        <button style={{ ...styles.oauth, opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={() => run(signInWithGoogle)}>
           Continue with Google
         </button>
-        <button style={styles.oauth} disabled={busy} onClick={() => run(signInWithMicrosoft)}>
+        <button style={{ ...styles.oauth, opacity: busy ? 0.6 : 1 }} disabled={busy} onClick={() => run(signInWithMicrosoft)}>
           Continue with Microsoft
         </button>
 
@@ -81,8 +84,13 @@ export default function LoginPage() {
             autoComplete={mode === "login" ? "current-password" : "new-password"}
           />
           {error && <div style={styles.error}>{error}</div>}
-          <button style={styles.primary} type="submit" disabled={busy}>
-            {busy ? "…" : mode === "login" ? "Sign in" : "Sign up"}
+          <button style={{ ...styles.primary, opacity: busy ? 0.7 : 1 }} type="submit" disabled={busy}>
+            {busy ? (
+              <span style={styles.busyRow}>
+                <span style={styles.spinner} aria-hidden />
+                {mode === "login" ? "Signing in…" : "Creating account…"}
+              </span>
+            ) : mode === "login" ? "Sign in" : "Sign up"}
           </button>
         </form>
 
@@ -108,7 +116,7 @@ const styles = {
     justifyContent: "center",
     background: "#f5f5f7",
     fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif",
+      "'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Arial, sans-serif",
   },
   card: {
     width: 360,
@@ -152,6 +160,16 @@ const styles = {
     cursor: "pointer",
   },
   error: { color: "#dc2626", fontSize: 13, marginBottom: 8 },
+  busyRow: { display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 },
+  spinner: {
+    width: 14,
+    height: 14,
+    border: "2px solid rgba(255,255,255,0.4)",
+    borderTopColor: "#fff",
+    borderRadius: "50%",
+    display: "inline-block",
+    animation: "mapspin 0.7s linear infinite",
+  },
   toggle: {
     width: "100%",
     marginTop: 14,
