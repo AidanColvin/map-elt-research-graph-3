@@ -1,4 +1,15 @@
 import { NextRequest } from 'next/server';
+import { readJsonBody, validatePipeline } from '@/lib/proxyGuard';
+
+// takes: a status and message
+// does: builds a JSON error Response (this route otherwise streams SSE)
+// returns: the Response
+function jsonError(status: number, error: string): Response {
+  return new Response(JSON.stringify({ error }), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
 
 // Streaming proxy: forwards the backend's Server-Sent Events progress stream
 // straight through to the browser so the progress UI reflects real backend
@@ -13,7 +24,11 @@ const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.ver
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return jsonError(parsed.status, parsed.error);
+  const valid = validatePipeline(parsed.value);
+  if (!valid.ok) return jsonError(valid.status, valid.error);
+  const body = valid.value;
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 295_000);

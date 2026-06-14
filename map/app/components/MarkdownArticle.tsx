@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import type { ReactNode } from "react";
 import Chart from "./Charts";
+import { safeUrl } from "@/lib/markdownSafe";
 
 /**
  * given any react children
@@ -68,6 +69,9 @@ export default function MarkdownArticle({ markdown }: { markdown: string }) {
     <article className="report">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
+        // Defense-in-depth: drop any non-http(s)/mailto/anchor URL so a poisoned
+        // link in parsed source text can never become a javascript:/data: sink.
+        urlTransform={safeUrl}
         components={{
           h2: ({ children }) => <h2 id={slugify(toText(children))}>{children}</h2>,
           h3: ({ children }) => <h3 id={slugify(toText(children))}>{children}</h3>,

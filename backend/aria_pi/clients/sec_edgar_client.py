@@ -11,6 +11,8 @@ import requests
 from datetime import date, timedelta
 from typing import Optional, List
 
+from aria_pi.utils.net_guard import assert_public_url
+
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 
@@ -525,8 +527,10 @@ class SECEdgarClient:
         if not url.endswith('/'):
             return url  # already a direct document link
         try:
+            assert_public_url(url)  # SSRF guard: only public http(s) hosts
             r = requests.get(url, headers={'User-Agent': USER_AGENT}, timeout=8)
             r.raise_for_status()
+            assert_public_url(r.url)  # re-check after any redirect
             # Find .htm links; prefer ones with "proxy" or "def14a" in the name
             links = re.findall(r'href="([^"]*\.(?:htm|html))"', r.text, re.IGNORECASE)
             for link in links:
@@ -542,10 +546,12 @@ class SECEdgarClient:
     def _fetch_proxy_bytes(self, url: str, max_bytes: int = 800_000) -> str:
         """Fetch a proxy document, capped at max_bytes, returned as str."""
         try:
+            assert_public_url(url)  # SSRF guard: only public http(s) hosts
             r = requests.get(
                 url, headers={'User-Agent': USER_AGENT}, timeout=14, stream=True,
             )
             r.raise_for_status()
+            assert_public_url(r.url)  # re-check after any redirect
             chunks, size = [], 0
             for chunk in r.iter_content(chunk_size=16_384):
                 chunks.append(chunk)
@@ -582,6 +588,9 @@ class SECEdgarClient:
         seen: set = set()
         for url in candidates[:5]:  # try at most 5 URLs to stay within budget
             try:
+                # SSRF guard: the company website is external/SEC-provided, and
+                # requests follows redirects — block any private/metadata host.
+                assert_public_url(url)
                 r = requests.get(
                     url,
                     headers={'User-Agent': USER_AGENT,
@@ -589,6 +598,7 @@ class SECEdgarClient:
                     timeout=10,
                     stream=True,
                 )
+                assert_public_url(r.url)  # re-check after any redirect
                 if r.status_code not in (200, 203):
                     continue
                 # Cap at 300 KB — leadership pages are short; large payloads
