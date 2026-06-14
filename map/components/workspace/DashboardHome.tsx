@@ -37,11 +37,6 @@ export default function DashboardHome({
       display: "flex",
       flexDirection: "column",
     }}>
-      {/* Eyebrow */}
-      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", color: "#8e8e93", textTransform: "uppercase", marginBottom: 24 }}>
-        A Research Workspace · Est. 2026
-      </p>
-
       {/* Headline */}
       <h1 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, marginBottom: 20 }}>
         <span style={{ color: "#1d1d1f" }}>Board-ready intelligence, </span>
@@ -50,7 +45,7 @@ export default function DashboardHome({
 
       {/* Body */}
       <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.65, marginBottom: 32 }}>
-        No LLM in the request path. No API keys. Every number, sentence, and citation traces to a free, keyless public data source — SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER.
+        No LLM in the request path. No API keys. Every number, sentence, and citation traces to a free, keyless public data source: SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER.
       </p>
 
       {/* 3D orbit */}
