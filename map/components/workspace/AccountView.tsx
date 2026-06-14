@@ -10,6 +10,9 @@
 
 import { useState } from "react";
 import type { MapUser } from "@/components/AuthGate";
+import type { SavedReportsState } from "./useSavedReports";
+import type { SavedReport } from "@/lib/savedReports";
+import { relativeTime } from "./SavedReports";
 import { CanvasCard, FONT } from "./ui";
 
 // takes: a MapUser
@@ -30,9 +33,13 @@ function displayName(user: MapUser): string {
 export default function AccountView({
   user,
   onSignOut,
+  saved,
+  onOpenProject,
 }: {
   user: MapUser;
   onSignOut: () => void;
+  saved: SavedReportsState;
+  onOpenProject: (r: SavedReport) => void;
 }) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -134,6 +141,11 @@ export default function AccountView({
           )}
         </div>
 
+        {/* Projects — the reports this account has saved to review later.
+            Reopening shows the saved copy instantly (it re-verifies freshness
+            in the originating view); removing deletes it from the saved store. */}
+        <Projects saved={saved} onOpenProject={onOpenProject} />
+
         <button
           onClick={onSignOut}
           style={{
@@ -158,6 +170,160 @@ export default function AccountView({
 }
 
 const btn: React.CSSProperties = { padding: "9px 16px", fontSize: 13 };
+
+// takes: { saved, onOpenProject }
+// does: renders the "Projects" section — the account's saved company profiles
+//       and sector scans, newest first, each row reopening the saved report or
+//       removing it. Shows an empty-state hint when nothing is saved yet.
+// returns: the projects section element
+function Projects({
+  saved,
+  onOpenProject,
+}: {
+  saved: SavedReportsState;
+  onOpenProject: (r: SavedReport) => void;
+}) {
+  const items = [...saved.saved].sort((a, b) => b.verifiedAt - a.verifiedAt);
+  return (
+    <div style={{ padding: "18px 0 4px", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginBottom: 12,
+        }}
+      >
+        <div style={{ fontSize: 12, color: "#a3a3a3" }}>Projects</div>
+        <div style={{ fontSize: 11.5, color: "#c0c0c5" }}>
+          {items.length ? `${items.length} saved` : ""}
+        </div>
+      </div>
+
+      {!saved.ready ? (
+        <div style={{ fontSize: 13.5, color: "#86868b" }}>Loading saved projects…</div>
+      ) : items.length === 0 ? (
+        <div style={{ fontSize: 13.5, color: "#86868b", lineHeight: 1.5 }}>
+          No saved projects yet. Run a Company Profile or Sector Scan and tap{" "}
+          <b style={{ fontWeight: 600 }}>Save report</b> to keep it here for later.
+        </div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {items.map((r) => (
+            <ProjectRow
+              key={r.id}
+              report={r}
+              onOpen={() => onOpenProject(r)}
+              onRemove={() => {
+                void saved.remove(r.id);
+              }}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// takes: { report, onOpen, onRemove }
+// does: renders one saved-project row — kind pill, title, last-verified time,
+//       a clickable surface that reopens it, and a remove control
+// returns: the project row element
+function ProjectRow({
+  report,
+  onOpen,
+  onRemove,
+}: {
+  report: SavedReport;
+  onOpen: () => void;
+  onRemove: () => void;
+}) {
+  const isCompany = report.kind === "company";
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        border: "1px solid rgba(0,0,0,0.07)",
+        borderRadius: 12,
+        padding: "9px 10px 9px 12px",
+        background: "#fafafa",
+      }}
+    >
+      <button
+        onClick={onOpen}
+        title={`Open — verified ${relativeTime(report.verifiedAt)}`}
+        style={{
+          flex: 1,
+          minWidth: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          border: "none",
+          background: "none",
+          cursor: "pointer",
+          textAlign: "left",
+          fontFamily: FONT,
+          padding: 0,
+        }}
+      >
+        <span
+          style={{
+            flexShrink: 0,
+            fontSize: 9.5,
+            fontWeight: 600,
+            letterSpacing: "0.05em",
+            textTransform: "uppercase",
+            padding: "3px 7px",
+            borderRadius: 999,
+            color: isCompany ? "#3730a3" : "#9a3412",
+            background: isCompany ? "rgba(99,102,241,0.12)" : "rgba(249,115,22,0.12)",
+          }}
+        >
+          {isCompany ? "Company" : "Sector"}
+        </span>
+        <span style={{ minWidth: 0 }}>
+          <span
+            style={{
+              display: "block",
+              fontSize: 14,
+              fontWeight: 500,
+              color: "#1d1d1f",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {report.title}
+          </span>
+          <span style={{ display: "block", fontSize: 11.5, color: "#9a9aa2", marginTop: 1 }}>
+            Verified {relativeTime(report.verifiedAt)}
+          </span>
+        </span>
+      </button>
+      <button
+        onClick={onRemove}
+        aria-label={`Remove saved ${report.title}`}
+        title="Remove"
+        style={{
+          flexShrink: 0,
+          width: 22,
+          height: 22,
+          borderRadius: "50%",
+          border: "none",
+          background: "transparent",
+          color: "#a0a0a8",
+          fontSize: 16,
+          lineHeight: 1,
+          cursor: "pointer",
+        }}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
 
 // takes: { label, value }
 // does: renders one read-only labelled account field row

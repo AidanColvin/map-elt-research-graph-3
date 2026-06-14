@@ -12,6 +12,8 @@ import PartnershipsView from "@/components/workspace/PartnershipsView";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { useSavedReports } from "@/components/workspace/useSavedReports";
+import type { SavedReport } from "@/lib/savedReports";
+import type { ReportData } from "@/components/Report";
 import { FONT } from "@/components/workspace/ui";
 
 // Single Apple-style nav bar: the logo, the view tabs, and the Profile button
@@ -234,6 +236,27 @@ export default function MapHome() {
     if (view === "sector") setView("company");
   }
 
+  // takes: a saved report opened from the Projects section of the profile
+  // does: loads the saved copy instantly into the matching tool (no regenerate)
+  //       and focuses that view, so a user can pick a project back up to review
+  // returns: nothing
+  function openProject(r: SavedReport) {
+    if (r.kind === "company") {
+      setCompanyDraft(r.query);
+      dive.loadSaved(r.query, r.content);
+      setView("company");
+    } else {
+      setSectorDraft(r.query);
+      try {
+        scan.loadSaved(r.query, JSON.parse(r.content) as ReportData);
+      } catch {
+        // content unparseable — fall back to a fresh run for the subject
+        scan.run(r.query);
+      }
+      setView("sector");
+    }
+  }
+
   // The auth gate shows on every hard refresh / first load by design: the
   // session lives only in React state for this page load.
   if (showIntro) {
@@ -363,6 +386,8 @@ export default function MapHome() {
         >
           <AccountView
             user={user}
+            saved={saved}
+            onOpenProject={openProject}
             onSignOut={() => {
               clearSession();
               setUser(null);
