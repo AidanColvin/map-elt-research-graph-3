@@ -300,6 +300,10 @@ export default function CompanyCanvas({
   saved: SavedReportsState;
 }) {
   // The H1 is replaced by the card's own title row, like every other module.
+  // Prefer the report's formal company name (the stripped leading "# Name")
+  // over the raw query, so the header reads "NVIDIA Corporation" not "nvidia".
+  const titleMatch = dive.markdown.match(/^#\s+(.+)/);
+  const reportTitle = titleMatch ? titleMatch[1].trim() : dive.company;
   const body = dive.markdown.replace(/^#\s+.*\n?/, "");
   const busy = dive.status === "loading" || dive.status === "streaming";
 
@@ -441,24 +445,25 @@ export default function CompanyCanvas({
           <div
             style={{
               display: "flex",
-              alignItems: "center",
+              alignItems: "flex-start",
               justifyContent: "space-between",
               gap: 12,
               flexWrap: "wrap",
-              margin: "0 0 6px",
+              margin: "0 0 10px",
             }}
           >
             <h2
               style={{
                 fontFamily: FONT,
-                fontSize: 26,
+                fontSize: "clamp(30px,3.6vw,46px)",
                 fontWeight: 700,
-                letterSpacing: "-0.02em",
+                letterSpacing: "-0.03em",
+                lineHeight: 1.05,
                 margin: 0,
                 color: "#1d1d1f",
               }}
             >
-              {dive.company}
+              {reportTitle}
             </h2>
             <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <VerifyPill note={verifyNote} />
