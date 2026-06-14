@@ -27,8 +27,13 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company Profile" },
   { key: "sector", label: "Sector Scan" },
-  { key: "accounts", label: "Companies" },
-  { key: "partnerships", label: "Partnerships" },
+  // DEACTIVATED — hidden from the public app. The "Companies" (accounts) and
+  // "Partnerships" views are intentionally removed from the sub-nav so they
+  // are unreachable in the live build. All of their code (the render blocks
+  // below, AccountsCanvas, PartnershipsView, and the /api routes) is kept in
+  // the repo. To REACTIVATE, uncomment the two lines below:
+  // { key: "accounts", label: "Companies" },
+  // { key: "partnerships", label: "Partnerships" },
 ];
 
 // takes: an optional pixel size
