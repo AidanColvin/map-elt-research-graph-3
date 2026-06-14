@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { OrbitNetwork } from "@/components/Chart3D";
 
 const ORBIT_POINTS = [
@@ -28,6 +29,17 @@ export default function DashboardHome({
   onOpenCompanyView: () => void;
   onPrefillSector:   (name: string) => void;
 }) {
+  const [mode, setMode] = useState<"company" | "sector">("company");
+  const [query, setQuery] = useState("");
+  const [focused, setFocused] = useState(false);
+
+  function submit() {
+    const q = query.trim();
+    if (!q) return;
+    if (mode === "company") onRunCompany(q);
+    else onRunSector(q);
+  }
+
   return (
     <div style={{
       maxWidth: 720,
@@ -44,9 +56,66 @@ export default function DashboardHome({
       </h1>
 
       {/* Body */}
-      <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.65, marginBottom: 32 }}>
+      <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.65, marginBottom: 28 }}>
         No LLM in the request path. No API keys. Every number, sentence, and citation traces to a free, keyless public data source: SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER.
       </p>
+
+      {/* Search */}
+      <div style={{ marginBottom: 16 }}>
+        {/* Company / Sector toggle */}
+        <div style={{
+          display: "inline-flex", padding: 3, marginBottom: 12,
+          background: "#f0f0f2", borderRadius: 999,
+        }}>
+          {(["company", "sector"] as const).map((m) => (
+            <button key={m} onClick={() => setMode(m)} style={{
+              padding: "6px 18px", fontSize: 13.5, fontWeight: 600,
+              border: "none", borderRadius: 999, cursor: "pointer",
+              background: mode === m ? "#fff" : "transparent",
+              color: mode === m ? "#1d1d1f" : "#86868b",
+              boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
+              transition: "all 0.15s",
+            }}>
+              {m === "company" ? "Company" : "Sector"}
+            </button>
+          ))}
+        </div>
+
+        {/* Search input */}
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          background: "#fff", borderRadius: 14,
+          border: `1.5px solid ${focused ? "#007aff" : "#e5e5ea"}`,
+          boxShadow: focused ? "0 0 0 4px rgba(0,122,255,0.1)" : "none",
+          padding: "4px 4px 4px 16px", transition: "all 0.15s",
+        }}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="7" stroke="#86868b" strokeWidth="2" />
+            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#86868b" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={mode === "company" ? "Search a company, e.g. Pfizer" : "Search a sector, e.g. oncology"}
+            style={{
+              flex: 1, border: "none", outline: "none", background: "transparent",
+              fontSize: 16, color: "#1d1d1f", padding: "10px 0",
+            }}
+          />
+          <button onClick={submit} disabled={!query.trim()} style={{
+            padding: "10px 22px", fontSize: 14.5, fontWeight: 600,
+            border: "none", borderRadius: 11, cursor: query.trim() ? "pointer" : "default",
+            background: query.trim() ? "#007aff" : "#e5e5ea",
+            color: query.trim() ? "#fff" : "#a0a0a5",
+            transition: "background 0.15s", flexShrink: 0,
+          }}>
+            Search
+          </button>
+        </div>
+      </div>
 
       {/* 3D orbit */}
       <div style={{ marginBottom: 32, borderRadius: 20, overflow: "hidden", background: "#f9f9fb", border: "1px solid #e5e5ea" }}>
@@ -97,7 +166,7 @@ export default function DashboardHome({
       {/* Footer */}
       <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #f2f2f7" }}>
         <p style={{ fontSize: 11.5, color: "#8e8e93", marginBottom: 8 }}>
-          Independent project. Not affiliated with UNC Chapel Hill. For information only — not investment advice.
+          Independent project. Not affiliated with UNC Chapel Hill. For information only, not investment advice.
         </p>
         <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase" }}>
           Free · Keyless · Primary-Source
