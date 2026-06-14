@@ -83,10 +83,9 @@ const S = {
     alignItems: "center",
     justifyContent: "center",
     padding: "32px 20px",
-    background: "#ffffff",
-    color: "#0a0a0a",
-    fontFamily:
-      "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif",
+    background: "var(--bg, #faf9f7)",
+    color: "var(--ink, #1d1d1f)",
+    fontFamily: "var(--sans)",
   } as React.CSSProperties,
   card: {
     width: "100%",
@@ -174,6 +173,9 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
   const [password, setPassword] = useState("");
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
+  // Which action is in flight, so we can show an inline spinner and disable the
+  // form instead of doing a jarring full-page redirect during Firebase calls.
+  const [busy, setBusy] = useState<null | "email" | "Google" | "Microsoft">(null);
 
   // takes: the signed-in MapUser (may include an in-memory password)
   // does: persists a sanitized session (never the password) and hands the
@@ -219,6 +221,7 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
 
     const auth = getFirebaseAuth();
     if (auth) {
+      setBusy("email");
       try {
         const cred =
           mode === "signup"
@@ -233,6 +236,8 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
         });
       } catch (err) {
         setError(prettyError(err));
+      } finally {
+        setBusy(null);
       }
       return;
     }
@@ -272,6 +277,9 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       provider === "Microsoft"
         ? new OAuthProvider("microsoft.com")
         : new GoogleAuthProvider();
+    // Popup (not redirect) keeps the user on this page — no jarring full-page
+    // navigation — while the spinner shows the sign-in is in progress.
+    setBusy(provider);
     try {
       const cred = await signInWithPopup(auth, p);
       const em = (cred.user.email || "").toLowerCase();
@@ -283,6 +291,8 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       });
     } catch (err) {
       setError(prettyError(err));
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -296,12 +306,20 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           </div>
         </div>
 
-        <button style={S.oauth} onClick={() => oauthSignIn("Google")}>
-          <GoogleIcon /> Continue with Google
+        <button
+          style={{ ...S.oauth, opacity: busy && busy !== "Google" ? 0.55 : 1 }}
+          disabled={!!busy}
+          onClick={() => oauthSignIn("Google")}
+        >
+          {busy === "Google" ? <span className="spinner" aria-hidden /> : <GoogleIcon />} Continue with Google
         </button>
 
-        <button style={S.oauth} onClick={() => oauthSignIn("Microsoft")}>
-          <MicrosoftIcon /> Continue with Microsoft
+        <button
+          style={{ ...S.oauth, opacity: busy && busy !== "Microsoft" ? 0.55 : 1 }}
+          disabled={!!busy}
+          onClick={() => oauthSignIn("Microsoft")}
+        >
+          {busy === "Microsoft" ? <span className="spinner" aria-hidden /> : <MicrosoftIcon />} Continue with Microsoft
         </button>
 
         <div
@@ -342,8 +360,13 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           {notice && (
             <div style={{ color: "#92400e", fontSize: 13, marginBottom: 8 }}>{notice}</div>
           )}
-          <button type="submit" style={S.primary}>
-            {mode === "login" ? "Log in" : "Sign up"}
+          <button type="submit" style={{ ...S.primary, opacity: busy ? 0.7 : 1 }} disabled={!!busy}>
+            {busy === "email" ? (
+              <span style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                <span className="spinner" aria-hidden style={{ borderTopColor: "#fff", borderColor: "rgba(255,255,255,0.4)" }} />
+                {mode === "login" ? "Logging in…" : "Creating account…"}
+              </span>
+            ) : mode === "login" ? "Log in" : "Sign up"}
           </button>
         </form>
 
