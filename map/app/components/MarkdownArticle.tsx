@@ -32,6 +32,35 @@ export function slugify(text: string): string {
 }
 
 /**
+ * given the (possibly incomplete) text of a ```chart code block while it is
+ * still streaming, sniff its declared chart type so the placeholder can reserve
+ * the exact aspect ratio the finished chart will occupy. defaults to "bar".
+ */
+function sniffChartType(raw: string): string {
+  const m = raw.match(/"type"\s*:\s*"(\w+)"/);
+  return m ? m[1] : "bar";
+}
+
+/**
+ * given a chart type
+ * return the width/height the matching <Chart> renders at, so the streaming
+ * placeholder can reserve the identical box and the page never jumps when the
+ * real chart replaces it. dimensions mirror the viewBoxes in Charts.tsx.
+ */
+function chartBox(type: string): { w: number; h: number } {
+  switch (type) {
+    case "pie":
+    case "donut":
+      return { w: 220, h: 220 };
+    case "hierarchy":
+    case "tree":
+      return { w: 620, h: 240 };
+    default: // line, bar
+      return { w: 620, h: 300 };
+  }
+}
+
+/**
  * renders a markdown report string with anchored headings and GFM tables
  */
 export default function MarkdownArticle({ markdown }: { markdown: string }) {
@@ -56,11 +85,24 @@ export default function MarkdownArticle({ markdown }: { markdown: string }) {
           pre: ({ children }) => <>{children}</>,
           code: ({ className, children }) => {
             if (className && className.includes("language-chart")) {
+              const raw = toText(children).trim();
               try {
-                return <Chart spec={JSON.parse(toText(children).trim())} />;
+                return <Chart spec={JSON.parse(raw)} />;
               } catch {
-                // JSON not complete yet (still streaming)
-                return <div className="chart chart-loading">Rendering chart…</div>;
+                // JSON not complete yet (still streaming). Reserve the exact box
+                // the finished chart will fill so the page never jumps when it
+                // resolves: use the chart's own aspect ratio as a placeholder.
+                const { w, h } = chartBox(sniffChartType(raw));
+                return (
+                  <figure className="chart chart-skeleton">
+                    <div
+                      className="chart-skeleton-box"
+                      style={{ aspectRatio: `${w} / ${h}` }}
+                    >
+                      <span className="chart-loading">Rendering chart…</span>
+                    </div>
+                  </figure>
+                );
               }
             }
             return <code className={className}>{children}</code>;

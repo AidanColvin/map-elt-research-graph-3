@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { ReportData } from "@/components/Report";
+import { friendlyError } from "@/lib/error-copy";
 
 export type SectorScanStatus = "idle" | "running" | "done" | "error";
 
@@ -146,11 +147,7 @@ export function useSectorScan(): SectorScanState {
       setData(json.data as ReportData);
       setStatus("done");
     } catch (e: any) {
-      setError(
-        e?.name === "AbortError"
-          ? "The engine took too long to respond. Try again."
-          : e?.message ?? "Something went wrong.",
-      );
+      setError(friendlyError(e, "scan"));
       setStatus("error");
     }
   }
