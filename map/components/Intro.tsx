@@ -29,9 +29,9 @@ function buildGraph() {
     const ang = ((-90 + (360 / INNER_N) * i) * Math.PI) / 180;
     const x = CX + INNER_R * Math.cos(ang);
     const y = CY + INNER_R * Math.sin(ang);
-    const spokeDelay = 0.7 + i * 0.06;
+    const spokeDelay = 0.08 + i * 0.01;
     spokes.push({ x1: CX, y1: CY, x2: x, y2: y, delay: spokeDelay });
-    inner.push({ x, y, r: 26, delay: spokeDelay + 0.4 });
+    inner.push({ x, y, r: 26, delay: spokeDelay + 0.06 });
 
     // 2–4 leaf nodes fanning out from each inner node
     const count = 2 + (i % 3);
@@ -42,9 +42,9 @@ function buildGraph() {
       const lr = INNER_R + LEAF_R + (j % 2) * 26;
       const lx = CX + lr * Math.cos(la);
       const ly = CY + lr * Math.sin(la);
-      const bDelay = 1.55 + i * 0.05 + j * 0.05;
+      const bDelay = 0.18 + i * 0.01 + j * 0.01;
       branches.push({ x1: x, y1: y, x2: lx, y2: ly, delay: bDelay });
-      leaves.push({ x: lx, y: ly, r: 8 + (j % 2) * 5, delay: bDelay + 0.35 });
+      leaves.push({ x: lx, y: ly, r: 8 + (j % 2) * 5, delay: bDelay + 0.05 });
     }
   }
 
@@ -68,8 +68,8 @@ export default function Intro({ onDone }: { onDone: () => void }) {
   }, [onDone]);
 
   React.useEffect(() => {
-    // Auto-advance once the build animation has fully played.
-    const t = window.setTimeout(finish, 5200);
+    // Show the graph briefly, then hand off to the app.
+    const t = window.setTimeout(finish, 1000);
     return () => window.clearTimeout(t);
   }, [finish]);
 
@@ -79,7 +79,7 @@ export default function Intro({ onDone }: { onDone: () => void }) {
       onClick={finish}
       title="Click to skip"
     >
-      <svg viewBox="0 0 1000 800" style={styles.svg} role="img" aria-label="map">
+      <svg viewBox="-90 -90 1180 980" style={styles.svg} role="img" aria-label="map">
         {/* Faint orbital interconnections */}
         {g.orbits.map((o, i) => (
           <ellipse
@@ -92,7 +92,7 @@ export default function Intro({ onDone }: { onDone: () => void }) {
             fill="none"
             stroke="#c9c7c1"
             strokeWidth={1}
-            style={{ opacity: 0, animation: 'introFade 1.4s ease forwards', animationDelay: '2.4s' }}
+            style={{ opacity: 0, animation: 'introFade 0.5s ease forwards', animationDelay: '0.3s' }}
           />
         ))}
 
@@ -212,7 +212,7 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0,
     transformBox: 'fill-box',
     transformOrigin: 'center',
-    animation: 'introPop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+    animation: 'introPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
   },
   centerText: {
     fontSize: 40,
@@ -220,8 +220,8 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '-0.02em',
     fill: '#0a0a0a',
     opacity: 0,
-    animation: 'introFade 0.6s ease forwards',
-    animationDelay: '0.4s',
+    animation: 'introFade 0.4s ease forwards',
+    animationDelay: '0.08s',
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif",
   },
@@ -232,7 +232,7 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#bbb',
     textTransform: 'uppercase',
     opacity: 0,
-    animation: 'introFade 1s ease forwards',
-    animationDelay: '2.8s',
+    animation: 'introFade 0.5s ease forwards',
+    animationDelay: '0.45s',
   },
 };
