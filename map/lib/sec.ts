@@ -755,19 +755,32 @@ function competitionExcerpt(business: string): string | undefined {
 function riskHeadlines(riskSeg: string): string[] {
   const lines = riskSeg.split("\n").map((l) => l.trim());
   const heads: string[] = [];
+  const seen = new Set<string>();
+  // A real risk header is risk-flavoured. Requiring this signal drops the
+  // wrong-content lines other 10-K subsections produce — corporate values
+  // ("Leaders Who Listen"), cost line items, product names, financial tables.
+  const riskSignal =
+    /\b(risk|adversel|could|may|uncertain|fail|harm|decline|disrupt|competit|regulat|complian|litigat|legal proceed|cyber|security|breach|privacy|data|supply|depend|fluctuat|volatil|intellectual property|infring|pandemic|macroeconomic|geopolit|tariff|interest rate|currency|liquidit|debt|impair|tax|climate|talent|personnel|acquisition|integration|reputation|liabilit|recall|catastroph|insur|disaster)\b/i;
+  // Lines that look like other 10-K sections / financial line items, not risks.
+  const notRisk =
+    /\b(research and development|sales and marketing|general and administrative|cost of (revenue|sales|goods)|gross (profit|margin)|net (income|sales|revenue)|operating (income|expenses?|margin)|cash (flow|and cash)|total (assets|liabilities|revenue|equity)|balance sheet|stockholders.? equity|properties|legal proceedings|mine safety|exhibits|signatures|our (people|values|culture|mission|purpose)|making a difference|leaders who)\b/i;
   for (const line of lines) {
     if (line.length < 16 || line.length > 130) continue;
     if (/[.;:]$/.test(line)) continue; // headers usually don't end in punctuation
-    // Skip index/ToC boilerplate and other non-headline chrome.
     if (/table of contents|index to (the\s+)?(consolidated\s+)?financial statements/i.test(line)) continue;
-    if (/^(item|index|table of contents|page|part [ivx]+|form 10-k|annual report|the following|see |our |we )/i.test(line))
-      continue;
+    if (/^(item|index|table of contents|page|part [ivx]+|form 10-k|annual report|the following|see )/i.test(line)) continue;
     if (/\.{2,}\s*\d{1,4}\s*$/.test(line) || /\s\d{1,4}\s*$/.test(line)) continue; // ToC page-number lines
     if (!/[a-z]/.test(line)) continue; // skip ALL-CAPS noise / numbers
+    if (notRisk.test(line)) continue; // not a risk — another section's header
+    if (!riskSignal.test(line)) continue; // must read like a risk
     const words = line.split(/\s+/);
     if (words.length < 3 || words.length > 18) continue;
-    if (!/^[A-Z]/.test(line)) continue;
-    heads.push(sanitizeMd(line.replace(/\s+/g, " ")));
+    if (!/^[A-Z“"]/.test(line)) continue;
+    const clean = sanitizeMd(line.replace(/\s+/g, " "));
+    const key = clean.toLowerCase().replace(/[^a-z0-9 ]/g, "").trim();
+    if (seen.has(key)) continue; // dedupe repeated category headers
+    seen.add(key);
+    heads.push(clean);
     if (heads.length >= 8) break;
   }
   return heads;
