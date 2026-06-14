@@ -176,7 +176,7 @@ function CompanyHero({
               boxShadow: "0 8px 28px rgba(60,40,120,0.08)",
             }}
           >
-            <Eyebrow style={{ marginBottom: 10 }}>Curated Deep Dive</Eyebrow>
+            <Eyebrow style={{ marginBottom: 10 }}>Curated Company Profile</Eyebrow>
             <div className="flex items-center gap-2.5 [&_.company-logo]:w-[30px] [&_.company-logo]:h-[30px] [&_.company-logo]:rounded-lg [&_.company-logo]:shadow-none [&_.company-logo_img]:p-[3px] [&_.company-logo.monogram]:text-[14px]" style={{ marginBottom: 14 }}>
               <CompanyLogo name="Apple" domain="apple.com" accent="#1d1d1f" />
               <span style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.02em" }}>

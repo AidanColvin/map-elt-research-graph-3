@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "Map — Research & Company Intelligence",
   description:
-    "Free, source-grounded intelligence reports. Company deep dives from SEC EDGAR and sector scans mapping public companies to UNC Chapel Hill research. No API keys, no cost.",
+    "Free, source-grounded intelligence reports. Company profiles from SEC EDGAR and sector scans mapping public companies to UNC Chapel Hill research. No API keys, no cost.",
 };
 
 export default function RootLayout({

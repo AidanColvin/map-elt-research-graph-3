@@ -1,4 +1,4 @@
-# NVIDIA: Company Deep Dive
+# NVIDIA: Company Profile
 
 > NVDA · NASDAQ · Semiconductors / Accelerated Computing · Santa Clara, CA · FY ends late January
 

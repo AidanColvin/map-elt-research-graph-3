@@ -1,4 +1,4 @@
-# Anthropic: Company Deep Dive
+# Anthropic: Company Profile
 
 > Private (Public Benefit Corporation) · Frontier AI · San Francisco, CA · IPO confidentially filed June 2026
 

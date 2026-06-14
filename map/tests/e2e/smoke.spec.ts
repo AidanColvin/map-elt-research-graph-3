@@ -70,7 +70,7 @@ test('dashboard hero renders correctly', async ({ page }) => {
   const body = await page.locator('body').innerText();
   expect(body).toContain('partnership');
   expect(body).toContain('Map it');
-  expect(body).toContain('Deep dive');
+  expect(body).toContain('View profile');
   expect(body).toContain('TRENDING SECTORS');
 });
 
@@ -165,7 +165,7 @@ test('Gene Therapy scan shows report content', async ({ page }) => {
   expect(text.length).toBeGreaterThan(1000);
 });
 
-test('companies table loads with download buttons', async ({ page }) => {
+test.skip('companies table loads with download buttons' /* Companies tab deactivated in PR #6 */, async ({ page }) => {
   await signIn(page);
   await page.locator('text=Companies').first().click();
   await page.waitForTimeout(2000);

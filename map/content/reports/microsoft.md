@@ -1,4 +1,4 @@
-# Microsoft: Company Deep Dive
+# Microsoft: Company Profile
 
 > MSFT · NASDAQ · Software & Cloud · Redmond, WA · FY ends June 30
 

@@ -1,4 +1,4 @@
-# Alphabet (Google): Company Deep Dive
+# Alphabet (Google): Company Profile
 
 > GOOGL · NASDAQ · Internet & AI · Mountain View, CA · FY ends December 31
 

@@ -1,4 +1,4 @@
-# Apple: Company Deep Dive
+# Apple: Company Profile
 
 > AAPL · NASDAQ · Consumer Electronics · Cupertino, CA · FY ends late September
 

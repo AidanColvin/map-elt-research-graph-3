@@ -1,4 +1,4 @@
-# OpenAI: Company Deep Dive
+# OpenAI: Company Profile
 
 > Private (PBC under nonprofit Foundation) · Frontier AI · San Francisco, CA · S-1 confidentially filed May 2026
 

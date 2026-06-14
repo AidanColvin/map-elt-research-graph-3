@@ -148,13 +148,13 @@ export default function Home({ embedded = false }: { embedded?: boolean }) {
             <>
               <div className="kicker">FREE · NO API KEYS · SOURCE-GROUNDED</div>
               <h1 className="hero-title">
-                Company <span className="hero-em">Deep Dive</span> Generator
+                Company <span className="hero-em">Profile</span> Generator
               </h1>
             </>
           )}
           <p className="hero-sub">
             Structured intelligence reports on any public company — real financials
-            pulled live from SEC EDGAR, plus hand-built deep dives on the companies
+            pulled live from SEC EDGAR, plus hand-built profiles on the companies
             that matter. No login, no cost.
           </p>
 
@@ -193,7 +193,7 @@ export default function Home({ embedded = false }: { embedded?: boolean }) {
             <div className="how-item">
               <strong>Curated</strong>
               <span>
-                Seven hand-written deep dives synthesized from SEC filings and primary
+                Seven hand-written profiles synthesized from SEC filings and primary
                 sources — Apple, NVIDIA, Microsoft, Alphabet, AWS, Anthropic, OpenAI.
               </span>
             </div>
@@ -230,7 +230,7 @@ export default function Home({ embedded = false }: { embedded?: boolean }) {
         {/* Embedded panels drop the standalone brand — the global Map header
             owns branding; the button becomes a plain "new report" action. */}
         <button className="brand" onClick={reset}>
-          {embedded ? "← New report" : "◆ Deep Dive"}
+          {embedded ? "← New report" : "◆ Company Profile"}
         </button>
         <form
           className="topsearch"
@@ -271,7 +271,7 @@ export default function Home({ embedded = false }: { embedded?: boolean }) {
           <div className="report-head">
             <div className="report-head-top">
               <div className="report-head-title">
-                <div className="report-eyebrow">Company Deep Dive</div>
+                <div className="report-eyebrow">Company Profile</div>
                 <h1 className="report-title">{company}</h1>
               </div>
               <CompanyLogo

@@ -156,10 +156,8 @@ test('other nav tabs still work after company profile changes', async ({ page })
   await page.waitForTimeout(2000);
   let body = await page.locator('body').innerText();
   expect(body).not.toContain(NOT_FOUND);
-  await page.locator('text="Companies"').first().click();
-  await page.waitForTimeout(2000);
-  body = await page.locator('body').innerText();
-  expect(body).not.toContain(NOT_FOUND);
+  // NOTE: the "Companies" tab was deactivated from the public sub-nav in PR #6
+  // (code retained behind a commented VIEWS entry), so it is no longer clickable.
   await page.locator('text="Dashboard"').first().click();
   await page.waitForTimeout(2000);
   body = await page.locator('body').innerText();

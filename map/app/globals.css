@@ -58,7 +58,7 @@ a {
   align-items: flex-end;
   font-family: var(--serif);
   font-weight: 600;
-  font-size: clamp(40px, 9vw, 80px);
+  font-size: clamp(26px, 5.5vw, 64px);
   line-height: 1;
   white-space: nowrap;
 }

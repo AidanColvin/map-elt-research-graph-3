@@ -4,21 +4,21 @@ import { useEffect } from "react";
 
 /**
  * first-load intro animation:
- *   1. "Deep Dive" appears in black on a white background
+ *   1. "Company Profile" appears in black on a white background
  *   2. stacks of palette-colored books fall letter-by-letter, each stack a
  *      different height, burying the word
  *   3. a sheet of paper slips from under the final stack and falls away
  *   4. onDone() is called, revealing the app
  */
 
-const WORD = "Deep Dive";
+const WORD = "Company Profile";
 const SLOTS = Array.from(WORD);
 
 // the requested palette
 const BOOK_COLORS = ["#983628", "#34623F", "#0B0500", "#A9927D", "#B3B7EE"];
 
-// distinct stack height per letter (D e e p · D i v e)
-const STACK_HEIGHTS = [3, 5, 2, 6, 4, 5, 3, 2];
+// distinct stack height per letter (C o m p a n y · P r o f i l e)
+const STACK_HEIGHTS = [3, 5, 2, 6, 4, 5, 3, 2, 4, 6, 3, 5, 2, 4];
 
 const LETTER_INK = "#191613";
 const BOOK_START = 700; // ms before the first book falls
