@@ -18,9 +18,16 @@ from pydantic import BaseModel, Field, conlist, constr
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
 import json
+import logging
 import os
 import time
 import uvicorn
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='{"time":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s","msg":%(message)s}',
+)
+_log = logging.getLogger("aria_pi")
 
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
@@ -134,8 +141,7 @@ async def run_pipeline(req: PipelineRequest):
         )
 
     except Exception as e:
-        import traceback
-        traceback.print_exc()  # full detail to server logs only
+        _log.exception("run_pipeline failed: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Internal error while generating the report.")
 
 
@@ -156,8 +162,7 @@ async def partnerships(req: PartnershipRequest):
             headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
         )
     except Exception as e:
-        import traceback
-        traceback.print_exc()  # full detail to server logs only
+        _log.exception("partnerships failed: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Internal error while generating the report.")
 
 
@@ -240,8 +245,7 @@ async def run_pipeline_stream(req: PipelineRequest):
 
             yield _sse({"type": "done", "report": report})
         except Exception as e:
-            import traceback
-            traceback.print_exc()  # full detail to server logs only
+            _log.exception("run_pipeline_stream failed: %s", type(e).__name__)
             yield _sse({"type": "error", "message": "Internal error while generating the report."})
 
     return StreamingResponse(

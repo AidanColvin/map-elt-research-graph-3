@@ -7,6 +7,9 @@ export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
 // Same live FastAPI backend as the other proxies (see run-pipeline/route.ts).
+if (!process.env.BACKEND_API_URL && process.env.NODE_ENV === 'production') {
+  console.warn('[partnerships] BACKEND_API_URL is not set — falling back to hardcoded domain. Set this env var in production.');
+}
 const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.vercel.app';
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
@@ -44,8 +47,9 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     clearTimeout(timeout);
     const isTimeout = err?.name === 'AbortError';
+    console.error('[partnerships] upstream error:', err?.message ?? err);
     return NextResponse.json(
-      { error: isTimeout ? 'Backend timed out' : (err?.message ?? 'Upstream error') },
+      { error: isTimeout ? 'Backend timed out' : 'Upstream error' },
       { status: isTimeout ? 504 : 502 },
     );
   }
