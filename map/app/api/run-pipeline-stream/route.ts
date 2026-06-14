@@ -20,6 +20,9 @@ export const fetchCache = 'force-no-store';
 
 // See app/api/run-pipeline/route.ts for why this is the "map-backend" domain
 // and not the stale "aria-pi-api" project.
+if (!process.env.BACKEND_API_URL && process.env.NODE_ENV === 'production') {
+  console.warn('[run-pipeline-stream] BACKEND_API_URL is not set — falling back to hardcoded domain. Set this env var in production.');
+}
 const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.vercel.app';
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
@@ -67,8 +70,9 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     clearTimeout(timeout);
     const isTimeout = err?.name === 'AbortError';
+    console.error('[run-pipeline-stream] upstream error:', err?.message ?? err);
     return new Response(
-      JSON.stringify({ error: isTimeout ? 'Backend timed out' : (err?.message ?? 'Upstream error') }),
+      JSON.stringify({ error: isTimeout ? 'Backend timed out' : 'Upstream error' }),
       { status: isTimeout ? 504 : 502, headers: { 'Content-Type': 'application/json' } },
     );
   }
