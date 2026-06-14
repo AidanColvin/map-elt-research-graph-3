@@ -21,15 +21,16 @@ The hard constraint behind every design decision in both engines: **completely f
 5. [Engine 2: Sector Scan](#engine-2-sector-scan)
 6. [Accounts database](#accounts-database)
 7. [Authentication](#authentication)
-8. [Data sources](#data-sources)
-9. [Repository layout](#repository-layout)
-10. [Local development](#local-development)
-11. [Environment variables](#environment-variables)
-12. [Deployment](#deployment)
-13. [Performance and limits](#performance-and-limits)
-14. [Data integrity rules](#data-integrity-rules)
-15. [Limitations](#limitations)
-16. [License](#license)
+8. [Security and privacy](#security-and-privacy)
+9. [Data sources](#data-sources)
+10. [Repository layout](#repository-layout)
+11. [Local development](#local-development)
+12. [Environment variables](#environment-variables)
+13. [Deployment](#deployment)
+14. [Performance and limits](#performance-and-limits)
+15. [Data integrity rules](#data-integrity-rules)
+16. [Limitations](#limitations)
+17. [License](#license)
 
 ## What it does
 
@@ -292,6 +293,49 @@ The Accounts view renders 142 partner accounts parsed from the UNC industry comp
 ## Authentication
 
 The workspace at `/` sits behind `AuthGate` (Firebase): email and password, Google, and Microsoft OAuth. A standalone auth portal (login page plus account dashboard, React Router) lives under `map/src/`. Firebase web config is in `map/src/firebase/config.js`. Reports themselves need no auth and no keys; the gate covers the workspace UI.
+
+## Security and privacy
+
+The design constraint (free, keyless, public-source) shapes the threat model: there are no paid API keys to leak, no LLM in the request path, and no private data to exfiltrate beyond what a user chooses to save. What hardening exists is focused on the two real surfaces: untrusted markdown rendered in the browser, and unauthenticated public proxy routes that forward to an expensive backend.
+
+```mermaid
+flowchart TB
+    U[Browser]
+    subgraph CLIENT["Client-side defenses"]
+        SU["safeUrl allowlist<br/>(lib/markdownSafe.ts)"]
+        RM["react-markdown<br/>no raw HTML, no dangerouslySetInnerHTML"]
+    end
+    subgraph EDGE["Edge / proxy defenses (Next.js)"]
+        MW["middleware.ts<br/>per-IP rate limit 10/min → 429"]
+        PG["proxyGuard.ts<br/>16 KB cap → 413<br/>shape + length validation → 400<br/>295s timeout → 504"]
+    end
+    subgraph STORE["Per-user data isolation"]
+        FS["Firestore rules<br/>users/{uid}/savedReports<br/>uid-scoped read/write"]
+        LS["localStorage<br/>guests + offline mirror"]
+    end
+    U --> SU --> RM
+    U --> MW --> PG
+    U --> FS & LS
+```
+
+### What is hardened
+
+* **Markdown XSS.** Reports are untrusted text (lifted from filings and public APIs). `react-markdown` renders with no raw-HTML pass (no `rehype-raw`), so `<script>`/`<img onerror>` render as inert text, and there is no `dangerouslySetInnerHTML` anywhere in the app. Every link and image URL passes through `safeUrl` (`map/lib/markdownSafe.ts`), an allowlist that strips control-character obfuscation (`java\tscript:`) then permits only `http(s):`, `mailto:`, in-page anchors, and same-origin paths; `javascript:`, `data:`, `vbscript:`, and protocol-relative `//` URLs collapse to a disabled link.
+* **Proxy abuse.** The unauthenticated `/api/run-pipeline`, `/api/run-pipeline-stream`, and `/api/partnerships` routes validate *before* doing any upstream work (`map/lib/proxyGuard.ts`): a 16 KB body cap (`413`), JSON shape and length checks (`sector` required and ≤200 chars, `companies` ≤25 items each ≤120 chars) (`400`), a 295s fetch timeout (`504`), and `no-store` cache headers. `map/middleware.ts` adds best-effort per-IP rate limiting (10 requests/minute, `429` with `Retry-After`).
+* **No secrets in the path.** No API keys are required or committed. The company-profile engine calls only keyless public APIs. The backend `ANTHROPIC_API_KEY` is optional and off the default path (falls back to a deterministic stub). Firebase web config is a public client identifier by design, not a secret.
+* **Per-user data isolation.** Saved reports for signed-in users live at `users/{uid}/savedReports/{id}` in Firestore, isolated by security rules (`firestore.rules`) that require `request.auth.uid == userId`; everything else is default-deny. Guests and offline use stay in device-local `localStorage`. No analytics, trackers, or beacons are present (no gtag/segment/mixpanel).
+* **Tested.** `map/tests/e2e/security.spec.ts` asserts the `safeUrl` allowlist (including obfuscated `javascript:`/`data:`/`vbscript:` and protocol-relative URLs) and the proxy guards (malformed JSON → `400`, oversized body → `413`, missing `sector` → `400`, over-long company list → `400`).
+
+### Honest limitations
+
+These are intentional tradeoffs for a public-data tool, called out so deployers can decide what to add.
+
+* **The auth gate is client-side.** It governs the workspace UI, not the API routes. The public proxy and `/api/generate` endpoints are unauthenticated by design (they serve only public data). To protect reports themselves, add server-side session checks.
+* **Client-side name leakage.** Because logos and avatars come from free third-party services, the browser sends the company domain to Google/DuckDuckGo favicon endpoints (`map/app/components/CompanyLogo.tsx`) and executive names to `ui-avatars.com` (`map/lib/leadership.ts`). The names are not sensitive, but they reveal who is being researched. All over HTTPS.
+* **Rate limiting is per-instance.** The middleware limiter is in-memory per serverless instance, not global; Vercel's platform DDoS protection is the global layer.
+* **No CSP / HSTS / X-Frame-Options headers** are configured yet. XSS is mitigated at the render layer rather than by a Content-Security-Policy; adding one via `next.config` or `vercel.json` would be defense-in-depth.
+* **Keyless fallback mode** (when Firebase is unconfigured) stores browser-local accounts in `localStorage`; treat it as a development/offline convenience, not production auth.
+* **Firestore rules must be deployed** to Firebase to take effect; they live in the repo (`firestore.rules`) but are not auto-applied by a frontend deploy.
 
 ## Data sources
 
