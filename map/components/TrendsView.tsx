@@ -86,13 +86,13 @@ export default function TrendsView({ data: rawData }: { data: any }) {
       <Head sector={d.report_meta.sector} />
 
       <div style={st.kpiGrid}>
-        <Kpi label="Years covered" value={span || '—'} />
+        <Kpi label="Years covered" value={span || '—'} tip={THIN_YEARS_TIP} />
         <Kpi label="Sector revenue CAGR" value={aggCagr == null ? '—' : `${aggCagr}%`} />
         <Kpi label="Fastest grower" value={grower ? `${grower.name}` : '—'} sub={grower ? `${grower.pct >= 0 ? '+' : ''}${grower.pct}%` : ''} />
         <Kpi label="Biggest decliner" value={decliner ? `${decliner.name}` : '—'} sub={decliner ? `${decliner.pct >= 0 ? '+' : ''}${decliner.pct}%` : ''} />
       </div>
 
-      <Card title="Sector revenue over time" caption={`Total revenue across reporting ${d.report_meta.sector} companies, by fiscal year (SEC filings). Note: earlier years cover fewer firms.`}>
+      <Card title="Sector revenue over time" tip={THIN_YEARS_TIP} caption={`Total revenue across reporting ${d.report_meta.sector} companies, by fiscal year (SEC filings). Note: earlier years cover fewer firms.`}>
         <LineChart series={[{ name: 'Sector revenue', color: BLUE, points: aggRev }]} yFmt={fmtUsd} area />
       </Card>
 
@@ -108,7 +108,7 @@ export default function TrendsView({ data: rawData }: { data: any }) {
         <LineChart series={idxSeries} yFmt={(v) => String(Math.round(v))} baseline100 />
       </Card>
 
-      <Card title="R&D spend over time" caption="Total reported research-and-development spend across the sector, by fiscal year.">
+      <Card title="R&D spend over time" tip={THIN_YEARS_TIP} caption="Total reported research-and-development spend across the sector, by fiscal year.">
         <LineChart series={[{ name: 'Sector R&D', color: GREEN, points: aggRd }]} yFmt={fmtUsd} area />
       </Card>
 
@@ -250,11 +250,42 @@ function GrowthBars({ rows }: { rows: { name: string; pct: number; cagr: number 
   );
 }
 
-function Card({ title, caption, children }: { title: string; caption: string; children: React.ReactNode }) {
-  return <div style={st.card}><div style={st.cardTitle}>{title}</div><div style={st.cardCaption}>{caption}</div>{children}</div>;
+// Plain-English explanation, reused wherever thin years are dropped.
+const THIN_YEARS_TIP =
+  'Years where fewer than ~60% of the sector’s reporting companies have filed are left out. '
+  + 'Early years (before most firms went public) and the latest, not-yet-filed year would otherwise '
+  + 'make the trend dip or spike for a reporting reason, not a real one.';
+
+// takes: tip text (and optional accessible label)
+// does: renders a small ⓘ info marker that reveals the explanation on hover
+//       or keyboard focus; also exposes it via title/aria-label for assistive tech
+// returns: the inline info-tip element
+function InfoTip({ text, label = 'More information' }: { text: string; label?: string }) {
+  const [open, setOpen] = React.useState(false);
+  return (
+    <span style={st.tipWrap}>
+      <button
+        type="button"
+        aria-label={label}
+        title={text}
+        style={st.tipDot}
+        onMouseEnter={() => setOpen(true)}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+      >
+        i
+      </button>
+      {open && <span role="tooltip" style={st.tipBubble}>{text}</span>}
+    </span>
+  );
 }
-function Kpi({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return <div style={st.kpi}><div style={st.kpiVal}>{value}</div>{sub ? <div style={st.kpiSub}>{sub}</div> : null}<div style={st.kpiLbl}>{label}</div></div>;
+
+function Card({ title, caption, children, tip }: { title: string; caption: string; children: React.ReactNode; tip?: string }) {
+  return <div style={st.card}><div style={st.cardTitle}>{title}{tip ? <InfoTip text={tip} /> : null}</div><div style={st.cardCaption}>{caption}</div>{children}</div>;
+}
+function Kpi({ label, value, sub, tip }: { label: string; value: string; sub?: string; tip?: string }) {
+  return <div style={st.kpi}><div style={st.kpiVal}>{value}</div>{sub ? <div style={st.kpiSub}>{sub}</div> : null}<div style={st.kpiLbl}>{label}{tip ? <InfoTip text={tip} /> : null}</div></div>;
 }
 function Legend({ items }: { items: { label: string; color: string }[] }) {
   return <div style={st.legend}>{items.map((it, i) => <span key={i} style={st.legendItem}><span style={{ ...st.legendSwatch, background: it.color }} />{it.label}</span>)}</div>;
@@ -283,4 +314,16 @@ const st: Record<string, React.CSSProperties> = {
   legendItem: { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#374151' },
   legendSwatch: { width: 12, height: 12, borderRadius: 3, display: 'inline-block' },
   empty: { fontSize: 14, color: '#777', fontStyle: 'italic', padding: '24px 0', lineHeight: 1.6 },
+  tipWrap: { position: 'relative', display: 'inline-flex', verticalAlign: 'middle', marginLeft: 7 },
+  tipDot: {
+    width: 16, height: 16, borderRadius: '50%', border: '1px solid #cfcdc7', background: '#fff',
+    color: '#777', fontSize: 10, fontWeight: 700, fontStyle: 'italic', lineHeight: '14px',
+    textAlign: 'center', padding: 0, cursor: 'help', fontFamily: 'Georgia, serif',
+  },
+  tipBubble: {
+    position: 'absolute', bottom: 'calc(100% + 8px)', left: '50%', transform: 'translateX(-50%)',
+    width: 260, background: '#1d1d1f', color: '#fff', fontSize: 12, fontWeight: 400,
+    lineHeight: 1.5, letterSpacing: 0, textTransform: 'none', padding: '10px 12px',
+    borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.18)', zIndex: 20, pointerEvents: 'none',
+  },
 };

@@ -10,9 +10,6 @@
   "dependencies": {
     "docx": "^9.7.1",
     "firebase": "^12.14.0",
-    "html2canvas": "^1.4.1",
-    "jspdf": "^4.2.1",
-    "jspdf-autotable": "^5.0.8",
     "next": "^15.1.6",
     "pptxgenjs": "^3.12.0",
     "react": "^19.0.0",

@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { friendlyError, friendlyHttp } from "@/lib/error-copy";
 
 export type DeepDiveStatus = "idle" | "loading" | "streaming" | "done" | "error";
 
@@ -44,7 +45,7 @@ export function useDeepDive(): DeepDiveState {
       });
       if (!res.ok || !res.body) {
         setStatus("error");
-        setMarkdown(`> Could not generate a report (HTTP ${res.status}).`);
+        setMarkdown(`> ${friendlyHttp(res.status)}`);
         return;
       }
       const reader = res.body.getReader();
@@ -61,7 +62,7 @@ export function useDeepDive(): DeepDiveState {
     } catch (e: any) {
       if (e?.name === "AbortError") return; // superseded by a newer request
       setStatus("error");
-      setMarkdown("> Network error while generating the report.");
+      setMarkdown(`> ${friendlyError(e, "report")}`);
     }
   }
 
