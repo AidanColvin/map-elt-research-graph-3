@@ -1154,12 +1154,12 @@ select.ws-input {
   letter-spacing: 0.07em;
   text-transform: uppercase;
   color: #86868b;
-  padding: 8px 14px;
+  padding: 8px 10px;
   white-space: nowrap;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
 }
 .acct-table tbody td {
-  padding: 8px 14px;
+  padding: 7px 10px;
   vertical-align: top;
   border-bottom: 1px solid rgba(0, 0, 0, 0.04);
   color: #4b4b51;
@@ -1192,8 +1192,8 @@ select.ws-input {
   background: rgba(245, 245, 247, 0.92);
 }
 .acct-table .acct-wide {
-  max-width: 340px;
-  min-width: 240px;
+  max-width: 280px;
+  min-width: 180px;
   white-space: normal;
 }
 /* Clamp long Description / Key Products / Resources cells to keep rows
