@@ -17,6 +17,9 @@ export const fetchCache = 'force-no-store';
 // NEXT_PUBLIC_API_URL in .env.production used to point this proxy at an old
 // backend (every sector returned pharma). Only an explicit BACKEND_API_URL
 // server var may override; otherwise we always use the live domain.
+if (!process.env.BACKEND_API_URL && process.env.NODE_ENV === 'production') {
+  console.warn('[run-pipeline] BACKEND_API_URL is not set — falling back to hardcoded domain. Set this env var in production.');
+}
 const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.vercel.app';
 
 // If the backend project keeps Vercel Deployment Protection ON, set this env
@@ -59,8 +62,9 @@ export async function POST(req: NextRequest) {
   } catch (err: any) {
     clearTimeout(timeout);
     const isTimeout = err?.name === 'AbortError';
+    console.error('[run-pipeline] upstream error:', err?.message ?? err);
     return NextResponse.json(
-      { error: isTimeout ? 'Backend timed out' : (err?.message ?? 'Upstream error') },
+      { error: isTimeout ? 'Backend timed out' : 'Upstream error' },
       { status: isTimeout ? 504 : 502 }
     );
   }
