@@ -74,13 +74,6 @@ export default function DashboardHome({
 
         {/* LEFT */}
         <div>
-          <p style={{
-            fontSize: 12, fontWeight: 600, letterSpacing: "0.06em",
-            color: "#8e8e93", marginBottom: 20,
-          }}>
-            UNC Research × Industry
-          </p>
-
           <h1 style={{
             fontSize: "clamp(34px, 4vw, 52px)",
             lineHeight: 1.1,
@@ -101,7 +94,7 @@ export default function DashboardHome({
             marginBottom: 32,
             maxWidth: 400,
           }}>
-            Deep-dive any company or scan a full sector against UNC research — sourced, scored, in about a minute.
+            Discover the research behind every deal. Search any company or sector and get a full intelligence report in about a minute.
           </p>
 
           {/* Search */}
@@ -243,23 +236,9 @@ export default function DashboardHome({
           </div>
 
           <h2 style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.015em", marginBottom: 2 }}>Oncology</h2>
-          <p style={{ fontSize: 13, color: "#aeaeb2", marginBottom: 6 }}>Public companies × UNC research overlap</p>
+          <p style={{ fontSize: 13, color: "#aeaeb2", marginBottom: 6 }}>Live sector intelligence scan</p>
 
-          <OrbitNetwork points={SCAN_POINTS} centerLabel="UNC" height={360} baseColor={BLUE} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
-            {[{ n: "18", label: "Companies" }, { n: "64", label: "Claims" }, { n: "7", label: "UNC Ties" }].map((s) => (
-              <div key={s.label} style={{
-                background: "#f2f2f7",
-                borderRadius: 12,
-                padding: "10px 0",
-                textAlign: "center",
-              }}>
-                <p style={{ fontSize: 20, fontWeight: 700, color: "#1d1d1f", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s.n}</p>
-                <p style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: "0.1em", color: "#aeaeb2", textTransform: "uppercase", marginTop: 3 }}>{s.label}</p>
-              </div>
-            ))}
-          </div>
+          <OrbitNetwork points={SCAN_POINTS} centerLabel="map" height={400} baseColor={BLUE} />
         </div>
       </div>
 
