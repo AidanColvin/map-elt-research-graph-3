@@ -6,6 +6,7 @@
 
 export interface AccountProfile {
   account: string;
+  founded: string;
   companyAliases: string;
   parentAccount: string;
   topIndustrySectorProfile: string;
@@ -37,7 +38,8 @@ export type AccountColumn = {
 
 /** Column order + display labels, matching the template's exact headers. */
 export const ACCOUNT_COLUMNS: AccountColumn[] = [
-  { key: "account", label: "Account", kind: "account" },
+  { key: "account", label: "Company", kind: "account" },
+  { key: "founded", label: "Founded" },
   { key: "companyAliases", label: "Company Aliases" },
   { key: "parentAccount", label: "Parent Account" },
   { key: "topIndustrySectorProfile", label: "Top Industry Sector Profile" },

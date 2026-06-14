@@ -30,6 +30,7 @@ function rpt(file: string, e: string): string {
 function row(p: Partial<AccountProfile>): AccountProfile {
   return {
     account: "",
+    founded: "",
     companyAliases: "",
     parentAccount: "",
     topIndustrySectorProfile: "",
