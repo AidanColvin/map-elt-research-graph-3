@@ -36,12 +36,22 @@ const VIEWS: { key: View; label: string }[] = [
 // takes: an optional pixel size
 // does: draws the node-graph brand glyph used in the header
 // returns: the logo SVG element
-function LogoMark() {
+function LogoMark({ size = 22 }: { size?: number }) {
   return (
-    <div style={{
-      width: 28, height: 28, borderRadius: "50%",
-      background: "#007aff", flexShrink: 0,
-    }} />
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
+      <circle cx="12" cy="12" r="3.2" fill="#1d1d1f" />
+      {[0, 60, 120, 180, 240, 300].map((deg) => {
+        const r = (deg * Math.PI) / 180;
+        const x = 12 + 8.5 * Math.cos(r);
+        const y = 12 + 8.5 * Math.sin(r);
+        return (
+          <g key={deg}>
+            <line x1="12" y1="12" x2={x} y2={y} stroke="#1d1d1f" strokeWidth="1.1" />
+            <circle cx={x} cy={y} r="1.9" fill="#1d1d1f" />
+          </g>
+        );
+      })}
+    </svg>
   );
 }
 

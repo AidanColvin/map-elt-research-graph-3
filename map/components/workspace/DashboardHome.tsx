@@ -1,5 +1,22 @@
 "use client";
 
+import { OrbitNetwork } from "@/components/Chart3D";
+
+const ORBIT_POINTS = [
+  { label: "Merck",       size: 14, highlight: true  },
+  { label: "Pfizer",      size: 14, highlight: true  },
+  { label: "Amgen",       size: 12, highlight: true  },
+  { label: "Regeneron",   size: 12, highlight: true  },
+  { label: "BMS",         size: 10, highlight: false },
+  { label: "AstraZeneca", size: 10, highlight: false },
+  { label: "Novartis",    size: 10, highlight: false },
+  { label: "Roche",       size: 10, highlight: false },
+  { label: "J&J",         size: 9,  highlight: false },
+  { label: "AbbVie",      size: 9,  highlight: false },
+  { label: "Gilead",      size: 9,  highlight: false },
+  { label: "Sanofi",      size: 9,  highlight: false },
+];
+
 export default function DashboardHome({
   onRunCompany,
   onRunSector,
@@ -13,13 +30,16 @@ export default function DashboardHome({
 }) {
   return (
     <div style={{
-      maxWidth: 680,
+      maxWidth: 1100,
       margin: "0 auto",
       padding: "48px 32px 32px",
       minHeight: "calc(100vh - 54px)",
       display: "flex",
-      flexDirection: "column",
+      gap: 48,
+      alignItems: "flex-start",
     }}>
+    {/* Left editorial column */}
+    <div style={{ flex: "0 0 480px", display: "flex", flexDirection: "column" }}>
       {/* Eyebrow */}
       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", color: "#8e8e93", textTransform: "uppercase", marginBottom: 24 }}>
         A Research Workspace · Est. 2026
@@ -80,6 +100,17 @@ export default function DashboardHome({
           Free · Keyless · Primary-Source
         </p>
       </div>
+    </div>
+
+    {/* Right orbit column */}
+    <div style={{ flex: 1, minWidth: 0, paddingTop: 8 }}>
+      <OrbitNetwork
+        points={ORBIT_POINTS}
+        centerLabel="map"
+        height={420}
+        baseColor="#007aff"
+      />
+    </div>
     </div>
   );
 }
