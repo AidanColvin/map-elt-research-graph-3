@@ -1066,18 +1066,19 @@ select.ws-input {
 /* Sub-navigation items: muted gray, calm hover, black when active. */
 .ws-nav-item {
   border: none;
+  border-bottom: 2px solid transparent;
   background: none;
   font-family: inherit;
   font-size: 13.5px;
   font-weight: 500;
-  color: #86868b;
+  color: #6e6e73;
   padding: 6px 14px;
-  border-radius: 999px;
+  border-radius: 0;
   cursor: pointer;
   /* Nav items render as both <button> and <a> (the Partnerships route link);
      anchors must never show the default underline, in any state. */
   text-decoration: none;
-  transition: color 0.18s ease, background 0.18s ease;
+  transition: color 0.18s ease;
 }
 .ws-nav-item:hover,
 .ws-nav-item:focus,
@@ -1089,9 +1090,12 @@ select.ws-input {
   color: #1d1d1f;
 }
 .ws-nav-item.active {
-  color: #1d1d1f;
-  background: rgba(0, 0, 0, 0.05);
+  color: #007aff;
+  background: none;
   font-weight: 600;
+  border-bottom: 2px solid #007aff;
+  border-radius: 0;
+  padding-bottom: 4px;
 }
 
 /* View transition: hardware-accelerated opacity + transform scale only. */
