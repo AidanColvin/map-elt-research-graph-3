@@ -2,38 +2,26 @@
 
 import { useState } from "react";
 import { OrbitNetwork } from "@/components/Chart3D";
-import CompanyLogo from "@/app/components/CompanyLogo";
 import { SECTORS, getSectorSuggestion } from "./sectors";
 
-const DEEP_DIVES = [
-  { name: "Apple",     ticker: "AAPL",    domain: "apple.com",     accent: "#1d1d1f" },
-  { name: "NVIDIA",    ticker: "NVDA",    domain: "nvidia.com",    accent: "#76b900" },
-  { name: "Microsoft", ticker: "MSFT",    domain: "microsoft.com", accent: "#0078d4" },
-  { name: "Alphabet",  ticker: "GOOGL",   domain: "google.com",    accent: "#4285f4" },
-  { name: "Anthropic", ticker: "Private", domain: "anthropic.com", accent: "#cc785c" },
-];
-
-const TRENDING = [
-  { name: "Clean Energy", count: 31, color: "#10b981" },
-  { name: "Biotech",      count: 44, color: "#818cf8" },
-  { name: "Quantum",      count: 12, color: "#f59e0b" },
-  { name: "Gene Therapy", count: 19, color: "#f472b6" },
-];
+// Apple blue
+const BLUE = "#007aff";
 
 const SCAN_POINTS = [
-  { label: "Merck",          size: 0.9,  highlight: true,  weight: 2 },
-  { label: "Pfizer",         size: 0.8,  highlight: true,  weight: 2 },
-  { label: "AstraZeneca",    size: 0.7,  weight: 1 },
-  { label: "Novartis",       size: 0.65, weight: 1 },
-  { label: "Amgen",          size: 0.6,  highlight: true,  weight: 1 },
-  { label: "Gilead",         size: 0.5,  weight: 1 },
-  { label: "BioNTech",       size: 0.45, weight: 1 },
-  { label: "Moderna",        size: 0.5,  weight: 1 },
-  { label: "Regeneron",      size: 0.4,  highlight: true,  weight: 1 },
-  { label: "Vertex",         size: 0.35, weight: 1 },
-  { label: "Illumina",       size: 0.3,  weight: 1 },
-  { label: "Exact Sciences", size: 0.3,  weight: 1 },
+  { label: "Merck",       size: 0.9,  highlight: true,  weight: 2 },
+  { label: "Pfizer",      size: 0.8,  highlight: true,  weight: 2 },
+  { label: "AstraZeneca", size: 0.7,  weight: 1 },
+  { label: "Novartis",    size: 0.65, weight: 1 },
+  { label: "Amgen",       size: 0.6,  highlight: true,  weight: 1 },
+  { label: "Gilead",      size: 0.5,  weight: 1 },
+  { label: "BioNTech",    size: 0.45, weight: 1 },
+  { label: "Moderna",     size: 0.5,  weight: 1 },
+  { label: "Regeneron",   size: 0.4,  highlight: true,  weight: 1 },
+  { label: "Vertex",      size: 0.35, weight: 1 },
+  { label: "Illumina",    size: 0.3,  weight: 1 },
 ];
+
+const SECTORS_QUICK = ["Clean Energy", "Biotech", "Quantum", "Gene Therapy"];
 
 function classifyQuery(q: string): "sector" | "company" {
   const v = q.trim().toLowerCase();
@@ -66,238 +54,212 @@ export default function DashboardHome({
 
   return (
     <div style={{
-      maxWidth: 1160,
+      maxWidth: 1120,
       margin: "0 auto",
-      padding: "0 24px",
-      /* Fill the viewport below the 54px nav without overflow */
+      padding: "0 32px",
       height: "calc(100vh - 54px)",
       display: "flex",
       flexDirection: "column",
+      justifyContent: "center",
       gap: 0,
     }}>
 
-      {/* ── Main split: fills most of the vertical space ── */}
+      {/* ── Two-column hero ── */}
       <div style={{
-        flex: 1,
         display: "grid",
-        gridTemplateColumns: "1fr 1.05fr",
-        gap: 40,
+        gridTemplateColumns: "1fr 1.1fr",
+        gap: 56,
         alignItems: "center",
-        paddingTop: 32,
-        paddingBottom: 16,
-        minHeight: 0,
       }}>
 
-        {/* LEFT — pitch + search + companies */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
+        {/* LEFT */}
+        <div>
           <p style={{
-            fontSize: 10.5, fontWeight: 700, letterSpacing: "0.24em",
-            color: "#9ca3af", textTransform: "uppercase", marginBottom: 16,
+            fontSize: 12, fontWeight: 600, letterSpacing: "0.06em",
+            color: "#8e8e93", marginBottom: 20,
           }}>
             UNC Research × Industry
           </p>
 
           <h1 style={{
-            fontSize: "clamp(30px, 3.8vw, 48px)",
-            lineHeight: 1.08, fontWeight: 700,
-            letterSpacing: "-0.025em", color: "#0f0f10",
-            marginBottom: 14,
+            fontSize: "clamp(34px, 4vw, 52px)",
+            lineHeight: 1.1,
+            fontWeight: 700,
+            letterSpacing: "-0.025em",
+            color: "#1d1d1f",
+            marginBottom: 16,
           }}>
             Map the{" "}
-            <em style={{
-              fontStyle: "italic",
-              background: "linear-gradient(110deg,#4f46e5,#7c3aed,#a855f7)",
-              WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent",
-            }}>
-              partnership
-            </em>{" "}
-            landscape.
+            <span style={{ color: BLUE }}>partnership</span>
+            {" "}landscape.
           </h1>
 
           <p style={{
-            fontSize: 15, color: "#6b7280", lineHeight: 1.55, marginBottom: 24, maxWidth: 380,
+            fontSize: 17,
+            color: "#6e6e73",
+            lineHeight: 1.6,
+            marginBottom: 32,
+            maxWidth: 400,
           }}>
-            Deep-dive any public company or scan an entire sector against UNC research — sourced, scored, in about a minute.
+            Deep-dive any company or scan a full sector against UNC research — sourced, scored, in about a minute.
           </p>
 
           {/* Search */}
           <form onSubmit={submit} style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "5px 5px 5px 18px",
-            background: "#fff",
-            border: "1px solid rgba(0,0,0,0.09)",
-            borderRadius: 16,
-            boxShadow: "0 4px 20px rgba(79,70,229,0.07), 0 1px 4px rgba(0,0,0,0.05)",
-            maxWidth: 420, marginBottom: 12,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "6px 6px 6px 18px",
+            background: "#ffffff",
+            border: "1px solid #d1d1d6",
+            borderRadius: 14,
+            boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+            maxWidth: 440,
+            marginBottom: 14,
           }}>
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Company, ticker, or sector…"
               aria-label="Company, ticker, or sector"
-              autoComplete="off" spellCheck={false}
+              autoComplete="off"
+              spellCheck={false}
               style={{
-                flex: 1, background: "transparent", border: "none",
-                fontSize: 14.5, color: "#0f0f10", outline: "none", padding: "8px 0",
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                fontSize: 16,
+                color: "#1d1d1f",
+                outline: "none",
+                padding: "7px 0",
               }}
             />
             <button type="submit" style={{
-              borderRadius: 11,
-              background: "linear-gradient(135deg,#4f46e5,#7c3aed)",
-              color: "#fff", fontSize: 13.5, fontWeight: 600,
-              padding: "9px 20px", border: "none", cursor: "pointer",
+              borderRadius: 10,
+              background: BLUE,
+              color: "#fff",
+              fontSize: 15,
+              fontWeight: 600,
+              padding: "10px 22px",
+              border: "none",
+              cursor: "pointer",
               whiteSpace: "nowrap",
-              boxShadow: "0 3px 12px rgba(79,70,229,0.32)",
-            }}>
+              transition: "opacity 0.12s",
+            }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.86")}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
+            >
               Map it
             </button>
           </form>
 
           {/* Try chips */}
-          <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 28 }}>
-            <span style={{ fontSize: 11.5, color: "#9ca3af" }}>Try:</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 40 }}>
+            <span style={{ fontSize: 13, color: "#8e8e93" }}>Try:</span>
             {["Apple", "Oncology", "Semiconductors"].map((chip) => (
               <button key={chip} onClick={() => setQuery(chip)} style={{
-                fontSize: 12, color: "#4b5563",
-                background: "#fff", border: "1px solid rgba(0,0,0,0.07)",
-                borderRadius: 999, padding: "4px 13px", cursor: "pointer",
-                transition: "box-shadow 0.12s",
+                fontSize: 13,
+                color: "#1d1d1f",
+                background: "#f2f2f7",
+                border: "none",
+                borderRadius: 999,
+                padding: "5px 14px",
+                cursor: "pointer",
+                transition: "background 0.12s",
               }}
-                onMouseEnter={(e) => (e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.09)")}
-                onMouseLeave={(e) => (e.currentTarget.style.boxShadow = "none")}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#e5e5ea")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#f2f2f7")}
               >
                 {chip}
               </button>
             ))}
           </div>
 
-          {/* Company quick-launch row */}
+          {/* Sector pills */}
           <div>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-              <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.18em", color: "#9ca3af", textTransform: "uppercase" }}>
-                Instant Profiles
-              </p>
-              <button onClick={onOpenCompanyView} style={{
-                fontSize: 12, color: "#4f46e5", fontWeight: 600,
-                background: "none", border: "none", cursor: "pointer", padding: 0,
-              }}>View all →</button>
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              {DEEP_DIVES.map((c) => (
-                <button key={c.name} onClick={() => onRunCompany(c.name)} style={{
-                  flex: 1, display: "flex", flexDirection: "column", alignItems: "center",
-                  gap: 6, padding: "12px 6px 10px",
-                  background: "#fff", border: "1px solid rgba(0,0,0,0.06)",
-                  borderRadius: 16, cursor: "pointer",
-                  boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-                  transition: "transform 0.18s, box-shadow 0.18s",
+            <p style={{ fontSize: 12, fontWeight: 600, color: "#8e8e93", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: 12 }}>
+              Trending Sectors
+            </p>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {SECTORS_QUICK.map((s) => (
+                <button key={s} onClick={() => onPrefillSector(s)} style={{
+                  fontSize: 13,
+                  color: BLUE,
+                  background: "rgba(0,122,255,0.08)",
+                  border: "1px solid rgba(0,122,255,0.18)",
+                  borderRadius: 999,
+                  padding: "6px 16px",
+                  cursor: "pointer",
+                  fontWeight: 500,
+                  transition: "background 0.12s",
                 }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.transform = "translateY(-2px)";
-                    e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.09)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.transform = "translateY(0)";
-                    e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
-                  }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,122,255,0.14)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "rgba(0,122,255,0.08)")}
                 >
-                  <div style={{ height: 3, width: "60%", borderRadius: 99, background: c.accent, opacity: 0.7, marginBottom: 2 }} />
-                  <div className="[&_.company-logo]:w-[32px] [&_.company-logo]:h-[32px] [&_.company-logo]:rounded-lg [&_.company-logo]:shadow-none [&_.company-logo_img]:p-[5px] [&_.company-logo.monogram]:text-[14px]">
-                    <CompanyLogo name={c.name} domain={c.domain} accent={c.accent} />
-                  </div>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#374151" }}>{c.name}</span>
+                  {s}
                 </button>
               ))}
+              <button onClick={onOpenCompanyView} style={{
+                fontSize: 13,
+                color: "#8e8e93",
+                background: "#f2f2f7",
+                border: "none",
+                borderRadius: 999,
+                padding: "6px 16px",
+                cursor: "pointer",
+                transition: "background 0.12s",
+              }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "#e5e5ea")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "#f2f2f7")}
+              >
+                All companies →
+              </button>
             </div>
           </div>
         </div>
 
-        {/* RIGHT — live sector scan card */}
+        {/* RIGHT — orbit card */}
         <div style={{
           borderRadius: 24,
-          background: "rgba(255,255,255,0.82)",
-          backdropFilter: "saturate(180%) blur(16px)",
-          WebkitBackdropFilter: "saturate(180%) blur(16px)",
-          border: "1px solid rgba(0,0,0,0.06)",
-          boxShadow: "0 16px 48px rgba(79,70,229,0.08), 0 2px 8px rgba(0,0,0,0.05)",
-          padding: "18px 18px 14px",
-          display: "flex", flexDirection: "column",
+          background: "#ffffff",
+          border: "1px solid #e5e5ea",
+          boxShadow: "0 8px 40px rgba(0,0,0,0.08)",
+          padding: "20px 20px 16px",
         }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
             <p style={{
               display: "flex", alignItems: "center", gap: 7,
-              fontSize: 10, fontWeight: 700, letterSpacing: "0.18em",
-              color: "#6b7280", textTransform: "uppercase",
+              fontSize: 11, fontWeight: 600, letterSpacing: "0.08em",
+              color: "#8e8e93", textTransform: "uppercase",
             }}>
               <span style={{
                 display: "inline-block", width: 6, height: 6, borderRadius: "50%",
-                background: "#10b981", boxShadow: "0 0 0 3px rgba(16,185,129,0.2)",
+                background: "#30d158",
                 animation: "pulse 1.6s ease-in-out infinite",
               }} aria-hidden />
               Sector Scan · Live
             </p>
-            <span style={{ fontSize: 10.5, color: "#9ca3af", fontVariantNumeric: "tabular-nums" }}>14 of 18</span>
+            <span style={{ fontSize: 11, color: "#aeaeb2", fontVariantNumeric: "tabular-nums" }}>14 of 18</span>
           </div>
 
-          <h2 style={{ fontSize: 20, fontWeight: 700, color: "#0f0f10", letterSpacing: "-0.01em", marginBottom: 1 }}>Oncology</h2>
-          <p style={{ fontSize: 12, color: "#9ca3af", marginBottom: 4 }}>Public companies × UNC research overlap</p>
+          <h2 style={{ fontSize: 22, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.015em", marginBottom: 2 }}>Oncology</h2>
+          <p style={{ fontSize: 13, color: "#aeaeb2", marginBottom: 6 }}>Public companies × UNC research overlap</p>
 
-          {/* Orbit — flex:1 so it fills remaining height */}
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <OrbitNetwork points={SCAN_POINTS} centerLabel="UNC" height={300} />
-          </div>
+          <OrbitNetwork points={SCAN_POINTS} centerLabel="UNC" height={360} baseColor={BLUE} />
 
-          {/* Stats */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginTop: 12 }}>
             {[{ n: "18", label: "Companies" }, { n: "64", label: "Claims" }, { n: "7", label: "UNC Ties" }].map((s) => (
               <div key={s.label} style={{
-                background: "rgba(249,250,251,0.9)", border: "1px solid rgba(0,0,0,0.04)",
-                borderRadius: 12, padding: "8px 0", textAlign: "center",
+                background: "#f2f2f7",
+                borderRadius: 12,
+                padding: "10px 0",
+                textAlign: "center",
               }}>
-                <p style={{ fontSize: 18, fontWeight: 700, color: "#0f0f10", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s.n}</p>
-                <p style={{ fontSize: 9, fontWeight: 600, letterSpacing: "0.12em", color: "#9ca3af", textTransform: "uppercase", marginTop: 3 }}>{s.label}</p>
+                <p style={{ fontSize: 20, fontWeight: 700, color: "#1d1d1f", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{s.n}</p>
+                <p style={{ fontSize: 9.5, fontWeight: 600, letterSpacing: "0.1em", color: "#aeaeb2", textTransform: "uppercase", marginTop: 3 }}>{s.label}</p>
               </div>
             ))}
           </div>
-        </div>
-      </div>
-
-      {/* ── Sector strip — pinned to bottom ── */}
-      <div style={{ paddingBottom: 20 }}>
-        <p style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: "0.18em", color: "#9ca3af", textTransform: "uppercase", marginBottom: 10 }}>
-          Trending Sectors
-        </p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 10 }}>
-          {TRENDING.map((s) => (
-            <button key={s.name} onClick={() => onPrefillSector(s.name)} style={{
-              textAlign: "left", border: "1px solid rgba(0,0,0,0.06)",
-              padding: "12px 14px", borderRadius: 14, cursor: "pointer",
-              background: "#fff",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.04)",
-              display: "flex", alignItems: "center", gap: 10,
-              transition: "transform 0.15s, box-shadow 0.15s",
-            }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.transform = "translateY(-2px)";
-                e.currentTarget.style.boxShadow = "0 6px 20px rgba(0,0,0,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.transform = "translateY(0)";
-                e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,0.04)";
-              }}
-            >
-              <span style={{
-                width: 32, height: 32, borderRadius: 9,
-                background: `${s.color}18`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 15, color: s.color, flexShrink: 0,
-              }}>✳</span>
-              <div>
-                <p style={{ fontSize: 13, fontWeight: 700, color: "#0f0f10", lineHeight: 1.2 }}>{s.name}</p>
-                <p style={{ fontSize: 11, color: s.color, fontWeight: 600, marginTop: 2 }}>{s.count} cos</p>
-              </div>
-            </button>
-          ))}
         </div>
       </div>
 
