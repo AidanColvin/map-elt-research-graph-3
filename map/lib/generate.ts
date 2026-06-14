@@ -62,7 +62,9 @@ export async function buildLiveReport(query: string): Promise<string> {
     hit ? fetchSubsidiaries(hit.cik, filings) : Promise.resolve([] as Subsidiary[]),
     fetchResearch(researchName, profile?.sicDescription),
   ]);
-  const execs = form4Execs.length ? form4Execs : tenk?.executives ?? [];
+  // Merge insider-derived (Form 4) and 10-K-derived officers so the roster
+  // isn't missing the CEO just because they haven't filed a recent Form 4.
+  const execs = mergeExecutives(form4Execs, tenk?.executives ?? []);
 
   // Label the 10-K by its reported fiscal year (the latest XBRL annual period),
   // not the filing-date year — otherwise the 10-K citation can read "FY2026"
@@ -97,6 +99,65 @@ export async function buildLiveReport(query: string): Promise<string> {
 }
 
 const LIVE_ACCENT = "#4f46e5";
+
+// takes: a title string
+// does: ranks an executive title by seniority (CEO/chair = most senior)
+// returns: a rank number (lower = more senior)
+function execRank(title: string): number {
+  const s = (title || "").toLowerCase();
+  if (/(chief executive|ceo|chair|founder|technoking)/.test(s)) return 0;
+  if (/president/.test(s)) return 1;
+  if (/(chief financial|cfo)/.test(s)) return 2;
+  if (/(chief operating|coo)/.test(s)) return 3;
+  if (/chief/.test(s)) return 4;
+  if (/(evp|executive vice president)/.test(s)) return 5;
+  if (/(svp|senior vice president)/.test(s)) return 6;
+  return 7;
+}
+
+// takes: a candidate executive name
+// does: rejects parse artifacts where a title fragment was captured as a name
+//       (e.g. "Executive Vice President"), keeping only plausible person names
+// returns: true if the string looks like a real person's name
+function looksLikePerson(name: string): boolean {
+  const n = (name || "").trim();
+  if (!/^[A-Z]/.test(n)) return false;
+  const words = n.split(/\s+/);
+  if (words.length < 2 || words.length > 5) return false;
+  if (/\b(president|chief|officer|vice|director|executive|senior|principal|treasurer|secretary|evp|svp|cfo|ceo|coo|cto|cmo|cao|counsel|chairman|chairwoman|chair|department|division|board)\b/i.test(n))
+    return false;
+  return true;
+}
+
+// takes: Form 4-derived and 10-K-derived executive lists
+// does: drops parse-artifact rows, merges the lists, dedupes by person
+//       (suffix/punctuation-insensitive), keeps the most senior known title per
+//       person, and ranks CEO-first
+// returns: up to 6 real executives, most senior first
+function mergeExecutives(form4: Executive[], tenk: Executive[]): Executive[] {
+  const key = (n: string) =>
+    n.toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\.?\b/g, "").replace(/[^a-z ]/g, "").replace(/\s+/g, " ").trim();
+  const byPerson = new Map<string, Executive>();
+  for (const e of [...form4, ...tenk]) {
+    if (!e?.name || !e?.title || !looksLikePerson(e.name)) continue;
+    const k = key(e.name);
+    const prev = byPerson.get(k);
+    if (!prev || execRank(e.title) < execRank(prev.title)) byPerson.set(k, e);
+  }
+  return [...byPerson.values()].sort((a, b) => execRank(a.title) - execRank(b.title)).slice(0, 6);
+}
+
+// takes: a prose excerpt and the target sentences per paragraph
+// does: regroups one long 10-K excerpt into a few shorter paragraphs at sentence
+//       boundaries so it reads as scannable blocks rather than a wall of text
+// returns: the text with paragraph breaks inserted
+function paragraphize(text: string, perPara = 2): string {
+  const sents = splitSentences(text.replace(/\s+/g, " ").trim()).filter(Boolean);
+  if (sents.length <= perPara) return text.trim();
+  const paras: string[] = [];
+  for (let i = 0; i < sents.length; i += perPara) paras.push(sents.slice(i, i + perPara).join(" "));
+  return paras.join("\n\n");
+}
 
 function leadership(name: string, execs: Executive[], isPublic: boolean): string {
   if (!execs.length) return "";
@@ -394,7 +455,7 @@ function strategicDirection(
     lines.push(
       `In its own words, from Item 1 (Business) of its FY${tenk.fiscalYear} Form 10-K, ${name} describes its business and strategy as follows [4]:\n`,
     );
-    lines.push(tenk.business);
+    lines.push(paragraphize(tenk.business));
     lines.push(`\n*Source: ${name} Form 10-K, Item 1 — Business (SEC EDGAR) [4].*`);
   } else if (wiki?.extract) {
     lines.push(
@@ -651,7 +712,7 @@ function outlook(
   }
   if (tenk?.mda) {
     lines.push(`\nFrom Management's Discussion & Analysis (Item 7) of the latest 10-K [4]:\n`);
-    lines.push(tenk.mda);
+    lines.push(paragraphize(tenk.mda));
   } else {
     lines.push(
       "The trajectory and margin profile above are the key metrics to watch in the next annual filing.",
