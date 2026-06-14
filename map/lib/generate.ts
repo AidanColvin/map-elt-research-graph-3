@@ -64,6 +64,14 @@ export async function buildLiveReport(query: string): Promise<string> {
   ]);
   const execs = form4Execs.length ? form4Execs : tenk?.executives ?? [];
 
+  // Label the 10-K by its reported fiscal year (the latest XBRL annual period),
+  // not the filing-date year — otherwise the 10-K citation can read "FY2026"
+  // while the financial tables correctly say "FY2025".
+  if (tenk && financials) {
+    const fy = latest(financials.revenue)?.fy;
+    if (fy) tenk.fiscalYear = String(fy);
+  }
+
   const name = profile?.name ?? wiki?.title ?? titleCase(query);
   if (!profile && !wiki) return notFound(query);
 
@@ -611,11 +619,10 @@ function recentFilings(filings: FilingRef[]): string {
 }
 
 function researchSection(research: ResearchSignal | null): string {
+  // Suppress the section entirely when there's no relevant indexed research —
+  // a hollow "none found" stub reads as broken and would dangle citation [3].
+  if (!research || !research.count || !research.topWorks.length) return "";
   const lines: string[] = ["## Research & Innovation Signals\n"];
-  if (!research || !research.count) {
-    lines.push("No recent indexed research output was found for this company. [3]");
-    return lines.join("\n") + "\n";
-  }
   lines.push(
     `OpenAlex indexes **${research.count.toLocaleString()}** works published since 2024 that reference this company [3]. Most-cited recent works:`,
   );

@@ -6,10 +6,13 @@
 import { getJson } from "./http";
 import type { ResearchSignal } from "./types";
 
-// Industries where scientific papers plausibly concern the company itself
-// (pharma, biotech, semiconductors, software, etc.), so we keep them.
-const RESEARCH_INDUSTRIES =
-  /pharma|biotech|biolog|medic|health|drug|therap|diagnost|life scien|genom|research|laborator|chemical|semiconductor|software|technolog|electronic|aerospace|scientific|instrument|computer/i;
+// Only life-sciences companies legitimately appear as the subject of the
+// biomedical papers OpenAlex is dominated by, so only they keep unfiltered
+// results. Tech / software / semiconductor / retail companies get the strict
+// relevance filter below — otherwise a common-word name ("Meta", "Oracle",
+// "Target") pulls in thousands of unrelated medical papers.
+const LIFE_SCIENCES =
+  /pharma|biotech|biolog|medic|health|drug|therap|diagnost|life scien|genom|clinical|hospital|vaccine|laborator|surgical|dental/i;
 
 // Top-level OpenAlex concepts that signal a basic-science paper rather than one
 // about a consumer/retail/industrial company — used to drop false positives
@@ -22,11 +25,11 @@ const BASIC_SCIENCE = new Set([
 ]);
 
 // takes: a SIC / industry description string (or undefined)
-// does: decides whether scientific papers could legitimately be about this
-//       company's own domain
-// returns: true for research-oriented industries, false otherwise
-function isResearchIndustry(industry?: string): boolean {
-  return !!industry && RESEARCH_INDUSTRIES.test(industry);
+// does: decides whether the biomedical papers OpenAlex returns could legitimately
+//       be about this company (true only for life-sciences industries)
+// returns: true for life-sciences industries, false otherwise
+function isLifeSciences(industry?: string): boolean {
+  return !!industry && LIFE_SCIENCES.test(industry);
 }
 
 // takes: a company name
@@ -72,10 +75,9 @@ export async function fetchResearch(
     venue: w.primary_location?.source?.display_name,
   });
 
-  // Research-oriented companies (pharma, biotech, semiconductors, software…)
-  // legitimately produce science papers and aren't common dictionary words, so
-  // keep OpenAlex's results as-is — the precise behaviour the original had.
-  if (isResearchIndustry(industry)) {
+  // Life-sciences companies legitimately are the subject of biomedical papers,
+  // so keep OpenAlex's results as-is for them.
+  if (isLifeSciences(industry)) {
     return {
       count: data.meta?.count ?? data.results.length,
       topWorks: data.results.slice(0, 5).map(toWork),
