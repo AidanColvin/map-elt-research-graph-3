@@ -655,16 +655,66 @@ export function markdownExportName(title: string): string {
 }
 
 // takes: a single line of inline Markdown
-// does: strips inline markers (**bold**, *em*, `code`, [text](url)) down to the
-//       readable plain text used by the PDF/Word renderers
+// does: strips inline markers (**bold**, *em*, `code`, ![img](url), [text](url))
+//       down to readable plain text used by the PDF/Word renderers.
+//       Images are removed entirely (no alt text noise in table cells).
+//       Links keep only the visible text (URLs are stripped — they appear in the
+//       references section verbatim and would overflow table columns).
 // returns: the cleaned plain-text string
 function stripInline(s: string): string {
   return s
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)') // links -> "text (url)"
-    .replace(/\*\*([^*]+)\*\*/g, '$1')               // bold
-    .replace(/\*([^*]+)\*/g, '$1')                   // italics
-    .replace(/`([^`]+)`/g, '$1')                     // inline code
+    .replace(/!\[([^\]]*)\]\([^)]*\)/g, '')         // images → remove entirely
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')        // links → text only
+    .replace(/\*\*([^*]+)\*\*/g, '$1')              // bold
+    .replace(/\*([^*]+)\*/g, '$1')                  // italics
+    .replace(/`([^`]+)`/g, '$1')                    // inline code
+    .replace(/\s{2,}/g, ' ')                        // collapse double-spaces left by removed images
     .trim();
+}
+
+// takes: a parsed chart spec object from a ```chart``` code block
+// does: converts the LLM chart spec into the format-neutral Block chart IR.
+//       line/bar → horizontal bars (the PDF renderer's native chart type).
+//       donut/pie → donut sectors.
+//       hierarchy → a Name/Role table (no vector tree renderer in PDF).
+// returns: a Block or null if the spec is unrecognised
+function chartSpecToBlock(spec: any): Block | null {
+  const title: string = spec.title || 'Chart';
+  const type: string = (spec.type || '').toLowerCase();
+
+  if ((type === 'donut' || type === 'pie') && Array.isArray(spec.slices)) {
+    return {
+      t: 'chart', chartKind: 'donut', title, solid: type === 'pie',
+      series: spec.slices.map((s: any) => ({
+        label: String(s.label ?? ''), value: Number(s.value) || 0, color: s.color,
+      })),
+    };
+  }
+
+  if ((type === 'line' || type === 'bar') && Array.isArray(spec.series)) {
+    const xs: string[] = Array.isArray(spec.x) ? spec.x : [];
+    const first = spec.series[0];
+    if (first && Array.isArray(first.values)) {
+      return {
+        t: 'chart', chartKind: 'bars', title,
+        subtitle: type === 'line' ? 'Trend over time' : undefined,
+        series: xs.map((label: string, i: number) => ({
+          label, value: Number(first.values[i]) || 0, color: first.color,
+        })),
+      };
+    }
+  }
+
+  if (type === 'hierarchy') {
+    const rows: string[][] = [];
+    if (spec.root) rows.push([String(spec.root.label ?? ''), String(spec.root.sub ?? '')]);
+    if (Array.isArray(spec.children)) {
+      spec.children.forEach((c: any) => rows.push([String(c.label ?? ''), String(c.sub ?? '')]));
+    }
+    return rows.length ? { t: 'table', headers: ['Name', 'Role'], rows } : null;
+  }
+
+  return null;
 }
 
 // takes: a Markdown document string
@@ -689,6 +739,30 @@ export function parseMarkdownBlocks(md: string): Block[] {
     const raw = lines[i];
     const line = raw.trimEnd();
     const trimmed = line.trim();
+
+    // Fenced code block: ```lang ... ```.
+    // The only language we render is "chart"; everything else is skipped silently.
+    if (trimmed.startsWith('```')) {
+      flushPara(); flushList();
+      const lang = trimmed.slice(3).trim().toLowerCase();
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].trim().startsWith('```')) {
+        codeLines.push(lines[i]);
+        i++;
+      }
+      // i now points at the closing fence; the outer loop's i++ advances past it.
+      if (lang === 'chart') {
+        const code = codeLines.join('\n').trim();
+        if (code) {
+          try {
+            const cb = chartSpecToBlock(JSON.parse(code));
+            if (cb) blocks.push(cb);
+          } catch { /* skip malformed chart JSON */ }
+        }
+      }
+      continue;
+    }
 
     // Pipe table: a header row followed by a |---|---| separator row.
     if (trimmed.startsWith('|') && /^\s*\|?[\s:|-]+\|?\s*$/.test(lines[i + 1] || '')) {
