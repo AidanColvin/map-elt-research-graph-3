@@ -15,6 +15,7 @@ import {
   findLatest10K,
   fetch10KSections,
   fetchExecutives,
+  fetchProxyExecutives,
   fetchSubsidiaries,
   resolveCik,
 } from "./sec";
@@ -67,8 +68,15 @@ export async function buildLiveReport(query: string): Promise<string> {
   // back to merging in Form 4 insiders when that list is sparse/unavailable
   // (which is also when the CEO would otherwise be missing).
   const tenkExecs = tenk?.executives ?? [];
-  const execs =
-    tenkExecs.length >= 3 ? mergeExecutives(tenkExecs, []) : mergeExecutives(form4Execs, tenkExecs);
+  let execs: Executive[];
+  if (tenkExecs.length >= 3) {
+    execs = mergeExecutives(tenkExecs, []);
+  } else {
+    // The 10-K omits the officer table (incorporated by reference) — supplement
+    // with Form 4 insiders and the DEF 14A proxy so the CEO isn't missing.
+    const proxyExecs = hit ? await fetchProxyExecutives(hit.cik, filings) : [];
+    execs = mergeExecutives(proxyExecs, [...form4Execs, ...tenkExecs]);
+  }
 
   // Label the 10-K by its reported fiscal year (the latest XBRL annual period),
   // not the filing-date year — otherwise the 10-K citation can read "FY2026"
@@ -144,6 +152,8 @@ function mergeExecutives(form4: Executive[], tenk: Executive[]): Executive[] {
   const byPerson = new Map<string, Executive>();
   for (const e of [...form4, ...tenk]) {
     if (!e?.name || !e?.title || !looksLikePerson(e.name)) continue;
+    if (/^(see remarks|remarks|other|n\/?a|none|—)$/i.test(e.title.trim())) continue; // placeholder title
+
     const k = key(e.name);
     const prev = byPerson.get(k);
     if (!prev || execRank(e.title) < execRank(prev.title)) byPerson.set(k, e);
