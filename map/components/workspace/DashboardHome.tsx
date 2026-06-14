@@ -3,18 +3,18 @@
 import { OrbitNetwork } from "@/components/Chart3D";
 
 const ORBIT_POINTS = [
-  { label: "Merck",       size: 14, highlight: true  },
-  { label: "Pfizer",      size: 14, highlight: true  },
-  { label: "Amgen",       size: 12, highlight: true  },
-  { label: "Regeneron",   size: 12, highlight: true  },
-  { label: "BMS",         size: 10, highlight: false },
-  { label: "AstraZeneca", size: 10, highlight: false },
-  { label: "Novartis",    size: 10, highlight: false },
-  { label: "Roche",       size: 10, highlight: false },
-  { label: "J&J",         size: 9,  highlight: false },
-  { label: "AbbVie",      size: 9,  highlight: false },
-  { label: "Gilead",      size: 9,  highlight: false },
-  { label: "Sanofi",      size: 9,  highlight: false },
+  { label: "Merck",       size: 0.8,  highlight: true  },
+  { label: "Pfizer",      size: 0.8,  highlight: true  },
+  { label: "Amgen",       size: 0.7,  highlight: true  },
+  { label: "Regeneron",   size: 0.7,  highlight: true  },
+  { label: "BMS",         size: 0.55, highlight: false },
+  { label: "AstraZeneca", size: 0.55, highlight: false },
+  { label: "Novartis",    size: 0.55, highlight: false },
+  { label: "Roche",       size: 0.55, highlight: false },
+  { label: "J&J",         size: 0.5,  highlight: false },
+  { label: "AbbVie",      size: 0.5,  highlight: false },
+  { label: "Gilead",      size: 0.5,  highlight: false },
+  { label: "Sanofi",      size: 0.5,  highlight: false },
 ];
 
 export default function DashboardHome({
@@ -30,16 +30,13 @@ export default function DashboardHome({
 }) {
   return (
     <div style={{
-      maxWidth: 1100,
+      maxWidth: 720,
       margin: "0 auto",
       padding: "48px 32px 32px",
       minHeight: "calc(100vh - 54px)",
       display: "flex",
-      gap: 48,
-      alignItems: "flex-start",
+      flexDirection: "column",
     }}>
-    {/* Left editorial column */}
-    <div style={{ flex: "0 0 480px", display: "flex", flexDirection: "column" }}>
       {/* Eyebrow */}
       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", color: "#8e8e93", textTransform: "uppercase", marginBottom: 24 }}>
         A Research Workspace · Est. 2026
@@ -47,14 +44,24 @@ export default function DashboardHome({
 
       {/* Headline */}
       <h1 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, marginBottom: 20 }}>
-        <span style={{ color: "#1d1d1f" }}>Board-ready intelligence,{"\n"}</span>
+        <span style={{ color: "#1d1d1f" }}>Board-ready intelligence, </span>
         <span style={{ color: "#007aff" }}>assembled from primary sources.</span>
       </h1>
 
       {/* Body */}
-      <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.65, marginBottom: 40, maxWidth: 560 }}>
+      <p style={{ fontSize: 16, color: "#6e6e73", lineHeight: 1.65, marginBottom: 32 }}>
         No LLM in the request path. No API keys. Every number, sentence, and citation traces to a free, keyless public data source — SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER.
       </p>
+
+      {/* 3D orbit */}
+      <div style={{ marginBottom: 32, borderRadius: 20, overflow: "hidden", background: "#f9f9fb", border: "1px solid #e5e5ea" }}>
+        <OrbitNetwork
+          points={ORBIT_POINTS}
+          centerLabel="map"
+          height={320}
+          baseColor="#007aff"
+        />
+      </div>
 
       {/* Canvas card */}
       <div style={{
@@ -62,14 +69,15 @@ export default function DashboardHome({
         borderRadius: 20,
         overflow: "hidden",
         marginBottom: "auto",
+        background: "#fff",
       }}>
         <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", color: "#8e8e93", textTransform: "uppercase", padding: "14px 20px 10px", borderBottom: "1px solid #f2f2f7" }}>
           Open a canvas
         </p>
         {[
           { label: "Company Profile", sub: "Live SEC filings, charts, leadership", action: () => onOpenCompanyView() },
-          { label: "Sector Scan", sub: "Trials + grants + filings, parallel pull", action: () => onRunSector("") },
-          { label: "Accounts", sub: "Partner database, exportable", action: () => onOpenCompanyView() },
+          { label: "Sector Scan",     sub: "Trials + grants + filings, parallel pull", action: () => onRunSector("") },
+          { label: "Database",        sub: "Partner database, exportable", action: () => onOpenCompanyView() },
         ].map((row, i, arr) => (
           <button key={row.label} onClick={row.action} style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -100,17 +108,6 @@ export default function DashboardHome({
           Free · Keyless · Primary-Source
         </p>
       </div>
-    </div>
-
-    {/* Right orbit column */}
-    <div style={{ flex: 1, minWidth: 0, paddingTop: 8 }}>
-      <OrbitNetwork
-        points={ORBIT_POINTS}
-        centerLabel="map"
-        height={420}
-        baseColor="#007aff"
-      />
-    </div>
     </div>
   );
 }
