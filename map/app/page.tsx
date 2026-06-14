@@ -27,7 +27,6 @@ type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "
 // the accounts route is "Companies"; its view key stays "accounts" so nothing
 // that references the route breaks.
 const VIEWS: { key: View; label: string }[] = [
-  { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company Profile" },
   { key: "sector", label: "Sector Scan" },
   // DEACTIVATED — hidden from the public app. The "Companies" (accounts) and
@@ -103,7 +102,7 @@ function GlobalHeader({
         display: "flex",
         alignItems: "center",
         padding: "0 22px",
-        background: "rgba(255,255,255,0.66)",
+        background: "rgba(250,249,247,0.82)",
         backdropFilter: "saturate(180%) blur(20px)",
         WebkitBackdropFilter: "saturate(180%) blur(20px)",
         borderBottom: "1px solid rgba(0,0,0,0.05)",
