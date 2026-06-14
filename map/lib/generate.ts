@@ -90,7 +90,7 @@ export async function buildLiveReport(query: string): Promise<string> {
   if (!profile && !wiki) return notFound(query);
 
   const parts: string[] = [
-    `# ${name}: Company Deep Dive\n`,
+    `# ${name}: Company Profile\n`,
     banner(profile, hit?.ticker),
     execSummary(name, profile, financials, wiki, tenk),
     companyOverview(name, profile, wiki, tenk),
@@ -756,7 +756,7 @@ function sources(
 
 function notFound(query: string): string {
   return [
-    `# ${titleCase(query)}: Company Deep Dive\n`,
+    `# ${titleCase(query)}: Company Profile\n`,
     "## Not Found\n",
     `We could not locate **${titleCase(query)}** in SEC EDGAR or Wikipedia.\n`,
     "Try one of the following:",

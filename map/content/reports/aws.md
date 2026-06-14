@@ -1,4 +1,4 @@
-# Amazon Web Services: Company Deep Dive
+# Amazon Web Services: Company Profile
 
 > AWS (segment of AMZN · NASDAQ) · Cloud Infrastructure · Seattle, WA · FY ends December 31
 

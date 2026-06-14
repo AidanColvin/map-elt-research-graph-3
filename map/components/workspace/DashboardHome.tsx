@@ -190,7 +190,7 @@ export default function DashboardHome({
       <div className="mt-14">
         <div className="flex items-center justify-between mb-4">
           <p className="text-[11px] font-semibold tracking-[0.2em] text-gray-500 uppercase">
-            Curated Deep Dives · Instant
+            Curated Company Profiles · Instant
           </p>
           <button
             onClick={onOpenCompanyView}
@@ -215,7 +215,7 @@ export default function DashboardHome({
               </div>
               <p className="text-[15px] font-semibold text-gray-900">{c.name}</p>
               <p className="text-xs text-gray-400 mb-2">{c.ticker}</p>
-              <span className="text-[13px] text-indigo-600">Deep dive →</span>
+              <span className="text-[13px] text-indigo-600">View profile →</span>
             </button>
           ))}
         </div>

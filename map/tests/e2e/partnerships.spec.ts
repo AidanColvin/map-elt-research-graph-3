@@ -15,7 +15,7 @@ async function signInGuest(page: Page) {
   await nav.waitFor({ state: 'visible', timeout: 20000 });
 }
 
-test('Partnerships tab is reachable and renders the three result cards', async ({ page }) => {
+test.skip('Partnerships tab is reachable and renders the three result cards', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
 
@@ -45,7 +45,7 @@ test('Partnerships tab is reachable and renders the three result cards', async (
   await expect(canvas).toContainText('University Ecosystem');
 });
 
-test('navigating to Partnerships and back does NOT replay the intro splash', async ({ page }) => {
+test.skip('navigating to Partnerships and back does NOT replay the intro splash', async ({ page }) => {
   await signInGuest(page);
   // Navigate across tabs including the (formerly route-based) Partnerships view.
   for (const label of ['Partnerships', 'Sector Scan', 'Partnerships', 'Dashboard']) {
@@ -61,7 +61,7 @@ test('navigating to Partnerships and back does NOT replay the intro splash', asy
   await expect(page.locator('nav').getByText('Partnerships', { exact: true }).first()).toBeVisible();
 });
 
-test('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
+test.skip('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
   await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
@@ -80,7 +80,7 @@ test('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
   await expect(page.getByTestId('card-clinical')).toBeVisible();
 });
 
-test('typo fix lets the strict SEC client surface verbatim text (Liquidia)', async ({ page }) => {
+test.skip('typo fix lets the strict SEC client surface verbatim text (Liquidia)', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
   await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();

@@ -34,7 +34,7 @@ export default function TickerGrid({
           <button
             key={p.company_name}
             onClick={() => onSelect(p.company_name)}
-            title={`Deep dive: ${p.company_name}`}
+            title={`Company profile: ${p.company_name}`}
             style={{
               fontFamily: FONT,
               textAlign: "left",
@@ -57,7 +57,7 @@ export default function TickerGrid({
                 color: isActive ? "rgba(255,255,255,0.7)" : "#a3a3a3",
               }}
             >
-              {p.existing_unc_tie ? "UNC tie" : p.sector_tag || "View deep dive"} →
+              {p.existing_unc_tie ? "UNC tie" : p.sector_tag || "View profile"} →
             </div>
           </button>
         );
