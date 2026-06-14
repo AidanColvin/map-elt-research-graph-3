@@ -14,8 +14,9 @@ import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { useSavedReports } from "@/components/workspace/useSavedReports";
 import { FONT } from "@/components/workspace/ui";
 
-const HEADER_H = 52;
-const SUBNAV_H = 44;
+// Single Apple-style nav bar: the logo, the view tabs, and the Profile button
+// all sit on one horizontal axis (no separate stacked sub-nav).
+const HEADER_H = 54;
 
 type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "account";
 
@@ -58,21 +59,36 @@ function LogoMark({ size = 22 }: { size?: number }) {
   );
 }
 
-// takes: the signed-in user, an onHome handler (logo → home), and an onProfile
-//        handler (Profile button → account view)
-// does: renders the fixed glassmorphism header chrome — a clickable logo +
-//       wordmark on the left that returns home, and the Profile button on the
-//       right that opens the account page (no dropdown)
+// takes: the signed-in user, the active view, an onHome handler (logo → home),
+//        an onChange(view) for the inline tabs, and an onProfile handler
+//        (Profile button → account view)
+// does: renders the single fixed glassmorphism nav bar, Apple-style — the
+//       clickable logo + wordmark anchored left (returns to the Dashboard),
+//       the view tabs centered on the SAME horizontal axis, and the Profile
+//       button anchored right. Left and right zones are equal-width so the
+//       tab group stays optically centered like apple.com.
 // returns: the global header element
 function GlobalHeader({
   user,
+  view,
   onHome,
+  onChange,
   onProfile,
 }: {
   user: MapUser;
+  view: View;
   onHome: () => void;
+  onChange: (v: View) => void;
   onProfile: () => void;
 }) {
+  // Equal-width flank zones keep the centered tab group from drifting when the
+  // logo and Profile button differ in width.
+  const flank = {
+    flex: 1,
+    display: "flex",
+    alignItems: "center",
+    minWidth: 0,
+  } as const;
   return (
     <header
       style={{
@@ -84,8 +100,7 @@ function GlobalHeader({
         zIndex: 100,
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
-        padding: "0 20px",
+        padding: "0 22px",
         background: "rgba(255,255,255,0.66)",
         backdropFilter: "saturate(180%) blur(20px)",
         WebkitBackdropFilter: "saturate(180%) blur(20px)",
@@ -93,111 +108,99 @@ function GlobalHeader({
         fontFamily: FONT,
       }}
     >
-      {/* Logo + wordmark is a home link. It uses in-app navigation (no full
-          reload) so the session and intro aren't re-triggered. */}
-      <button
-        onClick={onHome}
-        aria-label="Map home"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          border: "none",
-          background: "none",
-          cursor: "pointer",
-          padding: 0,
-        }}
-      >
-        <LogoMark />
-        <span
+      {/* Left zone — logo + wordmark is the home link. It uses in-app
+          navigation (no full reload) so the session and intro aren't
+          re-triggered, and lands on the Dashboard. */}
+      <div style={{ ...flank, justifyContent: "flex-start" }}>
+        <button
+          onClick={onHome}
+          aria-label="Map home — Dashboard"
           style={{
-            fontSize: 16,
-            fontWeight: 600,
-            letterSpacing: "0.32em",
-            color: "#1d1d1f",
-            userSelect: "none",
-          }}
-        >
-          map
-        </span>
-      </button>
-
-      <button
-        onClick={onProfile}
-        aria-label="Open account"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          border: "1px solid rgba(0,0,0,0.08)",
-          borderRadius: 999,
-          padding: "5px 14px 5px 6px",
-          background: "rgba(255,255,255,0.8)",
-          cursor: "pointer",
-          fontFamily: FONT,
-          fontSize: 13.5,
-          color: "#1d1d1f",
-        }}
-      >
-        <span
-          style={{
-            width: 26,
-            height: 26,
-            borderRadius: "50%",
-            background: "#1d1d1f",
-            color: "#fff",
             display: "flex",
             alignItems: "center",
-            justifyContent: "center",
-            fontSize: 12,
-            fontWeight: 600,
+            gap: 10,
+            border: "none",
+            background: "none",
+            cursor: "pointer",
+            padding: 0,
           }}
         >
-          {user.guest ? "G" : user.email[0].toUpperCase()}
-        </span>
-        Profile
-      </button>
-    </header>
-  );
-}
-
-// takes: the active view key and an onChange(view) callback
-// does: renders the elegant horizontal sub-navigation bar fixed just below
-//       the global header — Dashboard, Company Profile, Sector Scan
-// returns: the sub-nav element
-function SubNav({ view, onChange }: { view: View; onChange: (v: View) => void }) {
-  return (
-    <nav
-      aria-label="Workspace views"
-      style={{
-        position: "fixed",
-        top: HEADER_H,
-        left: 0,
-        right: 0,
-        height: SUBNAV_H,
-        zIndex: 90,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        background: "rgba(255,255,255,0.55)",
-        backdropFilter: "saturate(180%) blur(14px)",
-        WebkitBackdropFilter: "saturate(180%) blur(14px)",
-        borderBottom: "1px solid rgba(0,0,0,0.04)",
-        fontFamily: FONT,
-      }}
-    >
-      {VIEWS.map((v) => (
-        <button
-          key={v.key}
-          className={`ws-nav-item ${view === v.key ? "active" : ""}`}
-          onClick={() => onChange(v.key)}
-          aria-current={view === v.key ? "page" : undefined}
-        >
-          {v.label}
+          <LogoMark />
+          <span
+            style={{
+              fontSize: 16,
+              fontWeight: 600,
+              letterSpacing: "0.32em",
+              color: "#1d1d1f",
+              userSelect: "none",
+            }}
+          >
+            map
+          </span>
         </button>
-      ))}
-    </nav>
+      </div>
+
+      {/* Center zone — view tabs on the same axis as the logo. */}
+      <nav
+        aria-label="Workspace views"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          flexShrink: 0,
+        }}
+      >
+        {VIEWS.map((v) => (
+          <button
+            key={v.key}
+            className={`ws-nav-item ${view === v.key ? "active" : ""}`}
+            onClick={() => onChange(v.key)}
+            aria-current={view === v.key ? "page" : undefined}
+          >
+            {v.label}
+          </button>
+        ))}
+      </nav>
+
+      {/* Right zone — Profile button → account view. */}
+      <div style={{ ...flank, justifyContent: "flex-end" }}>
+        <button
+          onClick={onProfile}
+          aria-label="Open account"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            border: "1px solid rgba(0,0,0,0.08)",
+            borderRadius: 999,
+            padding: "5px 14px 5px 6px",
+            background: "rgba(255,255,255,0.8)",
+            cursor: "pointer",
+            fontFamily: FONT,
+            fontSize: 13.5,
+            color: "#1d1d1f",
+          }}
+        >
+          <span
+            style={{
+              width: 26,
+              height: 26,
+              borderRadius: "50%",
+              background: "#1d1d1f",
+              color: "#fff",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 12,
+              fontWeight: 600,
+            }}
+          >
+            {user.guest ? "G" : user.email[0].toUpperCase()}
+          </span>
+          Profile
+        </button>
+      </div>
+    </header>
   );
 }
 
@@ -243,7 +246,7 @@ export default function MapHome() {
   // The card body is always the scroll container — in every view the canvas
   // is capped to the viewport, which keeps Report's sticky download bar and
   // in-page citation anchors working identically everywhere.
-  const canvasMax = `calc(100vh - ${HEADER_H + SUBNAV_H + 48}px)`;
+  const canvasMax = `calc(100vh - ${HEADER_H + 48}px)`;
 
   return (
     <div
@@ -260,15 +263,16 @@ export default function MapHome() {
     >
       <GlobalHeader
         user={user}
+        view={view}
         onHome={() => setView("dashboard")}
+        onChange={setView}
         onProfile={() => setView("account")}
       />
-      <SubNav view={view} onChange={setView} />
 
       {/* All three views stay mounted; toggling display from none re-runs the
           .ws-view opacity/transform entrance without unmounting anything, so
           component state and scroll positions survive every switch. */}
-      <main style={{ padding: `${HEADER_H + SUBNAV_H + 24}px 28px 36px` }}>
+      <main style={{ padding: `${HEADER_H + 24}px 28px 36px` }}>
         <div
           className="ws-view"
           style={{ display: view === "dashboard" ? "block" : "none" }}
