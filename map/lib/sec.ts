@@ -887,10 +887,39 @@ function extractExecsByTitle(text: string): Executive[] {
     const prev = cand.get(key);
     if (!prev || seniority(title) < seniority(prev.title)) cand.set(key, { name, title });
   }
+
+  // Some proxies only cite the CEO by honorific + surname near the title
+  // ("Mr. Benioff, our Chair and Chief Executive Officer"). The word "our"
+  // makes it the company's OWN officer (not a director's external role), so it's
+  // safe to resolve the surname to the full name used elsewhere in the filing.
+  const honor = new RegExp(`\\b(?:Mr|Ms|Mrs|Dr)\\.?\\s+([A-Z][A-Za-z'’-]+)\\s*,?\\s+our\\s+(${PROXY_TITLE})\\b`, "g");
+  let h: RegExpExecArray | null;
+  while ((h = honor.exec(text))) {
+    const surname = h[1];
+    const title = h[2].trim();
+    const freq = (text.match(new RegExp("\\b" + escapeRegExp(surname), "g")) || []).length;
+    if (seniority(title) === 0 && freq < 25) continue; // real CEO is pervasive
+    const full = resolveSurname(text, surname);
+    if (!full) continue;
+    const key = full.toLowerCase();
+    const prev = cand.get(key);
+    if (!prev || seniority(title) < seniority(prev.title)) cand.set(key, { name: full, title });
+  }
+
   return [...cand.values()]
     .map((c) => ({ name: c.name, title: cleanTitle(c.title) }))
     .sort((a, b) => seniority(a.title) - seniority(b.title))
     .slice(0, 6);
+}
+
+// takes: the filing text and a surname
+// does: finds the full "First [M.] Surname" name used elsewhere in the filing
+// returns: the validated full name, or null
+function resolveSurname(text: string, surname: string): string | null {
+  const m = text.match(new RegExp(`\\b([A-Z][A-Za-z'’-]+(?:\\s+[A-Z]\\.?){0,2})\\s+${escapeRegExp(surname)}\\b`));
+  if (!m) return null;
+  const full = `${m[1]} ${surname}`.replace(/\s+/g, " ").trim();
+  return isExecName(full) ? full : null;
 }
 
 /**
