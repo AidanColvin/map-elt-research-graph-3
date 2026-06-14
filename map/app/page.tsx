@@ -136,7 +136,7 @@ function GlobalHeader({
               userSelect: "none",
             }}
           >
-            map
+            map 3
           </span>
         </button>
       </div>
