@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { readJsonBody, validatePipeline } from '@/lib/proxyGuard';
 
 // Never cache this route. Every search must hit the backend and return a
 // freshly generated report — we explicitly opt out of all Next.js caching so
@@ -24,7 +25,13 @@ const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.ver
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
 export async function POST(req: NextRequest) {
-  const body = await req.json();
+  // Size-cap + parse + shape-validate before any upstream work (the proxy is
+  // unauthenticated and the backend fan-out is expensive).
+  const parsed = await readJsonBody(req);
+  if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
+  const valid = validatePipeline(parsed.value);
+  if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: valid.status });
+  const body = valid.value;
 
   // Backend runs all sources within a 40 s budget; allow generous headroom.
   const controller = new AbortController();

@@ -14,10 +14,11 @@ Flow per request:
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, conlist, constr
 from typing import List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed, TimeoutError as FuturesTimeout
 import json
+import os
 import time
 import uvicorn
 
@@ -39,25 +40,43 @@ from aria_pi.sectors import (
 
 app = FastAPI(title="ARIA-PI Orchestrator", version="0.3.0")
 
+# The browser never calls this API directly — the Next.js app talks to it
+# server-side through its own /api proxy — so we restrict CORS to the known
+# frontend origins instead of "*". No credentials are ever used (the API is
+# keyless public-data), so allow_credentials stays False: a wildcard origin
+# combined with credentials is exactly the misconfiguration we avoid here.
+_ALLOWED_ORIGINS = [
+    o.strip()
+    for o in os.environ.get(
+        "ALLOWED_ORIGINS",
+        "https://map-omega-azure.vercel.app,http://localhost:3000",
+    ).split(",")
+    if o.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type"],
 )
 
 
+# Length/size caps stop a single request from forcing a huge fan-out or an
+# oversized payload. Pydantic raises a 422 automatically when these are exceeded.
+_Sector = constr(strip_whitespace=True, min_length=1, max_length=200)
+_Company = constr(strip_whitespace=True, min_length=1, max_length=120)
 
 
 class PipelineRequest(BaseModel):
-    sector: str
-    companies: Optional[List[str]] = None
-    company_override: Optional[str] = None  # legacy
+    sector: _Sector
+    companies: Optional[conlist(_Company, max_length=25)] = None
+    company_override: Optional[constr(max_length=120)] = None  # legacy
 
 
 class PartnershipRequest(BaseModel):
-    query: str
+    query: _Sector
     type: str = "company"  # "company" | "sector"
 
 
@@ -116,8 +135,8 @@ async def run_pipeline(req: PipelineRequest):
 
     except Exception as e:
         import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        traceback.print_exc()  # full detail to server logs only
+        raise HTTPException(status_code=500, detail="Internal error while generating the report.")
 
 
 @app.post("/api/partnerships")
@@ -138,8 +157,8 @@ async def partnerships(req: PartnershipRequest):
         )
     except Exception as e:
         import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+        traceback.print_exc()  # full detail to server logs only
+        raise HTTPException(status_code=500, detail="Internal error while generating the report.")
 
 
 def _sse(obj: dict) -> str:
@@ -222,8 +241,8 @@ async def run_pipeline_stream(req: PipelineRequest):
             yield _sse({"type": "done", "report": report})
         except Exception as e:
             import traceback
-            traceback.print_exc()
-            yield _sse({"type": "error", "message": str(e)})
+            traceback.print_exc()  # full detail to server logs only
+            yield _sse({"type": "error", "message": "Internal error while generating the report."})
 
     return StreamingResponse(
         gen(),
