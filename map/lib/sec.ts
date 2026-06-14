@@ -814,43 +814,77 @@ function looksLikeTitle(s: string): boolean {
   );
 }
 
+const EXEC_NAME_ONLY = new RegExp(`^${NAME}$`);
+
+/**
+ * given a candidate string
+ * return true if it reads like a real person's name (not a title, header, or
+ * bio sentence) — used to validate the executive-officers table
+ */
+function isExecName(s: string): boolean {
+  if (!EXEC_NAME_ONLY.test(s)) return false;
+  const words = s.split(/\s+/);
+  if (words.length < 2 || words.length > 4) return false;
+  if (/^(mr|ms|mrs|dr|messrs)\b/i.test(s)) return false; // bio honorific, not the roster name
+  // Reject strings that are actually titles / table headers.
+  if (
+    /\b(name|office|offices|age|position|title|officer|officers|chief|president|vice|chair|director|executive|senior|treasurer|secretary|counsel|controller|principal|department|division|board|since)\b/i.test(
+      s,
+    )
+  )
+    return false;
+  return true;
+}
+
 /**
  * given the full 10-K text
  * return the executive officers (name + title) from the
- * "Information about our Executive Officers" section, if present
+ * "Information about our Executive Officers" section, if present.
+ * Handles two common layouts: a single line ("Name Age Title" / "Name, Title")
+ * and a two-line table where the name and the office sit on adjacent lines.
  */
 function extractExecutives(text: string): Executive[] {
   const idx = text.search(
     /(Information about our Executive Officers|Executive Officers of (the |our )?(Registrant|Company)|Our Executive Officers)/i,
   );
   if (idx < 0) return [];
-  const section = text.slice(idx, idx + 5000);
+  const section = text.slice(idx, idx + 6000);
   const lines = section.split("\n").map((l) => l.trim()).filter(Boolean);
 
   const out: Executive[] = [];
   const seen = new Set<string>();
-  for (const line of lines) {
-    let name = "";
-    let title = "";
-    let m = line.match(EXEC_AGE);
-    if (m && looksLikeTitle(m[3])) {
-      name = m[1];
-      title = m[3];
-    } else {
-      m = line.match(EXEC_COMMA);
-      if (m && looksLikeTitle(m[2])) {
-        name = m[1];
-        title = m[2];
-      }
-    }
-    if (!name) continue;
-    const key = name.toLowerCase();
-    if (seen.has(key)) continue;
+  const add = (name: string, title: string) => {
+    const clean = name.replace(/\s+/g, " ").trim();
+    if (!isExecName(clean)) return;
+    const key = clean.toLowerCase();
+    if (seen.has(key)) return;
     seen.add(key);
-    out.push({ name: name.replace(/\s+/g, " ").trim(), title: cleanTitle(title) });
-    if (out.length >= 8) break;
+    out.push({ name: clean, title: cleanTitle(title) });
+  };
+
+  // Pass A — two-line table: a name line immediately followed by a title line.
+  // This is the most common modern layout (e.g. Oracle's "Name / Office(s)").
+  for (let i = 0; i < lines.length - 1 && out.length < 8; i++) {
+    const a = lines[i];
+    const b = lines[i + 1];
+    if (isExecName(a) && looksLikeTitle(b) && !isExecName(b)) add(a, b);
   }
-  return out;
+
+  // Pass B — single-line layouts, as a fallback when the table isn't present.
+  if (out.length < 3) {
+    for (const line of lines) {
+      if (out.length >= 8) break;
+      let m = line.match(EXEC_AGE);
+      if (m && looksLikeTitle(m[3])) {
+        add(m[1], m[3]);
+        continue;
+      }
+      m = line.match(EXEC_COMMA);
+      if (m && looksLikeTitle(m[2])) add(m[1], m[2]);
+    }
+  }
+
+  return out.slice(0, 8);
 }
 
 /**

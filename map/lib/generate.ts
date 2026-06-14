@@ -62,9 +62,13 @@ export async function buildLiveReport(query: string): Promise<string> {
     hit ? fetchSubsidiaries(hit.cik, filings) : Promise.resolve([] as Subsidiary[]),
     fetchResearch(researchName, profile?.sicDescription),
   ]);
-  // Merge insider-derived (Form 4) and 10-K-derived officers so the roster
-  // isn't missing the CEO just because they haven't filed a recent Form 4.
-  const execs = mergeExecutives(form4Execs, tenk?.executives ?? []);
+  // The 10-K "Information about our Executive Officers" list is the
+  // authoritative current roster, so trust it when it's substantial; only fall
+  // back to merging in Form 4 insiders when that list is sparse/unavailable
+  // (which is also when the CEO would otherwise be missing).
+  const tenkExecs = tenk?.executives ?? [];
+  const execs =
+    tenkExecs.length >= 3 ? mergeExecutives(tenkExecs, []) : mergeExecutives(form4Execs, tenkExecs);
 
   // Label the 10-K by its reported fiscal year (the latest XBRL annual period),
   // not the filing-date year — otherwise the 10-K citation can read "FY2026"
