@@ -68,10 +68,12 @@ function GlobalHeader({
   view,
   onHome,
   onChange,
+  onProfile,
 }: {
   view: View;
   onHome: () => void;
   onChange: (v: View) => void;
+  onProfile: () => void;
 }) {
   // Equal-width flank zones keep the centered tab group from drifting when the
   // logo and Profile button differ in width.
@@ -152,17 +154,28 @@ function GlobalHeader({
         ))}
       </nav>
 
-      {/* Right zone — live status pill. */}
+      {/* Right zone — Account link. */}
       <div style={{ ...flank, justifyContent: "flex-end" }}>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          border: "1px solid #e5e5ea", borderRadius: 999,
-          padding: "5px 14px", fontSize: 13.5, color: "#6e6e73",
-          background: "#fff",
-        }}>
-          <span style={{ width: 7, height: 7, borderRadius: "50%", background: "#30d158", display: "inline-block" }} />
-          live
-        </div>
+        <button
+          onClick={onProfile}
+          aria-current={view === "account" ? "page" : undefined}
+          style={{
+            display: "flex", alignItems: "center", gap: 7,
+            border: "1px solid #e5e5ea", borderRadius: 999,
+            padding: "5px 14px 5px 8px", fontSize: 13.5,
+            color: view === "account" ? "#007aff" : "#1d1d1f",
+            background: "#fff", cursor: "pointer",
+            fontFamily: FONT, fontWeight: 500,
+          }}
+        >
+          <span style={{
+            width: 22, height: 22, borderRadius: "50%",
+            background: view === "account" ? "#007aff" : "#1d1d1f",
+            color: "#fff", display: "flex", alignItems: "center",
+            justifyContent: "center", fontSize: 12, fontWeight: 600,
+          }}>A</span>
+          Account
+        </button>
       </div>
     </header>
   );
@@ -250,6 +263,7 @@ export default function MapHome() {
         view={view}
         onHome={() => setView("dashboard")}
         onChange={setView}
+        onProfile={() => setView("account")}
       />
 
       {/* All three views stay mounted; toggling display from none re-runs the
