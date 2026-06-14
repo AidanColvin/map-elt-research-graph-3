@@ -1,17 +1,16 @@
 "use client";
 
 /**
- * Firestore helpers for the sticky workspace: project folders and the company
- * report snapshots saved inside them. Schema:
+ * Project folders and the company report snapshots saved inside them.
  *
- *   users/{uid}/projects/{projectId}          { name, createdAt }
- *   users/{uid}/saved_profiles/{profileId}    { projectId, companyName, ticker,
- *                                               reportMarkdown, lastUpdated, filingDate }
- *
- * The Firestore instance comes from the app's configured Firebase setup
- * (@/lib/firebase). Every call is best-effort and guarded: when Firestore is
- * unconfigured or locked down, reads return [] and writes return false rather
- * than throwing, so the UI degrades gracefully instead of breaking.
+ * Storage model (mirrors lib/savedReports.ts):
+ *   - A device-local mirror in localStorage is the source of truth for the UI,
+ *     so saving is INSTANT and never blocks on the network, and saved projects
+ *     survive logging out and back in on the same device.
+ *   - Firestore (users/{uid}/projects, users/{uid}/saved_profiles) is written
+ *     best-effort and fire-and-forget with a hard timeout, so an unconfigured,
+ *     locked-down, or unreachable Firestore can never hang the "Save to Project"
+ *     flow. When it works it adds cross-device sync.
  */
 
 import { getFirebaseDb } from "@/lib/firebase";
@@ -39,107 +38,197 @@ export interface ProfileInput {
   filingDate: string;
 }
 
+const FIRESTORE_TIMEOUT_MS = 4000;
+const MAX_LOCAL = 200; // cap the local mirror so it can't exhaust localStorage
+
 // takes: a free-text string
 // does: normalizes it into a stable, id-safe slug
 // returns: the slug (e.g. "Apple Inc." -> "apple-inc")
 function slug(s: string): string {
-  return (s || "")
-    .toString().toLowerCase().trim()
-    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
+  return (s || "").toString().toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "untitled";
 }
 
-// takes: uid (string), name (string)
-// does: creates a new project folder under users/{uid}/projects in Firestore
-// returns: a Promise resolving to the new projectId, or null on failure
-export async function createProject(uid: string, name: string): Promise<string | null> {
-  try {
-    const db = getFirebaseDb();
-    if (!db || !uid) return null;
-    const { collection, doc, setDoc } = await import("firebase/firestore");
-    const ref = doc(collection(db, "users", uid, "projects"));
-    await setDoc(ref, { name: name.trim() || "Untitled project", createdAt: Date.now() });
-    return ref.id;
-  } catch {
-    return null;
-  }
+// takes: a uid (may be empty for keyless/guest accounts)
+// does: resolves the per-user storage namespace
+// returns: the uid, or "local" when none
+function scope(uid: string): string {
+  return uid && uid.trim() ? uid.trim() : "local";
 }
 
-// takes: uid (string)
-// does: lists the user's project folders, newest first
-// returns: a Promise resolving to an array of Project (empty on failure)
-export async function listProjects(uid: string): Promise<Project[]> {
+function projectsKey(uid: string): string {
+  return `map:projects:${scope(uid)}`;
+}
+function profilesKey(uid: string): string {
+  return `map:saved_profiles:${scope(uid)}`;
+}
+
+// takes: a localStorage key
+// does: reads and parses the stored array, tolerating any corruption
+// returns: the array (empty on any problem)
+function readLocal<T>(key: string): T[] {
   try {
-    const db = getFirebaseDb();
-    if (!db || !uid) return [];
-    const { collection, getDocs } = await import("firebase/firestore");
-    const snap = await getDocs(collection(db, "users", uid, "projects"));
-    const out = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }));
-    return out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const raw = localStorage.getItem(key);
+    const arr = raw ? (JSON.parse(raw) as T[]) : [];
+    return Array.isArray(arr) ? arr : [];
   } catch {
     return [];
   }
 }
 
-// takes: uid (string), projectId (string), profileData (ProfileInput)
-// does: saves a static snapshot of the company report to the specified user
-//       project in Firestore, stamping lastUpdated to now; re-saving the same
-//       company within a project overwrites the prior snapshot
-// returns: a Promise resolving to a boolean indicating success
+// takes: a localStorage key and an array
+// does: persists the array (capped), best-effort
+// returns: nothing
+function writeLocal<T>(key: string, arr: T[]): void {
+  try {
+    localStorage.setItem(key, JSON.stringify(arr.slice(0, MAX_LOCAL)));
+  } catch {
+    /* quota / unavailable — local mirror is best-effort */
+  }
+}
+
+// takes: a promise and a millisecond budget
+// does: resolves to undefined if the promise hasn't settled in time, so a
+//       hung Firestore call can never block the caller
+// returns: the promise's value, or undefined on timeout/error
+function withTimeout<T>(p: Promise<T>, ms = FIRESTORE_TIMEOUT_MS): Promise<T | undefined> {
+  return Promise.race([
+    p.catch(() => undefined),
+    new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), ms)),
+  ]);
+}
+
+// takes: a unique id seed string
+// does: builds a collision-resistant local id
+// returns: the id
+function makeId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// ── Firestore (best-effort, never awaited by the UI path) ──────────────────
+
+async function fsSetProject(uid: string, p: Project): Promise<void> {
+  const db = getFirebaseDb();
+  if (!db || !uid) return;
+  const { doc, setDoc } = await import("firebase/firestore");
+  await withTimeout(setDoc(doc(db, "users", uid, "projects", p.id), { name: p.name, createdAt: p.createdAt }));
+}
+
+async function fsSetProfile(uid: string, r: SavedProfile): Promise<void> {
+  const db = getFirebaseDb();
+  if (!db || !uid) return;
+  const { doc, setDoc } = await import("firebase/firestore");
+  await withTimeout(setDoc(doc(db, "users", uid, "saved_profiles", r.id), r));
+}
+
+async function fsDeleteProfile(uid: string, profileId: string): Promise<void> {
+  const db = getFirebaseDb();
+  if (!db || !uid) return;
+  const { doc, deleteDoc } = await import("firebase/firestore");
+  await withTimeout(deleteDoc(doc(db, "users", uid, "saved_profiles", profileId)));
+}
+
+async function fsListProjects(uid: string): Promise<Project[]> {
+  const db = getFirebaseDb();
+  if (!db || !uid) return [];
+  const { collection, getDocs } = await import("firebase/firestore");
+  const snap = await withTimeout(getDocs(collection(db, "users", uid, "projects")));
+  if (!snap) return [];
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }));
+}
+
+async function fsListProfiles(uid: string): Promise<SavedProfile[]> {
+  const db = getFirebaseDb();
+  if (!db || !uid) return [];
+  const { collection, getDocs } = await import("firebase/firestore");
+  const snap = await withTimeout(getDocs(collection(db, "users", uid, "saved_profiles")));
+  if (!snap) return [];
+  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SavedProfile, "id">) }));
+}
+
+// takes: arrays a and b of items with an `id`
+// does: merges them, de-duplicating by id (first occurrence wins)
+// returns: the merged array
+function mergeById<T extends { id: string }>(a: T[], b: T[]): T[] {
+  const map = new Map<string, T>();
+  for (const x of [...a, ...b]) if (x?.id && !map.has(x.id)) map.set(x.id, x);
+  return [...map.values()];
+}
+
+// ── Public API ─────────────────────────────────────────────────────────────
+
+// takes: uid (string; may be empty), name (string)
+// does: creates a project — written to the local mirror immediately and synced
+//       to Firestore in the background — so the call returns instantly and never
+//       hangs on the network
+// returns: a Promise resolving to the new projectId (never null)
+export async function createProject(uid: string, name: string): Promise<string> {
+  const project: Project = { id: makeId("proj"), name: name.trim() || "Untitled project", createdAt: Date.now() };
+  const key = projectsKey(uid);
+  writeLocal(key, [project, ...readLocal<Project>(key)]);
+  void fsSetProject(uid, project).catch(() => {}); // best-effort, not awaited
+  return project.id;
+}
+
+// takes: uid (string)
+// does: lists the user's project folders, newest first, merging the instant
+//       local mirror with any Firestore records (best-effort, time-bounded)
+// returns: a Promise resolving to Project[]
+export async function listProjects(uid: string): Promise<Project[]> {
+  const key = projectsKey(uid);
+  const local = readLocal<Project>(key);
+  const remote = uid ? await fsListProjects(uid) : [];
+  const merged = mergeById(local, remote).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  if (remote.length) writeLocal(key, merged); // refresh the mirror with cross-device items
+  return merged;
+}
+
+// takes: uid (string; may be empty), projectId (string), profileData (ProfileInput)
+// does: saves a static report snapshot to a project — local mirror immediately,
+//       Firestore in the background; re-saving the same company in a project
+//       overwrites the prior snapshot
+// returns: a Promise resolving to true (the local save always succeeds)
 export async function saveProfileToProject(
   uid: string,
   projectId: string,
   profileData: ProfileInput,
 ): Promise<boolean> {
-  try {
-    const db = getFirebaseDb();
-    if (!db || !uid || !projectId) return false;
-    const { doc, setDoc } = await import("firebase/firestore");
-    const profileId = `${projectId}__${slug(profileData.companyName)}`;
-    const record: SavedProfile = {
-      id: profileId,
-      projectId,
-      companyName: profileData.companyName,
-      ticker: profileData.ticker || "",
-      reportMarkdown: profileData.reportMarkdown,
-      lastUpdated: Date.now(),
-      filingDate: profileData.filingDate || "",
-    };
-    await setDoc(doc(db, "users", uid, "saved_profiles", profileId), record);
-    return true;
-  } catch {
-    return false;
-  }
+  if (!projectId) return false;
+  const record: SavedProfile = {
+    id: `${projectId}__${slug(profileData.companyName)}`,
+    projectId,
+    companyName: profileData.companyName,
+    ticker: profileData.ticker || "",
+    reportMarkdown: profileData.reportMarkdown,
+    lastUpdated: Date.now(),
+    filingDate: profileData.filingDate || "",
+  };
+  const key = profilesKey(uid);
+  const next = [record, ...readLocal<SavedProfile>(key).filter((p) => p.id !== record.id)];
+  writeLocal(key, next);
+  void fsSetProfile(uid, record).catch(() => {}); // best-effort, not awaited
+  return true;
 }
 
 // takes: uid (string), projectId (optional string)
-// does: lists saved profile snapshots for the user, optionally filtered to one
-//       project, newest-updated first
-// returns: a Promise resolving to an array of SavedProfile (empty on failure)
+// does: lists saved snapshots (local mirror merged with Firestore), optionally
+//       filtered to one project, newest-updated first
+// returns: a Promise resolving to SavedProfile[]
 export async function listSavedProfiles(uid: string, projectId?: string): Promise<SavedProfile[]> {
-  try {
-    const db = getFirebaseDb();
-    if (!db || !uid) return [];
-    const { collection, getDocs } = await import("firebase/firestore");
-    const snap = await getDocs(collection(db, "users", uid, "saved_profiles"));
-    let out = snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<SavedProfile, "id">) }));
-    if (projectId) out = out.filter((p) => p.projectId === projectId);
-    return out.sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
-  } catch {
-    return [];
-  }
+  const key = profilesKey(uid);
+  const local = readLocal<SavedProfile>(key);
+  const remote = uid ? await fsListProfiles(uid) : [];
+  let merged = mergeById(local, remote).sort((a, b) => (b.lastUpdated || 0) - (a.lastUpdated || 0));
+  if (remote.length) writeLocal(key, merged);
+  if (projectId) merged = merged.filter((p) => p.projectId === projectId);
+  return merged;
 }
 
 // takes: uid (string), profileId (string)
-// does: deletes a saved profile snapshot from Firestore
-// returns: a Promise resolving to a boolean indicating success
+// does: removes a saved snapshot from the local mirror and Firestore
+// returns: a Promise resolving to true
 export async function deleteSavedProfile(uid: string, profileId: string): Promise<boolean> {
-  try {
-    const db = getFirebaseDb();
-    if (!db || !uid || !profileId) return false;
-    const { doc, deleteDoc } = await import("firebase/firestore");
-    await deleteDoc(doc(db, "users", uid, "saved_profiles", profileId));
-    return true;
-  } catch {
-    return false;
-  }
+  const key = profilesKey(uid);
+  writeLocal(key, readLocal<SavedProfile>(key).filter((p) => p.id !== profileId));
+  void fsDeleteProfile(uid, profileId).catch(() => {});
+  return true;
 }

@@ -312,12 +312,13 @@ export default function CompanyCanvas({
   const [snapshot, setSnapshot] = useState<{ lastUpdated: number; company: string } | null>(null);
 
   // takes: nothing
-  // does: reloads the user's saved project snapshots from Firestore
+  // does: reloads the user's saved project snapshots (device-local mirror merged
+  //       with Firestore), so they reappear after logging back in
   // returns: nothing (updates state)
   async function reloadProfiles() {
     try {
-      const uid = getFirebaseAuth()?.currentUser?.uid ?? null;
-      setProfiles(uid ? await listSavedProfiles(uid) : []);
+      const uid = getFirebaseAuth()?.currentUser?.uid ?? "";
+      setProfiles(await listSavedProfiles(uid));
     } catch {
       setProfiles([]);
     }

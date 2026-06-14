@@ -46,12 +46,10 @@ export function ProjectSaveControl({
   const rootRef = useRef<HTMLDivElement>(null);
 
   // takes: nothing
-  // does: refreshes the project list from Firestore for the current user
+  // does: refreshes the project list (device-local mirror merged with Firestore)
   // returns: nothing (updates state)
   async function refresh() {
-    const uid = currentUid();
-    if (!uid) { setProjects([]); return; }
-    setProjects(await listProjects(uid));
+    setProjects(await listProjects(currentUid() ?? ""));
   }
 
   useEffect(() => {
@@ -74,17 +72,16 @@ export function ProjectSaveControl({
     if (busy) return;
     setBusy(true);
     setStatus("Saving…");
-    const uid = currentUid();
-    const ok = uid
-      ? await saveProfileToProject(uid, projectId, {
-          companyName,
-          ticker: ticker || "",
-          reportMarkdown: getMarkdown(),
-          filingDate,
-        })
-      : false;
+    // Saves to the device immediately and syncs to the cloud in the background,
+    // so it works for any signed-in account and never hangs on the network.
+    await saveProfileToProject(currentUid() ?? "", projectId, {
+      companyName,
+      ticker: ticker || "",
+      reportMarkdown: getMarkdown(),
+      filingDate,
+    });
     setBusy(false);
-    setStatus(ok ? "Saved to project" : "Sign in to sync — saved locally");
+    setStatus("Saved to project");
     setOpen(false);
     window.setTimeout(() => setStatus(""), 2600);
   }
@@ -98,17 +95,11 @@ export function ProjectSaveControl({
     if (!name || busy) return;
     setBusy(true);
     setStatus("Creating project…");
-    const uid = currentUid();
-    const projectId = uid ? await createProject(uid, name) : null;
+    const projectId = await createProject(currentUid() ?? "", name);
     setBusy(false);
     setModal(false);
     setNewName("");
-    if (projectId) {
-      await saveInto(projectId);
-    } else {
-      setStatus("Sign in to sync projects");
-      window.setTimeout(() => setStatus(""), 2600);
-    }
+    await saveInto(projectId);
   }
 
   const pill =
