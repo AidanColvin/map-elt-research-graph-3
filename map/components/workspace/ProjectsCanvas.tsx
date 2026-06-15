@@ -132,10 +132,13 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
     const profiles = await listSavedProfiles(currentUid(), p.id);
     const runs = profiles.filter((s) => s.ticker === BUNDLE_TICKER);
     setSavedRuns(runs);
-    // Auto-generate the report on open — no need to retype the name and press
-    // Run. The project name is the subject; "auto" detects company vs sector.
-    // Skip when the project already has saved runs (open those instead).
-    if (runs.length === 0 && p.name.trim()) runSubject(p.name.trim(), "auto");
+    // Auto-load the most recent saved run, or kick off a fresh pipeline run for
+    // brand-new projects — either way the user never has to click Run manually.
+    if (runs.length > 0) {
+      openSavedRun(runs[runs.length - 1]);
+    } else if (p.name.trim()) {
+      runSubject(p.name.trim(), "auto");
+    }
   }
 
   async function createNew() {
