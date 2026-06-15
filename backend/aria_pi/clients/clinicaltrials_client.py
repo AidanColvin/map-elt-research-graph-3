@@ -143,6 +143,33 @@ def unc_site_stats(trials: List[dict]) -> tuple:
     return (count > 0, count)
 
 
+def fetch_unc_sponsored_trials(company_name: str) -> List[dict]:
+    """UNCTrial list — trials where company sponsors AND UNC is a collaborator/site.
+
+    Wraps the existing ClinicalTrialsClient.search_by_sponsor() and converts
+    the UNC-signal trials into UNCTrial-shaped dicts with is_joint=True.
+    """
+    client = ClinicalTrialsClient()
+    try:
+        all_trials = client.search_by_sponsor(company_name) or []
+    except Exception as e:
+        print(f"fetch_unc_sponsored_trials error for {company_name}: {e}")
+        return []
+    results = []
+    for t in all_trials:
+        if t.get("unc_signal"):
+            results.append({
+                "nct_id": t.get("nct_id") or "",
+                "title": t.get("title") or "",
+                "phase": t.get("phase") or "",
+                "status": t.get("status") or "",
+                "lead_sponsor": t.get("lead_sponsor") or "",
+                "is_joint": True,
+                "url": t.get("url") or "",
+            })
+    return results[:4]
+
+
 def _detect_unc(strs: List[str]) -> str:
     """Return the first string that looks UNC-affiliated, or ''. """
     for s in strs:
