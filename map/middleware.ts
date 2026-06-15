@@ -25,6 +25,18 @@ const ALWAYS_PUBLIC = [
   '/api/auth',        // Firebase auth callbacks if present
 ];
 
+// The free, keyless data pipeline. These routes power the app for everyone —
+// including guests — so they must NOT require a token. Each does its own
+// optional token verification + per-client rate limiting inside the handler
+// (see lib/verifyAuth.ts). Any future user-scoped API route left off this list
+// still gets the Bearer gate below.
+const PUBLIC_API = [
+  '/api/generate',
+  '/api/partnerships',
+  '/api/run-pipeline',        // also covers /api/run-pipeline-stream (prefix)
+  '/api/freshness',
+];
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -33,6 +45,9 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith('/api/')) {
+    if (PUBLIC_API.some(p => pathname.startsWith(p))) {
+      return NextResponse.next();
+    }
     const auth = request.headers.get('authorization');
     if (!auth?.startsWith('Bearer ')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
