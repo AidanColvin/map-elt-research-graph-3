@@ -1,27 +1,19 @@
 import { test, expect, Page } from '@playwright/test';
+import { mockBackend, gotoWorkspace, clickNav, visibleView } from './helpers';
 
-const BASE = 'http://localhost:3000';
+// Arm offline backend + image-host mocks before every test.
+test.beforeEach(async ({ page }) => {
+  await mockBackend(page);
+});
 
-// Guest sign-in + reach a generated Apple report on the Company Profile view.
-// Apple is curated, so the deep dive returns instantly without external calls.
+// Guest sign-in + reach a generated Apple report on the Company view. Apple is
+// curated, so the deep dive returns instantly without external calls.
 async function signInGuest(page: Page) {
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  const guest = page.getByRole('button', { name: /continue as guest/i });
-  const nav = page.locator('nav').first();
-  await Promise.race([
-    guest.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
-    nav.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
-  ]);
-  if (await guest.isVisible().catch(() => false)) await guest.click();
-  await nav.waitFor({ state: 'visible', timeout: 20000 });
-}
-
-function visibleView(page: Page) {
-  return page.locator('.ws-view:visible');
+  await gotoWorkspace(page);
 }
 
 async function openAppleReport(page: Page) {
-  await page.locator('text="Company Profile"').first().click();
+  await clickNav(page, 'Company');
   await page.waitForTimeout(1200);
   const chip = visibleView(page).locator('button:has-text("Apple")').first();
   await expect(chip).toBeVisible({ timeout: 8000 });

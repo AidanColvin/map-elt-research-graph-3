@@ -1,18 +1,22 @@
 import { test, expect, Page } from '@playwright/test';
+import { mockBackend, gotoWorkspace } from './helpers';
 
-const BASE = 'http://localhost:3000';
+// NOTE: All tests in this file are skipped. The "Partnerships" tab was removed
+// from the public workspace sub-nav (the live VIEWS are Dashboard / Company /
+// Sector / Database — see map/app/page.tsx); the PartnershipsView component is
+// retained in the tree but is no longer reachable from the UI. These specs are
+// kept (skipped) as the contract for when the tab is re-enabled. They are
+// CI-safe: mockBackend stubs /api/partnerships, so re-enabling them won't hit a
+// real backend.
+
+// Arm offline backend + image-host mocks before every test.
+test.beforeEach(async ({ page }) => {
+  await mockBackend(page);
+});
 
 // Guest sign-in on the main workspace, mirroring the other specs.
 async function signInGuest(page: Page) {
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  const guest = page.getByRole('button', { name: /continue as guest/i });
-  const nav = page.locator('nav').first();
-  await Promise.race([
-    guest.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
-    nav.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
-  ]);
-  if (await guest.isVisible().catch(() => false)) await guest.click();
-  await nav.waitFor({ state: 'visible', timeout: 20000 });
+  await gotoWorkspace(page);
 }
 
 test.skip('Partnerships tab is reachable and renders the three result cards', async ({ page }) => {

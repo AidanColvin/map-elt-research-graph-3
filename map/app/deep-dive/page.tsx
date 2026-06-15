@@ -16,7 +16,7 @@ interface TocItem {
 
 const DEFAULT_ACCENT = "#4f46e5";
 
-export default function Home({ embedded = false }: { embedded?: boolean }) {
+function DeepDiveApp({ embedded = false }: { embedded?: boolean }) {
   const [query, setQuery] = useState("");
   const [company, setCompany] = useState("");
   const [accent, setAccent] = useState(DEFAULT_ACCENT);
@@ -333,4 +333,8 @@ function guessDomain(name: string): string {
     .replace(/&/g, "and")
     .replace(/[^a-z0-9]/g, "");
   return base ? `${base}.com` : "";
+}
+
+export default function Page() {
+  return <DeepDiveApp />;
 }

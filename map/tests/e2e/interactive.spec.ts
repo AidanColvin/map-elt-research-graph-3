@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { gotoWorkspace, visibleView, clickNav, openProfile, attachConsole } from './helpers';
+import { gotoWorkspace, visibleView, clickNav, openProfile, attachConsole, mockBackend } from './helpers';
 
 /**
  * Interactive UI flow coverage for the Map workspace.
@@ -22,13 +22,19 @@ import { gotoWorkspace, visibleView, clickNav, openProfile, attachConsole } from
 const REPORT_TIMEOUT = 45000;
 
 test.describe('Map workspace — interactive flows', () => {
+  // Arm offline backend + image-host mocks before every navigation so no test
+  // depends on a real backend, Firebase, or third-party logo hosts.
+  test.beforeEach(async ({ page }) => {
+    await mockBackend(page);
+  });
+
   /**
    * 1a. Typing in the Company Profile search bar updates the input's value
    *     (the search field is controlled, so what you type is reflected live).
    */
   test('typing in the company search bar updates the input value', async ({ page }) => {
     await gotoWorkspace(page);
-    await clickNav(page, 'Company Profile');
+    await clickNav(page, 'Company');
 
     const view = visibleView(page);
     const search = view
@@ -46,35 +52,43 @@ test.describe('Map workspace — interactive flows', () => {
   });
 
   /**
-   * 1b. The dashboard "Try:" quick chips filter/prefill the unified search box,
-   *     demonstrating that an interactive control mutates the search query.
+   * 1b. The dashboard search is a controlled input with a Company/Sector mode
+   *     toggle. Typing reflects live, and switching mode swaps the placeholder —
+   *     proving the interactive controls mutate state.
    */
-  test('dashboard quick-try chips prefill the unified search box', async ({ page }) => {
+  test('dashboard search input is controlled and the mode toggle works', async ({ page }) => {
     await gotoWorkspace(page);
     // Default landing view is the Dashboard.
     const view = visibleView(page);
-    const search = view.locator('input[placeholder="Company, ticker, or sector..."]').first();
+    const search = view.locator('input[placeholder*="company" i]').first();
     await expect(search).toBeVisible({ timeout: 8000 });
     await expect(search).toHaveValue('');
 
-    await view.getByRole('button', { name: /^Apple$/ }).first().click();
-    await expect(search).toHaveValue('Apple');
+    await search.fill('Pfizer');
+    await expect(search).toHaveValue('Pfizer');
+
+    // Switching to Sector mode swaps the placeholder copy.
+    await view.getByRole('button', { name: /^Sector$/ }).click();
+    await expect(view.locator('input[placeholder*="sector" i]').first()).toBeVisible();
   });
 
   /**
    * 2. Cross-loading a company: running a curated company from the Dashboard
-   *    hands it to the Company Profile canvas and switches focus there, with the
+   *    search hands it to the Company canvas and switches focus there, with the
    *    streamed report appearing under that company's name.
    */
   test('running a company from the dashboard cross-loads the Company view', async ({ page }) => {
     test.setTimeout(REPORT_TIMEOUT + 20000);
     await gotoWorkspace(page);
 
-    // Dashboard "Curated Deep Dives" cards run a company and jump to Company view.
+    // Dashboard is in "company" mode by default — type a company and submit.
     const dash = visibleView(page);
-    await dash.getByRole('button', { name: /^Apple/ }).first().click();
+    const search = dash.locator('input[placeholder*="company" i]').first();
+    await expect(search).toBeVisible({ timeout: 8000 });
+    await search.fill('Apple');
+    await search.press('Enter');
 
-    // We should now be on the Company Profile canvas...
+    // We should now be on the Company canvas...
     const company = visibleView(page);
     await expect(company.getByRole('heading', { name: 'Apple', exact: true })).toBeVisible({
       timeout: REPORT_TIMEOUT,
@@ -102,17 +116,17 @@ test.describe('Map workspace — interactive flows', () => {
     // Dashboard — the hero headline ("Map the partnership landscape").
     await clickNav(page, 'Dashboard');
     await expect(
-      visibleView(page).getByRole('heading', { name: /partnership landscape/i }),
+      visibleView(page).getByRole('heading', { name: /board-ready intelligence/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Company Profile — idle hero headline ("...board-ready in seconds.").
-    await clickNav(page, 'Company Profile');
+    await clickNav(page, 'Company');
     await expect(
       visibleView(page).getByRole('heading', { name: /board-ready/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Sector Scan — idle hero headline ("Scan an entire sector...").
-    await clickNav(page, 'Sector Scan');
+    await clickNav(page, 'Sector');
     await expect(
       visibleView(page).getByRole('heading', { name: /scan an entire sector/i }),
     ).toBeVisible({ timeout: 8000 });
@@ -128,7 +142,7 @@ test.describe('Map workspace — interactive flows', () => {
     // Back to Dashboard to confirm round-trip navigation still works.
     await clickNav(page, 'Dashboard');
     await expect(
-      visibleView(page).getByRole('heading', { name: /partnership landscape/i }),
+      visibleView(page).getByRole('heading', { name: /board-ready intelligence/i }),
     ).toBeVisible({ timeout: 8000 });
   });
 
@@ -148,7 +162,7 @@ test.describe('Map workspace — interactive flows', () => {
     await expect(page.getByRole('button', { name: /map home/i })).toBeVisible();
 
     // Walk the offline views; none should error.
-    for (const label of ['Company Profile', 'Sector Scan', 'Dashboard']) {
+    for (const label of ['Company', 'Sector', 'Dashboard']) {
       await clickNav(page, label);
       await page.waitForTimeout(400);
     }
@@ -168,16 +182,14 @@ test.describe('Map workspace — interactive flows', () => {
    * 2b. Cross-loading from the Sector Scan TickerGrid into the Company view.
    *
    *     The ticker grid (`components/workspace/TickerGrid.tsx`) only renders
-   *     after a *completed* sector scan, which depends on the live serverless
-   *     pipeline. When that backend is unavailable the scan can't produce
-   *     profiles, so there's nothing to click. We attempt a real scan and, if
-   *     it doesn't complete in time (backend offline/cold), skip rather than
-   *     leave a flaky failure.
+   *     after a *completed* sector scan. With the backend mocked, the scan
+   *     returns a deterministic report whose `section4_profiles` populate the
+   *     grid, so this is now a real green test rather than a perpetual skip.
    */
   test('clicking a sector ticker cross-loads that company into the Company view', async ({ page }) => {
-    test.setTimeout(140000);
+    test.setTimeout(60000);
     await gotoWorkspace(page);
-    await clickNav(page, 'Sector Scan');
+    await clickNav(page, 'Sector');
 
     const sectorView = visibleView(page);
     const input = sectorView.locator('input[aria-label="Sector"]').first();
@@ -185,18 +197,10 @@ test.describe('Map workspace — interactive flows', () => {
     await input.fill('Oncology');
     await input.press('Enter');
 
-    // Wait for the ticker grid (buttons titled "Deep dive: <company>") to appear
-    // once the scan finishes. If the pipeline is unavailable, skip.
-    const ticker = page.locator('button[title^="Deep dive:"]').first();
-    const ready = await ticker
-      .waitFor({ state: 'visible', timeout: 110000 })
-      .then(() => true)
-      .catch(() => false);
-
-    test.skip(
-      !ready,
-      'Sector pipeline did not return profiles (live backend unavailable); TickerGrid requires a completed scan.',
-    );
+    // The ticker grid renders buttons titled "Company profile: <company>" once
+    // the (mocked) scan finishes.
+    const ticker = page.locator('button[title^="Company profile:"]').first();
+    await expect(ticker).toBeVisible({ timeout: 30000 });
 
     const companyName = (await ticker.innerText()).split('\n')[0].trim();
     await ticker.click();

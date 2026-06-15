@@ -78,7 +78,7 @@ function suggestFor(input: string): string {
   return m ?? '';
 }
 
-export default function Home({ embedded = false }: { embedded?: boolean }) {
+function SectorScanApp({ embedded = false }: { embedded?: boolean }) {
   // Plays the network-graph intro once on first load, then reveals the app.
   // Skipped when embedded in the Map dashboard (the intro already played there).
   const [showIntro, setShowIntro] = useState(!embedded);
@@ -625,3 +625,7 @@ const styles: Record<string, React.CSSProperties> = {
   linkBtn: { marginTop: 24, fontSize: 15, color: '#666', alignSelf: 'flex-start' },
   footer: { fontSize: 12, color: '#bbb', letterSpacing: '0.05em', marginTop: 40 },
 };
+
+export default function Page() {
+  return <SectorScanApp />;
+}
