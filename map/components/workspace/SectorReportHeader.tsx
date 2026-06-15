@@ -1,6 +1,6 @@
 "use client";
 
-import type { SectorReportModel, PeerBar, MatrixRow, FacultyRow } from "@/lib/sectorReport";
+import type { SectorReportModel, PeerBar, MatrixRow, FacultyRow, AlignmentBar } from "@/lib/sectorReport";
 import { FONT } from "./ui";
 
 /**
@@ -42,6 +42,35 @@ function PeerChart({ peers, color }: { peers: PeerBar[]; color: string }) {
 }
 
 const SIGNAL_DOT: Record<string, string> = { "NIH grant": "#16a34a", PubMed: "#3b82f6", Trial: "#a855f7", None: "#9ca3af" };
+
+// Vertical alignment-signal chart: bar height = signal count, colored by
+// strength (green 3+, blue 2, gray 1) — matches the report's key.
+function AlignmentChart({ bars }: { bars: AlignmentBar[] }) {
+  if (!bars.length) return null;
+  const max = Math.max(...bars.map((b) => b.count), 1);
+  const color = (n: number) => (n >= 3 ? "#639922" : n === 2 ? "#378ADD" : "#B4B2A9");
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
+        {[["3+ signals", "#639922"], ["2 signals", "#378ADD"], ["1 signal", "#B4B2A9"]].map(([l, c]) => (
+          <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: MUTED }}>
+            <span style={{ width: 10, height: 10, borderRadius: 3, background: c, display: "inline-block" }} />{l}
+          </span>
+        ))}
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 8, height: 180, borderBottom: `1px solid ${BORDER}`, paddingBottom: 0, overflowX: "auto" }}>
+        {bars.map((b, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, minWidth: 34, flex: "1 0 auto" }}>
+            <span style={{ flex: 1, display: "flex", alignItems: "flex-end" }}>
+              <span title={`${b.name}: ${b.count}`} style={{ display: "block", width: 26, height: `${(b.count / max) * 150}px`, background: color(b.count), borderRadius: "4px 4px 0 0" }} />
+            </span>
+            <span style={{ fontSize: 9.5, color: MUTED, transform: "rotate(-35deg)", transformOrigin: "center", whiteSpace: "nowrap", height: 36 }}>{b.name}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const th = { fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: MUTED, borderBottom: `1px solid ${BORDER}`, padding: "8px 10px 8px 0", textAlign: "left" as const };
 const td = { fontSize: 13, color: MUTED, padding: "11px 10px 11px 0", borderBottom: `1px solid ${BORDER}`, verticalAlign: "top" as const };
@@ -139,7 +168,7 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
           {m.matrix.map((r: MatrixRow, i) => (
             <tr key={i}>
               <td style={{ ...td, color: INK, fontWeight: 600 }}>{r.company}</td>
-              <td style={td}><span style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 999, background: r.tier === "Strategic" ? "#e8effb" : "#f2f2f2", color: r.tier === "Strategic" ? "#1f5d99" : MUTED }}>{r.tier}</span></td>
+              <td style={td}><span style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 999, background: r.tier === "Strategic" ? "#e8effb" : "#f2f2f2", color: r.tier === "Strategic" ? "#1f5d99" : MUTED }}>{r.signal === "None" ? "Various" : r.tier}</span></td>
               <td style={td}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 999, background: SIGNAL_DOT[r.signal], marginRight: 6, verticalAlign: "middle" }} />{r.signal}</td>
               <td style={td}>{r.contactUrl ? <A href={r.contactUrl}>{r.contact}</A> : r.contact}</td>
               <td style={td}>{r.grantOrPmid ? <a href={r.grantUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><code style={codePill}>{r.grantOrPmid}</code></a> : "—"}</td>
@@ -148,6 +177,12 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
           ))}
         </tbody>
       </table>
+
+      {/* UNC alignment-signal chart */}
+      {m.alignmentChart.length > 0 && <div style={{ marginBottom: 28 }}>
+        <Eyebrow>UNC alignment signals by company</Eyebrow>
+        <AlignmentChart bars={m.alignmentChart} />
+      </div>}
 
       {/* Faculty */}
       {m.faculty.length > 0 && <>
