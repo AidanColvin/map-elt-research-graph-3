@@ -48,11 +48,11 @@ const SIGNAL_DOT: Record<string, string> = { "NIH grant": "#16a34a", PubMed: "#3
 function AlignmentChart({ bars }: { bars: AlignmentBar[] }) {
   if (!bars.length) return null;
   const max = Math.max(...bars.map((b) => b.count), 1);
-  const color = (n: number) => (n >= 3 ? "#639922" : n === 2 ? "#378ADD" : "#B4B2A9");
+  const color = (n: number) => (n >= 3 ? "#5BA57A" : n === 2 ? "#5B9BD5" : "#C4C4C8");
   return (
     <div>
       <div style={{ display: "flex", gap: 16, marginBottom: 12 }}>
-        {[["3+ signals", "#639922"], ["2 signals", "#378ADD"], ["1 signal", "#B4B2A9"]].map(([l, c]) => (
+        {[["3+ signals", "#5BA57A"], ["2 signals", "#5B9BD5"], ["1 signal", "#C4C4C8"]].map(([l, c]) => (
           <span key={l} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: MUTED }}>
             <span style={{ width: 10, height: 10, borderRadius: 3, background: c, display: "inline-block" }} />{l}
           </span>
