@@ -6,6 +6,7 @@ import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { useDeepDive } from "./useDeepDive";
 import { useSectorScan } from "./useSectorScan";
 import { buildPartnershipMarkdown, type PartnerData } from "./PartnershipsView";
+import { detectSubjectKind } from "./sectors";
 import { mergeCompaniesIntoDB, validateIncomingCompany } from "@/lib/dedup";
 import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
 import type { AccountProfile } from "./accountProfile";
@@ -103,7 +104,11 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   const [newName, setNewName] = useState("");
 
   const [subject, setSubject] = useState("");
-  const [mode, setMode] = useState<"company" | "sector">("company");
+  // `mode` is what the user picked: "auto" (detect from the text) or a forced
+  // "company"/"sector". `resolvedMode` is what the most recent run actually used
+  // — the panels render off this so a result is never mislabeled mid-edit.
+  const [mode, setMode] = useState<"auto" | "company" | "sector">("auto");
+  const [resolvedMode, setResolvedMode] = useState<"company" | "sector">("company");
   const [runStatus, setRunStatus] = useState<"idle" | "running" | "done">("idle");
   const [companyMd, setCompanyMd] = useState("");
   const [uncMd, setUncMd] = useState("");
@@ -147,8 +152,8 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   }
 
   function resetRun() {
-    setSubject(""); setMode("company"); setRunStatus("idle"); setCompanyMd(""); setUncMd("");
-    setUncStatus("idle"); setSectorData(null); setSaveMsg("");
+    setSubject(""); setMode("auto"); setResolvedMode("company"); setRunStatus("idle");
+    setCompanyMd(""); setUncMd(""); setUncStatus("idle"); setSectorData(null); setSaveMsg("");
   }
 
   // ── Pipeline run ───────────────────────────────────────────────────────
@@ -169,9 +174,13 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   function runAll() {
     const s = subject.trim();
     if (!s) return;
+    // In "auto" mode, decide company vs sector from the text (e.g. "health
+    // tech" → sector); otherwise honor the user's forced choice.
+    const eff: "company" | "sector" = mode === "auto" ? detectSubjectKind(s) : mode;
+    setResolvedMode(eff);
     setCompanyMd(""); setUncMd(""); setSectorData(null); setSaveMsg("");
     setRunStatus("running");
-    if (mode === "company") {
+    if (eff === "company") {
       dive.run(s);   // Company Profile
       runUNC(s);     // UNC Partnership Profile
     } else {
@@ -179,12 +188,15 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
     }
   }
 
+  // Live preview of what "auto" will run, shown under the search bar.
+  const detected: "company" | "sector" = subject.trim() ? detectSubjectKind(subject) : "company";
+
   // Sync live hook output into local state only while a run is in flight, so
   // reopening a saved run is never clobbered by stale hook state.
   useEffect(() => { if (runStatus === "running") setCompanyMd(dive.markdown); }, [dive.markdown, runStatus]);
   useEffect(() => { if (runStatus === "running" && scan.data) setSectorData(scan.data); }, [scan.data, runStatus]);
 
-  const liveDone = mode === "company"
+  const liveDone = resolvedMode === "company"
     ? (dive.status === "done" || dive.status === "error") &&
       (uncStatus === "done" || uncStatus === "error")
     : (scan.status === "done" || scan.status === "error");
@@ -212,7 +224,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   // ── Save / reopen a run ────────────────────────────────────────────────
   async function saveRun() {
     if (!current) return;
-    const bundle: RunBundle = { subject, mode, companyMd, uncMd, sectorData, savedAt: Date.now() };
+    const bundle: RunBundle = { subject, mode: resolvedMode, companyMd, uncMd, sectorData, savedAt: Date.now() };
     setSaveMsg("Saving…");
     await saveProfileToProject(currentUid(), current.id, {
       companyName: subject || "Pipeline run",
@@ -232,6 +244,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
       setRunStatus("done");
       setSubject(b.subject || "");
       setMode(b.mode ?? "company");
+      setResolvedMode(b.mode ?? "company");
       setCompanyMd(b.companyMd || "");
       setUncMd(b.uncMd || "");
       setUncStatus(b.uncMd ? "done" : "idle");
@@ -347,18 +360,28 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   return (
     <CanvasCard title={`Project — ${current.name}`}>
       <div style={{ padding: "20px 28px 36px", fontFamily: FONT, maxWidth: 1040, margin: "0 auto" }}>
-        <button
-          onClick={() => { setCurrent(null); refreshProjects(); }}
-          style={{ border: "none", background: "none", cursor: "pointer", fontSize: 13, color: "#5b6cff", padding: 0, marginBottom: 14 }}
-        >
-          ← All projects
-        </button>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 14 }}>
+          <button
+            onClick={() => { setCurrent(null); refreshProjects(); }}
+            style={{ border: "none", background: "none", cursor: "pointer", fontSize: 13, color: "#5b6cff", padding: 0 }}
+          >
+            ← All projects
+          </button>
+          <button
+            data-testid="delete-current-project"
+            onClick={(e) => current && removeProject(current, e)}
+            title="Delete this project"
+            style={{ border: "1px solid #f0d2d0", background: "#fff", cursor: "pointer", fontSize: 12.5, color: "#ff3b30", padding: "5px 12px", borderRadius: 999, fontWeight: 500 }}
+          >
+            ✕ Delete project
+          </button>
+        </div>
 
         {/* Run bar */}
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
-          {/* Company / Sector toggle */}
+          {/* Auto / Company / Sector toggle — Auto detects from the text */}
           <div role="tablist" aria-label="Pipeline mode" style={{ display: "inline-flex", background: "#ececf0", borderRadius: 999, padding: 3, flexShrink: 0 }}>
-            {(["company", "sector"] as const).map((m) => (
+            {(["auto", "company", "sector"] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -383,7 +406,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") runAll(); }}
-            placeholder={mode === "company" ? "Company name — e.g. Apple…" : "Sector — e.g. Oncology…"}
+            placeholder="Company or sector — e.g. Apple, Health Tech…"
             aria-label="Pipeline subject"
             style={{ flex: 1, minWidth: 200, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: "11px 15px", fontSize: 15, outline: "none", background: "#fff", fontFamily: FONT }}
           />
@@ -401,9 +424,15 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
           {saveMsg && <span style={{ fontSize: 12, color: "#5b6cff" }}>{saveMsg}</span>}
         </div>
         <p style={{ fontSize: 12, color: "#9a9aa2", margin: "0 0 22px" }}>
-          {mode === "company"
-            ? "Company mode: runs Company Profile + UNC Partnership Profile."
-            : "Sector mode: runs Sector Scan + Database."}
+          {mode === "auto"
+            ? (subject.trim()
+                ? `Auto-detected: ${detected === "company"
+                    ? `Company “${subject.trim()}” → Company Profile + UNC Partnership Profile.`
+                    : `Sector “${subject.trim()}” → Sector Scan + Database.`} Use the toggle to override.`
+                : "Auto mode: detects whether you typed a company or a sector. Use the toggle to force one.")
+            : mode === "company"
+              ? "Company mode: runs Company Profile + UNC Partnership Profile."
+              : "Sector mode: runs Sector Scan + Database."}
         </p>
 
         {/* Saved runs in this project */}
@@ -426,10 +455,10 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
           <div data-testid="pipeline-results" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <Panel
               title="Company Profile"
-              note={mode === "company" && (dive.status === "streaming" || (runStatus === "running" && !companyMd)) ? "Generating…" : undefined}
+              note={resolvedMode === "company" && (dive.status === "streaming" || (runStatus === "running" && !companyMd)) ? "Generating…" : undefined}
               actions={companyActions}
             >
-              {mode !== "company"
+              {resolvedMode !== "company"
                 ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the company profile.</p>
                 : companyMd
                   ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
@@ -438,10 +467,10 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
 
             <Panel
               title="UNC Partnership Profile"
-              note={mode === "company" && uncStatus === "loading" ? "Generating…" : mode === "company" && uncStatus === "error" ? "Partnership data unavailable." : undefined}
+              note={resolvedMode === "company" && uncStatus === "loading" ? "Generating…" : resolvedMode === "company" && uncStatus === "error" ? "Partnership data unavailable." : undefined}
               actions={uncActions}
             >
-              {mode !== "company"
+              {resolvedMode !== "company"
                 ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the UNC profile.</p>
                 : uncMd
                   ? <div className="workspace-md"><MarkdownArticle markdown={uncMd.replace(/^#\s+.*\n?/, "")} /></div>
@@ -450,10 +479,10 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
 
             <Panel
               title="Sector Scan"
-              note={mode === "sector" && scan.status === "running" ? "Generating…" : mode === "sector" && scan.status === "error" ? (scan.error || "Sector scan unavailable.") : undefined}
+              note={resolvedMode === "sector" && scan.status === "running" ? "Generating…" : resolvedMode === "sector" && scan.status === "error" ? (scan.error || "Sector scan unavailable.") : undefined}
               actions={sectorActions}
             >
-              {mode !== "sector"
+              {resolvedMode !== "sector"
                 ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the sector scan.</p>
                 : sectorData
                   ? <Report data={sectorData} hideToc />
@@ -462,10 +491,10 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
 
             <Panel
               title="Database"
-              note={mode === "sector" ? `${dbRows.length} new ${dbRows.length === 1 ? "company" : "companies"} from this run · merged into the Database tab` : undefined}
+              note={resolvedMode === "sector" ? `${dbRows.length} new ${dbRows.length === 1 ? "company" : "companies"} from this run · merged into the Database tab` : undefined}
               actions={dbActions}
             >
-              {mode !== "sector"
+              {resolvedMode !== "sector"
                 ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the database.</p>
                 : dbRows.length > 0
                   ? (
