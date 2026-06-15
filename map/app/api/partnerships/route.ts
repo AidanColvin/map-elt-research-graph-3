@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readJsonBody, validatePartnership } from '@/lib/proxyGuard';
-import { verifyAuth } from '@/lib/verifyAuth';
+import { verifyAuth, clientKey } from '@/lib/verifyAuth';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 // Never cache — every partnership lookup must hit the backend live.
@@ -20,11 +20,9 @@ const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 //       and relays its JSON response (no caching)
 // returns: the backend's partnership payload, or an error status on failure
 export async function POST(req: NextRequest) {
-  let decoded;
-  try { decoded = await verifyAuth(req); }
-  catch (r) { return r as Response; }
-
-  const { allowed, retryAfterSeconds } = checkRateLimit(decoded.uid, 'partnerships', 20);
+  // Auth optional — keyless pipeline; verify a token if present, else anonymous.
+  const decoded = await verifyAuth(req);
+  const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'partnerships', 20);
   if (!allowed) return rateLimitResponse(retryAfterSeconds);
 
   const parsed = await readJsonBody(req);
