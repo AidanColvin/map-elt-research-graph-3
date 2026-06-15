@@ -30,6 +30,7 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company" },
   { key: "sector", label: "Sector" },
+  { key: "partnerships", label: "UNC" },
   { key: "accounts", label: "Database" },
 ];
 

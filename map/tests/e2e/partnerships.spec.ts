@@ -1,12 +1,11 @@
 import { test, expect, Page } from '@playwright/test';
 import { mockBackend, gotoWorkspace } from './helpers';
 
-// NOTE: All tests in this file are skipped. The "Partnerships" tab was removed
-// from the public workspace sub-nav (the live VIEWS are Dashboard / Company /
-// Sector / Database — see map/app/page.tsx); the PartnershipsView component is
-// retained in the tree but is no longer reachable from the UI. These specs are
-// kept (skipped) as the contract for when the tab is re-enabled. They are
-// CI-safe: mockBackend stubs /api/partnerships, so re-enabling them won't hit a
+// NOTE: The Partnerships feature is surfaced in the workspace sub-nav as the
+// "UNC" tab (the live VIEWS are Dashboard / Company / Sector / UNC / Database —
+// see map/app/page.tsx). The PartnershipsView component renders its own
+// "Partnerships" heading and the company/sector toggle inside that view. These
+// specs are CI-safe: mockBackend stubs /api/partnerships, so they never hit a
 // real backend.
 
 // Arm offline backend + image-host mocks before every test.
@@ -19,13 +18,13 @@ async function signInGuest(page: Page) {
   await gotoWorkspace(page);
 }
 
-test.skip('Partnerships tab is reachable and renders the three result cards', async ({ page }) => {
+test('Partnerships tab is reachable and renders the three result cards', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
 
   // Click the Partnerships tab — it toggles an in-app view (no route change,
   // so navigation never replays the intro splash).
-  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
+  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await expect(page.getByRole('heading', { name: 'Partnerships' })).toBeVisible();
 
@@ -49,10 +48,10 @@ test.skip('Partnerships tab is reachable and renders the three result cards', as
   await expect(canvas).toContainText('University Ecosystem');
 });
 
-test.skip('navigating to Partnerships and back does NOT replay the intro splash', async ({ page }) => {
+test('navigating to Partnerships and back does NOT replay the intro splash', async ({ page }) => {
   await signInGuest(page);
   // Navigate across tabs including the (formerly route-based) Partnerships view.
-  for (const label of ['Partnerships', 'Sector Scan', 'Partnerships', 'Dashboard']) {
+  for (const label of ['UNC', 'Sector', 'UNC', 'Dashboard']) {
     await page.locator('nav').getByText(label, { exact: true }).first().click();
     await page.waitForTimeout(600);
     const body = await page.locator('body').innerText();
@@ -62,13 +61,13 @@ test.skip('navigating to Partnerships and back does NOT replay the intro splash'
     expect(body).not.toContain('MAPPING ARCHITECTURE PLATFORM');
   }
   // The workspace nav is still present (we never left the SPA / re-gated auth).
-  await expect(page.locator('nav').getByText('Partnerships', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('nav').getByText('UNC', { exact: true }).first()).toBeVisible();
 });
 
-test.skip('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
+test('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
+  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('tab', { name: /company/i }).click();
   await page.getByLabel('Partnership search').fill('Eli Lily');
@@ -84,10 +83,10 @@ test.skip('typo "Eli Lily" is corrected and shown to the user', async ({ page })
   await expect(page.getByTestId('card-clinical')).toBeVisible();
 });
 
-test.skip('typo fix lets the strict SEC client surface verbatim text (Liquidia)', async ({ page }) => {
+test('typo fix lets the strict SEC client surface verbatim text (Liquidia)', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
+  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('tab', { name: /company/i }).click();
   // Liquidia is a UNC-Chapel Hill spinout whose 10-K names UNC verbatim; the
