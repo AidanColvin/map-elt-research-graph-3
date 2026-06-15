@@ -132,3 +132,21 @@ test('NIH staff section shows PI name from grant data', async ({ page }) => {
   // relationship" (the "Why UNC" framing is the non-partner variant).
   expect(body).toContain('DEEPEN THE RELATIONSHIP');
 });
+
+test('downloadable UNC report renders with export + save controls', async ({ page }) => {
+  test.setTimeout(120000);
+  await signInGuest(page);
+  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByLabel('Partnership search').fill('Eli Lilly');
+  await page.getByRole('button', { name: /^Search$/ }).click();
+  const report = page.getByTestId('unc-report');
+  await expect(report).toBeVisible({ timeout: 90000 });
+  await expect(report.getByRole('heading', { name: /UNC Partnership Report/i })).toBeVisible();
+  // The same export + save bar as the Company profile.
+  await expect(report.getByRole('button', { name: 'Download PDF' })).toBeVisible();
+  await expect(report.getByRole('button', { name: 'Download DOCX' })).toBeVisible();
+  await expect(report.getByRole('button', { name: 'Markdown' })).toBeVisible();
+  await expect(report.getByRole('button', { name: /Save to Project/ })).toBeVisible();
+  await expect(report.getByRole('button', { name: /Save report/ })).toBeVisible();
+});

@@ -1,8 +1,13 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
+import MarkdownArticle from "@/app/components/MarkdownArticle";
+import { CompanyExportBar } from "./CompanyExportBar";
+import { ProjectSaveControl } from "./ProjectSaveControl";
+import { SaveControl } from "./SavedReports";
+import type { SavedReportsState } from "./useSavedReports";
 
 type PartnerType = "company" | "sector";
 
@@ -117,6 +122,150 @@ const SECTOR_CHIPS = ["Artificial Intelligence", "Cybersecurity", "Cloud Computi
 
 const CHIP_CLASS = "rounded-full bg-white/80 border border-black/[0.06] hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer";
 
+// takes: the resolved partnership data
+// does: renders the same evidence into a downloadable Markdown report — the
+//       document the export bar (PDF / DOCX / Markdown) and the saved-report /
+//       project snapshots all serialize. Mirrors the on-screen sections so the
+//       file matches what the user sees. Every line traces to a primary source.
+// returns: the report Markdown string
+function buildPartnershipMarkdown(data: PartnerData): string {
+  const resolvedName = data.resolved_name ?? data.query;
+  const paperCount = data.clinical.count;
+  const secMentions = data.financial.quotes.length;
+  const nihGrants = data.nih_grants ?? [];
+  const nihPis = data.nih_pis ?? [];
+  const trials = data.trials ?? [];
+  const coiCount = data.coi?.count ?? 0;
+  const units = data.unc_units ?? [];
+  const isPartner = paperCount > 0 || secMentions > 0 || nihGrants.length > 0 || trials.length > 0;
+  const depth =
+    (paperCount > 3 || secMentions > 0 || nihGrants.length > 0 || trials.length > 0) ? "Active"
+    : (paperCount >= 1 || coiCount > 0) ? "Exploratory"
+    : "None confirmed";
+
+  const L: string[] = [];
+  L.push(`# ${resolvedName}: UNC Partnership Report`);
+  L.push("");
+  L.push(`_Relationship depth: **${depth}** · ${isPartner ? "UNC Partner" : "Not yet a partner"} · assembled from public primary sources_`);
+  L.push("");
+
+  L.push("## Partnership Status");
+  L.push("");
+  L.push(
+    isPartner
+      ? `${resolvedName} has a verifiable research relationship with UNC Chapel Hill.`
+      : `No public research relationship with UNC was found in PubMed, NIH RePORTER, or SEC filings. This reflects publicly indexed academic and financial data only — operational relationships (IT deployments, hiring, clinical pilots) are not captured here.`
+  );
+  L.push("");
+  L.push(`- Co-authored papers with UNC: **${paperCount}**`);
+  L.push(`- NIH RePORTER grants (UNC, mentioning ${resolvedName}): **${nihGrants.length}**`);
+  L.push(`- Clinical trials with UNC as a site/collaborator: **${trials.length}**`);
+  L.push(`- Verbatim SEC filing mentions of UNC: **${secMentions}**`);
+  L.push(`- Conflict-of-interest disclosures (last ${data.coi?.window_years ?? 5} years): **${coiCount}**`);
+  L.push("");
+
+  L.push("## UNC Research Contacts");
+  L.push("");
+  if (nihPis.length > 0) {
+    nihPis.forEach((p) => {
+      L.push(`- **${p.name}** — ${p.org || "UNC Chapel Hill"}. ${p.project_title}${p.grant_url ? ` ([NIH grant](${p.grant_url}))` : ""}`);
+    });
+  } else if (data.clinical.top_authors.length > 0) {
+    data.clinical.top_authors.forEach((a) => L.push(`- ${a} · UNC Chapel Hill`));
+  } else {
+    L.push("_No named UNC investigators found in public grant or publication records._");
+  }
+  L.push("");
+
+  L.push("## Active Programs — ClinicalTrials.gov");
+  L.push("");
+  if (trials.length > 0) {
+    trials.forEach((t) => {
+      const meta = [t.nct_id, t.phase, t.status].filter(Boolean).join(" · ");
+      L.push(`- [${t.title}](${t.url}) — ${meta}${t.unc_signal ? " · **UNC site**" : ""}`);
+    });
+  } else if ((data.trials_total ?? 0) > 0) {
+    L.push(`${resolvedName} sponsors ${data.trials_total} active trial(s) — none with UNC listed as a site.`);
+  } else {
+    L.push("_No active clinical trials found with UNC as a collaborator._");
+  }
+  L.push("");
+
+  if (units.length > 0) {
+    L.push("## UNC Units Involved");
+    L.push("");
+    units.forEach((u) => L.push(`- ${u.unit} · ${u.count} paper${u.count !== 1 ? "s" : ""}`));
+    L.push("");
+  }
+
+  L.push("## Verifiable Evidence");
+  L.push("");
+  L.push(`### Clinical / Research — ${paperCount} co-authored paper(s)`);
+  L.push("");
+  if (data.clinical.papers.length > 0) {
+    data.clinical.papers.forEach((p) => L.push(`- [${p.title}](${p.url}) — PMID ${p.pmid}${p.year ? ` · ${p.year}` : ""}`));
+  } else {
+    L.push("_No co-authored papers found._");
+  }
+  L.push("");
+  L.push(`### Conflict of Interest — last ${data.coi?.window_years ?? 5} years`);
+  L.push("");
+  if (data.coi && data.coi.papers.length > 0) {
+    data.coi.papers.forEach((p) => L.push(`- [${p.title}](${p.url}) — PMID ${p.pmid}${p.year ? ` · ${p.year}` : ""}`));
+  } else {
+    L.push("_No disclosed conflicts of interest found._");
+  }
+  L.push("");
+  L.push("### Financial / Legal — verbatim SEC mentions of UNC");
+  L.push("");
+  if (data.financial.quotes.length > 0) {
+    data.financial.quotes.forEach((raw) => {
+      const q = typeof raw === "string" ? { text: raw, filing_url: "" } : raw;
+      const src = q.filing_url || data.financial.filing_url;
+      L.push(`> ${q.text}${src ? ` — [SEC filing](${src})` : ""}`);
+      L.push("");
+    });
+  } else {
+    L.push("_No verbatim SEC mentions found._");
+    L.push("");
+  }
+  L.push("### University Ecosystem — official unc.edu mentions");
+  L.push("");
+  if (data.ecosystem.length > 0) {
+    data.ecosystem.forEach((m) => L.push(`- [${m.title}](${m.url})`));
+  } else {
+    L.push("_No official UNC web mentions found._");
+  }
+  L.push("");
+
+  L.push(`## ${isPartner ? "Deepen the Relationship" : "Why UNC"}`);
+  L.push("");
+  const inventoryMatch = ACCOUNTS.find((a) =>
+    a.account.toLowerCase().includes(resolvedName.toLowerCase()) ||
+    resolvedName.toLowerCase().includes(a.account.toLowerCase())
+  );
+  if (inventoryMatch?.linkToReport) {
+    L.push(`- 📄 **Partnership Profile on file** — [open the full background profile for ${inventoryMatch.account}](${inventoryMatch.linkToReport})`);
+  }
+  L.push("");
+  L.push("**UNC partnership models**");
+  PARTNERSHIP_MODELS.forEach((m) => L.push(`- ${m.model} → ${m.unit}`));
+  L.push("");
+  L.push("**UNC research assets**");
+  NC_ACCESS.forEach((a) => L.push(`- **${a.asset}** — ${a.description} (${a.url})`));
+  L.push("");
+
+  L.push("## Sources");
+  L.push("");
+  if (data.links?.pubmed) L.push(`- PubMed: ${data.links.pubmed}`);
+  if (data.links?.edgar) L.push(`- SEC EDGAR: ${data.links.edgar}`);
+  if (data.links?.unc_web) L.push(`- unc.edu: ${data.links.unc_web}`);
+  L.push("");
+  L.push("_Signals from PubMed co-authorship, NIH RePORTER grants, ClinicalTrials.gov, and SEC filings. Operational relationships (IT contracts, hiring, clinical pilots) are not indexed in public research databases and may not appear above._");
+
+  return L.join("\n");
+}
+
 // takes: nothing
 // does: renders the Partnerships content — answers the two BD questions ("are
 //       they a UNC partner, and where" / "if not, why should they be") from
@@ -125,12 +274,27 @@ const CHIP_CLASS = "rounded-full bg-white/80 border border-black/[0.06] hover:sh
 //       chrome-free so it mounts both as the in-app UNC view and the standalone
 //       /partnerships route.
 // returns: the Partnerships view element
-export default function PartnershipsView() {
+export default function PartnershipsView({
+  saved,
+  initialQuery,
+}: {
+  saved?: SavedReportsState;
+  initialQuery?: string;
+} = {}) {
   const [type, setType] = useState<PartnerType>("company");
   const [query, setQuery] = useState("");
   const [data, setData] = useState<PartnerData | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const whyRef = useRef<HTMLDivElement | null>(null);
+
+  // Reopening a saved UNC report (or a Save-to-Project snapshot) lands here with
+  // an initialQuery — re-run its live company lookup so the freshest evidence
+  // shows. Empty/unset initialQuery leaves the idle state untouched.
+  useEffect(() => {
+    const q = (initialQuery ?? "").trim();
+    if (q) runSearch(q, "company");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   // takes: a query string and a search type
   // does: posts to /api/partnerships and stores the result, syncing the visible
@@ -300,6 +464,36 @@ export default function PartnershipsView() {
 
         return (
           <div data-testid="results-canvas" style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* ── Downloadable report — same Company-Profile chrome (title +
+                export/save bar + rendered Markdown body, same font). The export
+                bar and save controls serialize the full report Markdown. ───── */}
+            {(() => {
+              const reportMd = buildPartnershipMarkdown(data);
+              const fileTitle = `${resolvedName} — UNC Partnership Report`;
+              return (
+                <div data-testid="unc-report" style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 6 }}>
+                  <Eyebrow>UNC Partnership Report</Eyebrow>
+                  <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                    <h2 style={{ fontFamily: FONT, fontSize: "clamp(28px,3.2vw,42px)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.05, margin: 0, color: "#1d1d1f" }}>
+                      {resolvedName}: UNC Partnership Report
+                    </h2>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                      <CompanyExportBar markdown={reportMd} title={fileTitle} />
+                      <ProjectSaveControl companyName={`${resolvedName} — UNC Partnership`} getMarkdown={() => reportMd} />
+                      {saved && (
+                        <SaveControl saved={saved} kind="partnership" query={resolvedName} title={`${resolvedName}: UNC Partnership Report`} getContent={() => reportMd} />
+                      )}
+                    </div>
+                  </div>
+                  <div className="workspace-md">
+                    <MarkdownArticle markdown={reportMd.replace(/^#\s+.*\n?/, "")} />
+                  </div>
+                  <hr style={{ border: "none", borderTop: "1px solid rgba(0,0,0,0.08)", margin: "10px 0 0" }} />
+                  <Eyebrow>Interactive detail · clickable sources</Eyebrow>
+                </div>
+              );
+            })()}
+
             {/* Typo correction notice */}
             {data.resolved_name &&
               data.resolved_name.trim().toLowerCase() !== data.query.trim().toLowerCase() && (
