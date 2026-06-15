@@ -23,6 +23,10 @@ from aria_pi.clients.nih_reporter_client import NIHReporterClient, unc_pis_from_
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
 from aria_pi.sectors import seeds_for
 from aria_pi.utils.name_resolver import normalize_company_name
+from aria_pi.clients.confirmed_partners_client import (
+    resolve_confirmed_partner,
+    EMPTY_CONFIRMED,
+)
 
 _COI_WINDOW_YEARS = 5  # COI disclosures must be within the last N years
 
@@ -218,6 +222,7 @@ def safe_trials(company_name: str, client: ClinicalTrialsClient) -> dict:
 # returns: the full company partnership record, including `resolved_name`
 def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     target = sec_web_name or company_name
+    confirmed = resolve_confirmed_partner(company_name)
     pubmed, sec, web = PubMedClient(), SECEdgarClient(), WebSearchClient()
     nih_client, trials_client = NIHReporterClient(), ClinicalTrialsClient()
     results = {}
@@ -256,6 +261,7 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
         "nih_pis": nih["pis"],
         "trials": trials["unc_trials"],
         "trials_total": trials["all_count"],
+        "confirmed_interactions": confirmed,
         "mention_count": clinical["count"] + coi["count"] + len(financial["quotes"]) + len(ecosystem),
     }
 
@@ -297,6 +303,12 @@ def resolve_sector(sector: str) -> dict:
         for m in (r["ecosystem"] or [])[:2]:
             ecosystem.append({**m, "company": r["query"]})
 
+    confirmed_in_sector = [
+        r["confirmed_interactions"]
+        for r in top
+        if r.get("confirmed_interactions", {}).get("found")
+    ]
+
     return {
         "query": sector,
         "resolved_name": sector,
@@ -316,6 +328,13 @@ def resolve_sector(sector: str) -> dict:
         "unc_units": [{"unit": u, "count": c} for u, c in sorted(unit_tally.items(), key=lambda kv: -kv[1])],
         "financial": {"quotes": financial_quotes[:10], "filing_url": ""},
         "ecosystem": ecosystem[:10],
+        "confirmed_interactions": {
+            "found": len(confirmed_in_sector) > 0,
+            "confirmed_companies": [
+                {"partner": c["partner"], "engagement_type": c["engagement_type"], "unc_unit": c["unc_unit"]}
+                for c in confirmed_in_sector
+            ],
+        },
     }
 
 
@@ -328,7 +347,8 @@ def resolve_partnerships(query: str, type: str) -> dict:
         return {"query": "", "resolved_name": "", "type": type, "links": build_links(""),
                 "clinical": {"count": 0, "top_authors": [], "papers": []},
                 "coi": {"count": 0, "papers": [], "window_years": _COI_WINDOW_YEARS},
-                "unc_units": [], "financial": {"quotes": [], "filing_url": ""}, "ecosystem": []}
+                "unc_units": [], "financial": {"quotes": [], "filing_url": ""}, "ecosystem": [],
+                "confirmed_interactions": EMPTY_CONFIRMED}
     if type == "sector":
         return resolve_sector(query)
     # Correct typos before the strict SEC/Web clients see the name; PubMed still
