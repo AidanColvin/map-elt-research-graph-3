@@ -19,7 +19,7 @@ The hard constraint behind every design decision in both engines: **completely f
 3. [System architecture](#system-architecture)
 4. [Engine 1: Company Profile](#engine-1-company-profile)
 5. [Engine 2: Sector Scan](#engine-2-sector-scan)
-6. [Accounts database](#accounts-database)
+6. [Company database](#company-database)
 7. [Authentication](#authentication)
 8. [Security and privacy](#security-and-privacy)
 9. [Data sources](#data-sources)
@@ -40,10 +40,10 @@ The app has three surfaces.
 
 | View | What it shows |
 |---|---|
-| Dashboard | Launchpad. Greeting, a floating command deck that runs either engine, quick access cards, live ticker grid. |
+| Dashboard | Launchpad. Editorial hero, a search bar with a Company/Sector toggle that runs either engine, a rotating 3D orbit, and an "Open a Canvas" card. |
 | Company | Company Profile embedded as a canvas card. Search any public company, the report streams in. |
 | Sector | Sector Scan embedded as a canvas card. Live progress ("N of M companies"), ticker grid, full report. Clicking a ticker cross loads that company into the Company view. |
-| Accounts | The 142 account database table with Excel, PDF, and Markdown downloads. |
+| Database | The company database (154 companies) as an interactive table: live search, type filters (Public / Private / Nonprofit / Government), sortable columns, structure pills, and CSV / Excel / PDF / Markdown export. |
 
 **The standalone pages** carry the two source apps over whole:
 
@@ -282,13 +282,15 @@ A top nav turns one report's data into five sector customized views, each downlo
 
 The analytics behind Visualize, Trends, and Excel live in `map/lib/report-analytics.ts`: HHI concentration, Pearson correlation matrix, quartile and five number summaries, CAGR, a 0 to 100 partnership priority score, percentile ranks, Lorenz curve, and segment analysis. All charts are hand rolled inline SVG; no chart library.
 
-## Accounts database
+## Company database
 
-The Accounts view renders 142 partner accounts parsed from the UNC industry company load template and enriched by research: public companies verified against SEC EDGAR (FY2025 Form 10-K or latest filings), private companies, nonprofits, and government agencies verified against official websites. Each profile carries aliases, parent account, sector profiles, description, structure, ownership, address, employees, revenue, and an auth gated link to the source report.
+The Database view renders 154 companies parsed from the UNC industry company load template and enriched by research: public companies verified against SEC EDGAR (FY2025 Form 10-K or latest filings), private companies, nonprofits, and government agencies verified against official websites. Each profile carries aliases, parent account, sector profiles, description, structure, ownership, address, founded year, employees, revenue, and an auth gated link to the source report.
+
+It renders as an interactive table (`InteractiveAccountsTable`): live search across name / sector / HQ, type-filter pills (Public / Private / Nonprofit / Government, auto-classified from each company's structure and ownership), click-to-sort columns, structure pills, exchange tags, and a pinned first column.
 
 * Data lives in `map/components/workspace/accountsData.ts`; full citations in `ACCOUNTS_DATA.md` at the repo root.
 * Duplicate companies between the core and template sets are merged by `getUniqueAccounts()`.
-* Downloads: a full `.xlsx` workbook, a landscape PDF summary table, and the raw Markdown.
+* Downloads: CSV of the currently filtered set, plus a full `.xlsx` workbook, a landscape PDF summary table, and the raw Markdown.
 
 ## Authentication
 
@@ -375,8 +377,8 @@ map/                                the merged app (Next.js, one Vercel project)
   components/
     AuthGate.tsx                    Firebase sign in gate
     workspace/                      DashboardHome, CompanyCanvas, SectorCanvas,
-                                    AccountsCanvas, AccountsTable, TickerGrid,
-                                    accountsData, accountsExport, hooks
+                                    AccountsCanvas, InteractiveAccountsTable,
+                                    TickerGrid, accountsData, accountsExport, hooks
     Report.tsx                      sector report renderer, charts, TOC, summary
     VisualsView.tsx                 23 charts + diagrams
     TrendsView.tsx                  10 year SEC trajectories
