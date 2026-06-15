@@ -23,11 +23,14 @@ service cloud.firestore {
                          && request.auth.uid == userId;
     }
 
-    // Project folders and the company report snapshots saved inside them —
-    // same per-user isolation: readable and writable only by their owner.
+    // Project folders: owner has full read/write. Any authenticated user can
+    // read a single public project by direct path (no cross-user listing —
+    // the collection-level read below is still owner-only).
     match /users/{userId}/projects/{projectId} {
       allow read, write: if request.auth != null
                          && request.auth.uid == userId;
+      allow get: if request.auth != null
+                 && resource.data.visibility == "public";
     }
     match /users/{userId}/saved_profiles/{profileId} {
       allow read, write: if request.auth != null

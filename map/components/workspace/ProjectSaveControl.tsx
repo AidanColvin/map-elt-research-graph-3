@@ -41,6 +41,7 @@ export function ProjectSaveControl({
   const [modal, setModal] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [newName, setNewName] = useState("");
+  const [newVisibility, setNewVisibility] = useState<"public" | "private">("private");
   const [status, setStatus] = useState("");
   const [busy, setBusy] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -95,10 +96,11 @@ export function ProjectSaveControl({
     if (!name || busy) return;
     setBusy(true);
     setStatus("Creating project…");
-    const projectId = await createProject(currentUid() ?? "", name);
+    const projectId = await createProject(currentUid() ?? "", name, newVisibility);
     setBusy(false);
     setModal(false);
     setNewName("");
+    setNewVisibility("private");
     await saveInto(projectId);
   }
 
@@ -212,6 +214,27 @@ export function ProjectSaveControl({
                 fontFamily: FONT,
               }}
             />
+            <div role="group" aria-label="Visibility" style={{ display: "inline-flex", background: "#ececf0", borderRadius: 999, padding: 3, marginTop: 12 }}>
+              {(["private", "public"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setNewVisibility(v)}
+                  style={{
+                    border: "none", cursor: "pointer", borderRadius: 999, padding: "6px 13px",
+                    fontSize: 12.5, fontWeight: 600,
+                    background: newVisibility === v ? "#fff" : "transparent",
+                    color: newVisibility === v ? "#1d1d1f" : "#8a8a92",
+                    boxShadow: newVisibility === v ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                  }}
+                >
+                  {v === "private" ? "🔒 Private" : "🌐 Public"}
+                </button>
+              ))}
+            </div>
+            <p style={{ margin: "6px 0 0", fontSize: 11.5, color: "#9a9aa2" }}>
+              {newVisibility === "private" ? "Only you can see this project." : "Anyone with the link can view this project."}
+            </p>
             <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, marginTop: 16 }}>
               <button
                 type="button"
