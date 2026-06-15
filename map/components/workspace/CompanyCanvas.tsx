@@ -10,6 +10,11 @@ import { SaveControl, VerifyPill } from "./SavedReports";
 import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
 import { CompanyExportBar } from "./CompanyExportBar";
+import UNCReportSnapshot from "./UNCReportSnapshot";
+
+// Curated profiles that carry a live UNC partnership snapshot beneath the
+// report. Matched case-insensitively against the resolved company name.
+const UNC_SNAPSHOT_COMPANIES = new Set(["apple", "microsoft"]);
 import { ProjectSaveControl } from "./ProjectSaveControl";
 import { SnapshotBadge } from "./SnapshotBadge";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -492,6 +497,12 @@ export default function CompanyCanvas({
             <MarkdownArticle markdown={body} />
             {dive.status === "streaming" && <span className="cursor" />}
           </div>
+          {/* Live UNC partnership snapshot — only for curated profiles, and only
+              once the report has finished streaming. Keyed on the company so it
+              refetches when the subject changes. */}
+          {dive.status === "done" && UNC_SNAPSHOT_COMPANIES.has(dive.company.trim().toLowerCase()) && (
+            <UNCReportSnapshot key={dive.company} company={dive.company} />
+          )}
         </div>
       )}
     </CanvasCard>
