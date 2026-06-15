@@ -186,5 +186,3 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ talking_points });
 }
 
-// Export isUrl so tests can import it without bundling the full route handler.
-export { isUrl };
