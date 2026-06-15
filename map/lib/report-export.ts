@@ -341,11 +341,11 @@ function hexRgb(hex: string | undefined, fallback: [number, number, number] = [0
 // Renders a Block[] to a paginated, vector PDF using PdfDoc. A top-down `y`
 // cursor is tracked and a new page is started whenever content would overflow,
 // so memory stays flat regardless of report length (no DOM rasterization).
-function renderBlocksToPdf(doc: PdfDoc, blocks: Block[], titleOverride?: string): void {
+function renderBlocksToPdf(doc: PdfDoc, blocks: Block[], titleOverride?: string, startY = 48): void {
   const margin = 48;
   const contentW = doc.width - margin * 2;
   // y measured from the TOP of the page; converted to PDF coords on write.
-  let y = margin;
+  let y = startY;
 
   // Convert top-down y to PDF bottom-up baseline coordinate.
   const baseline = (topY: number, size: number) => doc.height - topY - size;
@@ -802,6 +802,61 @@ export async function downloadMarkdownPdf(markdown: string, title: string) {
   const doc = new PdfDoc();
   renderBlocksToPdf(doc, blocks, title);
   saveBlob(doc.save(), `${markdownExportName(title)}.pdf`);
+}
+
+// takes: a Markdown string, a display title, and optional filename override
+// does: renders the Markdown to a branded PDF with the Map node-graph logo
+//       drawn in the top-left of the first page header, then triggers download
+// returns: nothing (saves "<filename>.pdf")
+export async function downloadBrandedPdf(markdown: string, title: string, filename = 'report') {
+  const blocks = parseMarkdownBlocks(markdown);
+  const doc = new PdfDoc();
+  drawMapBrandHeader(doc, title);
+  // Start content below the branded header (extra top margin for header area)
+  renderBlocksToPdf(doc, blocks, undefined, 88);
+  saveBlob(doc.save(), `${filename}.pdf`);
+}
+
+// Draw the Map node-graph logo + report title in the top stripe of the first page.
+// The logo is a central node with 6 spokes radiating at 60-degree intervals,
+// matching the SVG in app/page.tsx. Uses doc.sector() for filled circles and
+// doc.line() for spokes, all in native PDF coordinates.
+function drawMapBrandHeader(doc: PdfDoc, title: string): void {
+  const pageH = doc.height; // 792 pt
+  const margin = 48;
+
+  // Thin accent bar across top of page
+  doc.rect(0, pageH - 32, doc.width, 32, [0.07, 0.07, 0.08]);
+
+  // ── Map node-graph logo (centered vertically in the 32pt bar) ──
+  const lx = margin;          // center-x of logo in PDF coords
+  const ly = pageH - 16;      // center-y of logo (16pt from top = center of 32pt bar)
+  const scale = 9;            // logo radius scale (viewBox 24→ pt)
+  const r0 = 3.2 * scale / 12;  // central circle radius
+  const r1 = 1.9 * scale / 12;  // outer dot radius
+  const spoke = 8.5 * scale / 12; // spoke length
+
+  const logoColor: [number, number, number] = [1, 1, 1];
+
+  // Central circle (full sector 0→2π)
+  doc.sector(lx, ly, r0, 0, Math.PI * 2, logoColor);
+
+  // 6 spokes + outer dots
+  [0, 60, 120, 180, 240, 300].forEach((deg) => {
+    const rad = (deg * Math.PI) / 180;
+    const ox = lx + spoke * Math.cos(rad);
+    const oy = ly + spoke * Math.sin(rad);
+    doc.line(lx, ly, ox, oy, 0.9, logoColor);
+    doc.sector(ox, oy, r1, 0, Math.PI * 2, logoColor);
+  });
+
+  // ── Wordmark ──
+  doc.text('Map', lx + spoke + r1 + 6, ly - 6, { size: 10, bold: true, color: [1, 1, 1] });
+  doc.text('Research Intelligence', lx + spoke + r1 + 30, ly - 6, { size: 8, bold: false, color: [0.75, 0.75, 0.75] });
+
+  // ── Report title below the bar ──
+  doc.text(title, margin, pageH - 52, { size: 14, bold: true, color: [0.07, 0.07, 0.08] });
+  doc.line(margin, pageH - 60, doc.width - margin, pageH - 60, 0.5, [0.85, 0.85, 0.85]);
 }
 
 // takes: a Markdown string and a display title
