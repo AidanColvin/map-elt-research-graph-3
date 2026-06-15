@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { FONT } from "./ui";
+import { authFetch } from "@/lib/authFetch";
 
 // The fields this snapshot reads from /api/partnerships — a subset of the full
 // resolver payload (see PartnershipsView's PartnerData). Kept narrow on purpose.
@@ -51,7 +52,7 @@ export default function UNCReportSnapshot({ company }: { company: string }) {
     setData(null);
     (async () => {
       try {
-        const res = await fetch("/api/partnerships", {
+        const res = await authFetch("/api/partnerships", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query: company, type: "company" }),

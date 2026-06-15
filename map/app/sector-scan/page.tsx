@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Report, { ReportData } from '@/components/Report';
 import Intro from '@/components/Intro';
+import { authFetch } from '@/lib/authFetch';
 import ExcelView from '@/components/ExcelView';
 import SlidesView from '@/components/SlidesView';
 import VisualsView from '@/components/VisualsView';
@@ -120,7 +121,7 @@ function SectorScanApp({ embedded = false }: { embedded?: boolean }) {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 300_000);
-      const res = await fetch('/api/run-pipeline-stream', {
+      const res = await authFetch('/api/run-pipeline-stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sector }),
@@ -202,7 +203,7 @@ function SectorScanApp({ embedded = false }: { embedded?: boolean }) {
       try {
         const controller = new AbortController();
         const timeout = setTimeout(() => controller.abort(), 300_000);
-        const res = await fetch('/api/run-pipeline', {
+        const res = await authFetch('/api/run-pipeline', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ sector }),

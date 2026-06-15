@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
+import { authFetch } from "@/lib/authFetch";
 import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { CompanyExportBar } from "./CompanyExportBar";
 import { ProjectSaveControl } from "./ProjectSaveControl";
@@ -308,7 +309,7 @@ export default function PartnershipsView({
     setStatus("loading");
     setData(null);
     try {
-      const res = await fetch("/api/partnerships", {
+      const res = await authFetch("/api/partnerships", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: trimmed, type: t }),
