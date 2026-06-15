@@ -190,14 +190,109 @@ export async function mockBackend(page: Page): Promise<void> {
 
   // Partnership lookup.
   await page.route('**/api/partnerships', async (route) => {
+    // Query-aware so the typo-resolution specs (which assert different resolved
+    // names + SEC verbatim per query) and the new partner-depth specs all pass
+    // against the same offline mock.
+    const posted = (() => { try { return route.request().postDataJSON(); } catch { return null; } })();
+    const q = String(posted?.query ?? '').toLowerCase();
+
+    if (q.includes('liquidia')) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          data: {
+            query: 'Liquidia',
+            resolved_name: 'Liquidia Corp',
+            type: 'company',
+            links: {
+              pubmed: 'https://pubmed.ncbi.nlm.nih.gov/?term=Liquidia',
+              edgar: 'https://www.sec.gov/cgi-bin/browse-edgar?company=liquidia&type=10-K',
+              unc_web: 'https://www.google.com/search?q=site:unc.edu+Liquidia',
+            },
+            clinical: { count: 3, top_authors: ['Hickey AJ'], papers: [{ pmid: '40000001', title: 'Inhaled treprostinil dry powder — UNC formulation work.', authors: ['Hickey AJ'], journal: 'JPharmSci', year: '2025', url: 'https://pubmed.ncbi.nlm.nih.gov/40000001/' }] },
+            coi: { count: 0, papers: [], window_years: 5 },
+            unc_units: [{ unit: 'UNC Eshelman School of Pharmacy', count: 3 }],
+            financial: {
+              quotes: [{ text: 'Our technology originated from research conducted at the University of North Carolina at Chapel Hill.', filing_url: 'https://www.sec.gov/x' }],
+              filing_url: 'https://www.sec.gov/x',
+            },
+            ecosystem: [],
+            nih_grants: [],
+            nih_pis: [],
+            trials: [],
+            trials_total: 6,
+          },
+        }),
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        resolved: { name: 'Apple Inc.', query: 'Apple' },
-        clinical: { items: [], note: 'test' },
-        financial: { items: [], note: 'test' },
-        ecosystem: { items: [], note: 'test' },
+        data: {
+          query: 'Eli Lilly',
+          resolved_name: 'ELI LILLY & Co',
+          type: 'company',
+          links: {
+            pubmed: 'https://pubmed.ncbi.nlm.nih.gov/?term=Eli+Lilly',
+            edgar: 'https://www.sec.gov/cgi-bin/browse-edgar?company=eli+lilly&type=10-K',
+            unc_web: 'https://www.google.com/search?q=site:unc.edu+Eli+Lilly',
+          },
+          clinical: {
+            count: 8,
+            top_authors: ["D'Alessio D", 'Bhatt DL', "O'Shaughnessy J"],
+            papers: [
+              {
+                pmid: '42191907',
+                title: 'A novel ex vivo platform for functional evaluation of treatment responses in metastatic ovarian cancer.',
+                authors: ["D'Alessio D"],
+                journal: 'JAMIA',
+                year: '2026',
+                url: 'https://pubmed.ncbi.nlm.nih.gov/42191907/',
+              },
+            ],
+          },
+          coi: { count: 1, papers: [{ pmid: '42114520', title: 'SURPASS-CVOT trial.', authors: ['Bhatt DL'], journal: 'NEJM', year: '2026', url: 'https://pubmed.ncbi.nlm.nih.gov/42114520/' }], window_years: 5 },
+          unc_units: [
+            { unit: 'UNC Lineberger Comprehensive Cancer Center', count: 2 },
+          ],
+          financial: { quotes: [], filing_url: '' },
+          ecosystem: [],
+          nih_grants: [
+            {
+              project_num: '5R01CA123456-03',
+              title: 'GLP-1 receptor agonists in pancreatic cancer prevention',
+              pi: "D'Alessio D",
+              department: 'Medicine',
+              fiscal_year: 2025,
+              url: 'https://reporter.nih.gov/project-details/5R01CA123456-03',
+            },
+          ],
+          nih_pis: [
+            {
+              name: "D'Alessio D",
+              org: 'UNC School of Medicine — Medicine',
+              project_title: 'GLP-1 receptor agonists in pancreatic cancer prevention',
+              grant_url: 'https://reporter.nih.gov/project-details/5R01CA123456-03',
+            },
+          ],
+          trials: [
+            {
+              nct_id: 'NCT05000000',
+              title: 'SURPASS-CVOT: Tirzepatide vs Dulaglutide in T2D',
+              phase: 'Phase 3',
+              status: 'COMPLETED',
+              lead_sponsor: 'Eli Lilly and Company',
+              collaborators: ['University of North Carolina at Chapel Hill'],
+              unc_signal: 'University of North Carolina at Chapel Hill',
+              url: 'https://clinicaltrials.gov/study/NCT05000000',
+            },
+          ],
+          trials_total: 47,
+        },
       }),
     });
   });
