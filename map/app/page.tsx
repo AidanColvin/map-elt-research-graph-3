@@ -9,6 +9,7 @@ import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
 import PartnershipsView from "@/components/workspace/PartnershipsView";
+import ProjectsCanvas from "@/components/workspace/ProjectsCanvas";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { useSavedReports } from "@/components/workspace/useSavedReports";
@@ -22,7 +23,7 @@ import { getUniqueAccounts } from "@/components/workspace/accountsData";
 // all sit on one horizontal axis (no separate stacked sub-nav).
 const HEADER_H = 54;
 
-type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "account";
+type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "projects" | "account";
 
 // The sub-nav routes (the "account" view is reached via the Profile button,
 // not the sub-nav, so it's intentionally not listed here). Display text for
@@ -34,6 +35,7 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "sector", label: "Sector" },
   { key: "partnerships", label: "UNC" },
   { key: "accounts", label: "Database" },
+  { key: "projects", label: "Projects" },
 ];
 
 // takes: an optional pixel size
@@ -370,6 +372,18 @@ export default function MapHome() {
           <section style={{ ...cardStyle, padding: "26px 28px 36px" }}>
             <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
           </section>
+        </div>
+
+        <div
+          className="ws-view"
+          style={{
+            display: view === "projects" ? "flex" : "none",
+            height: canvasMax,
+            maxWidth: 1100,
+            margin: "0 auto",
+          }}
+        >
+          <ProjectsCanvas onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))} />
         </div>
 
         <div
