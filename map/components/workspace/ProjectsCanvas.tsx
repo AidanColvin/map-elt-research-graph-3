@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Report, { type ReportData } from "@/components/Report";
+import { type ReportData } from "@/components/Report";
 import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { useDeepDive } from "./useDeepDive";
 import { useSectorScan } from "./useSectorScan";
@@ -490,79 +490,33 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
 
         {runStatus === "idle" ? (
           <p style={{ fontSize: 13.5, color: "#9a9aa2" }}>Type a subject and run the pipeline, or open a saved run above.</p>
-        ) : (
-          <div data-testid="pipeline-results" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <Panel
-              title="Company Profile"
-              note={resolvedMode === "company" && (dive.status === "streaming" || (runStatus === "running" && !companyMd)) ? "Generating…" : undefined}
-              actions={companyActions}
-            >
-              {resolvedMode !== "company"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the company profile.</p>
-                : companyMd
-                  ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
-                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No company profile yet.</p>}
-            </Panel>
-
-            <Panel
-              title="UNC Partnership Profile"
-              note={resolvedMode === "company" && uncStatus === "loading" ? "Generating…" : resolvedMode === "company" && uncStatus === "error" ? "Partnership data unavailable." : undefined}
-              actions={uncActions}
-            >
-              {resolvedMode !== "company"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the UNC profile.</p>
-                : uncMd
-                  ? <div className="workspace-md"><MarkdownArticle markdown={uncMd.replace(/^#\s+.*\n?/, "")} /></div>
-                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC profile yet.</p>}
-            </Panel>
-
-            <Panel
-              title="Sector Scan"
-              note={resolvedMode === "sector" && scan.status === "running" ? "Generating…" : resolvedMode === "sector" && scan.status === "error" ? (scan.error || "Sector scan unavailable.") : undefined}
-              actions={sectorActions}
-            >
-              {resolvedMode !== "sector"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the sector scan.</p>
-                : sectorData
-                  ? <Report data={sectorData} hideToc />
-                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No sector scan yet.</p>}
-            </Panel>
-
-            <Panel
-              title="Database"
-              note={resolvedMode === "sector" ? `${dbRows.length} new ${dbRows.length === 1 ? "company" : "companies"} from this run · merged into the Database tab` : undefined}
-              actions={dbActions}
-            >
-              {resolvedMode !== "sector"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the database.</p>
-                : dbRows.length > 0
-                  ? (
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {dbRows.slice(0, 30).map((r) => (
-                        <li key={r.account} style={{ fontSize: 12.5, background: "#eef0ff", color: "#4451c8", borderRadius: 999, padding: "3px 10px" }}>{r.account}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>
-                      No new companies{sectorData ? " — all already in the Database." : " yet."} Excel export still includes the full Database{` (${dateStamp}).`}
-                    </p>
-                  )}
-            </Panel>
-
-            {/* Per-company partnership report cards (sector runs) */}
-            {resolvedMode === "sector" && cards.length > 0 && (
-              <section style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "22px 26px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
-                <div style={{ marginBottom: 4 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
-                  <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
-                    Condensed sector overview, then one sourced card per company. Every claim links to a primary public source. Download the full report above.
+        ) : resolvedMode === "sector" ? (
+          /* ── Sector run: clean partnership-intelligence report ── */
+          <div data-testid="pipeline-results">
+            {/* Download bar */}
+            {sectorActions.length > 0 && (
+              <div style={{ marginBottom: 18 }}>
+                <DownloadRow actions={sectorActions} />
+                {dbRows.length > 0 && (
+                  <p style={{ fontSize: 11.5, color: "#9a9aa2", margin: "8px 0 0" }}>
+                    {dbRows.length} new {dbRows.length === 1 ? "company" : "companies"} merged into the Database tab
                   </p>
-                </div>
-                {sectorModel && (
-                  <div style={{ borderTop: "1px solid #ececf0", marginTop: 14, paddingTop: 22 }}>
-                    <SectorReportHeader m={sectorModel} />
-                  </div>
                 )}
+              </div>
+            )}
+
+            {/* Running spinner */}
+            {scan.status === "running" && (
+              <p style={{ fontSize: 13.5, color: "#9a9aa2" }}>Scanning {subject}…</p>
+            )}
+            {scan.status === "error" && (
+              <p style={{ fontSize: 13, color: "#dc2626" }}>{scan.error || "Sector scan unavailable."}</p>
+            )}
+
+            {/* Sector report header + company cards */}
+            {sectorData && (
+              <div style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "28px 28px 32px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+                {sectorModel && <SectorReportHeader m={sectorModel} />}
                 {cards.map((c, i) => (
                   <CompanyReportCard
                     key={`${c.name}-${i}`}
@@ -571,8 +525,34 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
                     onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
                   />
                 ))}
-              </section>
+                {!sectorModel && !cards.length && (
+                  <p style={{ fontSize: 13, color: "#9a9aa2" }}>No sector data yet.</p>
+                )}
+              </div>
             )}
+          </div>
+        ) : (
+          /* ── Company run: two-panel layout ── */
+          <div data-testid="pipeline-results" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            <Panel
+              title="Company Profile"
+              note={dive.status === "streaming" || (runStatus === "running" && !companyMd) ? "Generating…" : undefined}
+              actions={companyActions}
+            >
+              {companyMd
+                ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
+                : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No company profile yet.</p>}
+            </Panel>
+
+            <Panel
+              title="UNC Partnership Profile"
+              note={uncStatus === "loading" ? "Generating…" : uncStatus === "error" ? "Partnership data unavailable." : undefined}
+              actions={uncActions}
+            >
+              {uncMd
+                ? <div className="workspace-md"><MarkdownArticle markdown={uncMd.replace(/^#\s+.*\n?/, "")} /></div>
+                : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC profile yet.</p>}
+            </Panel>
           </div>
         )}
       </div>
