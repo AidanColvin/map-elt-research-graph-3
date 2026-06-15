@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { authFetch } from "@/lib/authFetch";
@@ -22,6 +22,46 @@ interface PI { name: string; org: string; project_title: string; grant_url: stri
 // unc_signal is the matched facility/collaborator NAME (a string), or "" — not a
 // boolean. Truthiness, not `=== true`, is the correct UNC-site test.
 interface Trial { nct_id: string; title: string; phase: string; status: string; lead_sponsor: string; collaborators: string[]; unc_signal: string | boolean; url: string; }
+
+export interface UNCFacultyLead {
+  pi_name: string;
+  pi_email?: string;
+  department?: string;
+  grant_number?: string;
+  project_title?: string;
+  fiscal_year?: string | number;
+  award_amount?: number | null;
+}
+export interface RelationshipSignal {
+  strength: 'confirmed' | 'probable';
+  filing_type?: string;
+  date?: string;
+  excerpt?: string;
+  source_url?: string;
+  nct_id?: string;
+}
+export interface UNCTrial {
+  nct_id: string;
+  title: string;
+  phase?: string;
+  status?: string;
+  lead_sponsor?: string;
+  is_joint?: boolean;
+  url?: string;
+}
+export interface UNCPatent {
+  patent_id: string;
+  title: string;
+  date?: string;
+  school?: string;
+}
+export interface TalkingPoint {
+  category: 'Research Overlap' | 'Existing Relationship' | 'Partnership Opportunity' | 'Contact';
+  headline: string;
+  detail: string;
+  strength: 'high' | 'medium' | 'low';
+}
+
 export interface PartnerData {
   query: string;
   resolved_name?: string;
@@ -36,6 +76,10 @@ export interface PartnerData {
   nih_pis?: PI[];
   trials?: Trial[];
   trials_total?: number;
+  unc_faculty_leads?: UNCFacultyLead[];
+  relationship_signals?: RelationshipSignal[];
+  unc_joint_trials?: UNCTrial[];
+  unc_patents?: UNCPatent[];
 }
 
 // Static UNC partnership assets — copied VERBATIM from the backend
@@ -286,6 +330,9 @@ export default function PartnershipsView({
   const [query, setQuery] = useState("");
   const [data, setData] = useState<PartnerData | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
+  const [talkingPoints, setTalkingPoints] = useState<TalkingPoint[]>([]);
+  const [tpStatus, setTpStatus] = useState<"idle" | "loading" | "done">("idle");
+  const [copyMsg, setCopyMsg] = useState("");
   const whyRef = useRef<HTMLDivElement | null>(null);
 
   // Reopening a saved UNC report (or a Save-to-Project snapshot) lands here with
@@ -322,6 +369,36 @@ export default function PartnershipsView({
       setStatus("error");
     }
   }
+
+  const fetchTalkingPoints = useCallback(async (pd: PartnerData) => {
+    setTpStatus("loading");
+    setTalkingPoints([]);
+    try {
+      const res = await fetch("/api/talking-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_name: pd.resolved_name ?? pd.query,
+          unc_faculty_leads: pd.unc_faculty_leads ?? [],
+          relationship_signals: pd.relationship_signals ?? [],
+          unc_trials: pd.unc_joint_trials ?? [],
+          unc_patents: pd.unc_patents ?? [],
+          company_summary: "",
+        }),
+      });
+      const json = await res.json();
+      setTalkingPoints(json.talking_points ?? []);
+      setTpStatus("done");
+    } catch {
+      setTpStatus("done");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (data && status === "done") {
+      fetchTalkingPoints(data);
+    }
+  }, [data, status, fetchTalkingPoints]);
 
   // takes: a form submit event
   // does: runs the search for the current input + toggle
@@ -793,6 +870,81 @@ export default function PartnershipsView({
               <p style={{ fontSize: 12, color: "#9a9aa2", fontStyle: "italic", margin: "18px 0 0", lineHeight: 1.5 }}>
                 Signals from PubMed co-authorship, NIH RePORTER grants, ClinicalTrials.gov, and SEC filings. Operational relationships (IT contracts, hiring, clinical pilots) are not indexed in public research databases and may not appear above — check the Partnership Profile for the full picture.
               </p>
+            </div>
+
+            {/* ── Section E — Talking Points ───────────────────────────────── */}
+            <div data-testid="talking-points-card" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
+                <div>
+                  <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>Talking Points</p>
+                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 0" }}>BD outreach — paste directly into an email</p>
+                </div>
+                <button
+                  onClick={() => {
+                    if (!talkingPoints.length) return;
+                    const text = talkingPoints
+                      .map((tp) => `[${tp.category}] ${tp.headline}\n→ ${tp.detail}`)
+                      .join("\n\n");
+                    navigator.clipboard.writeText(text).then(() => {
+                      setCopyMsg("Copied!");
+                      setTimeout(() => setCopyMsg(""), 2000);
+                    });
+                  }}
+                  disabled={tpStatus !== "done" || talkingPoints.length === 0}
+                  style={{
+                    border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
+                    fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
+                    color: "#1d1d1f", whiteSpace: "nowrap",
+                  }}
+                >
+                  {copyMsg || "Copy all as text"}
+                </button>
+              </div>
+
+              {tpStatus === "loading" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} style={{ height: 54, borderRadius: 10, background: "linear-gradient(90deg,#f5f5f7 25%,#ebebed 50%,#f5f5f7 75%)", backgroundSize: "400% 100%", animation: "shimmer 1.4s infinite" }} />
+                  ))}
+                </div>
+              )}
+
+              {tpStatus === "done" && talkingPoints.length === 0 && (
+                <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No talking points generated.</p>
+              )}
+
+              {tpStatus === "done" && talkingPoints.length > 0 && (
+                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                  {talkingPoints.map((tp, i) => {
+                    const pillBg = tp.strength === "high" ? "#dcfce7" : tp.strength === "medium" ? "#fef9c3" : "#f3f4f6";
+                    const pillColor = tp.strength === "high" ? "#15803d" : tp.strength === "medium" ? "#a16207" : "#6b7280";
+                    const isUrl = tp.detail.startsWith("http://") || tp.detail.startsWith("https://");
+                    const urlMatch = tp.detail.match(/(https?:\/\/\S+)/);
+                    return (
+                      <li key={i} data-testid="talking-point-row" style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9aa2" }}>{tp.category}</span>
+                          <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 9px", background: pillBg, color: pillColor }}>
+                            {tp.strength.charAt(0).toUpperCase() + tp.strength.slice(1)}
+                          </span>
+                        </div>
+                        <p data-testid="tp-headline" style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f", margin: "0 0 4px", lineHeight: 1.4 }}>{tp.headline}</p>
+                        <p style={{ fontSize: 12.5, color: "#6b6b73", margin: 0, lineHeight: 1.45 }}>
+                          {urlMatch
+                            ? <>
+                                {tp.detail.slice(0, tp.detail.indexOf(urlMatch[1])).replace(/ — $/, "")}
+                                {" "}<a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
+                              </>
+                            : isUrl
+                              ? <a href={tp.detail} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
+                              : tp.detail
+                          }
+                        </p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
             </div>
           </div>
         );

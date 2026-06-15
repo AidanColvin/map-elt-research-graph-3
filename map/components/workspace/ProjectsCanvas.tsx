@@ -38,6 +38,7 @@ function currentUid(): string {
 // One saved pipeline run, serialized into a project's SavedProfile record.
 interface RunBundle {
   subject: string;
+  mode?: "company" | "sector";
   companyMd: string;
   uncMd: string;
   sectorData: ReportData | null;
@@ -105,6 +106,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   const [newName, setNewName] = useState("");
 
   const [subject, setSubject] = useState("");
+  const [mode, setMode] = useState<"company" | "sector">("company");
   const [runStatus, setRunStatus] = useState<"idle" | "running" | "done">("idle");
   const [companyMd, setCompanyMd] = useState("");
   const [uncMd, setUncMd] = useState("");
@@ -136,7 +138,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   }
 
   function resetRun() {
-    setSubject(""); setRunStatus("idle"); setCompanyMd(""); setUncMd("");
+    setSubject(""); setMode("company"); setRunStatus("idle"); setCompanyMd(""); setUncMd("");
     setUncStatus("idle"); setSectorData(null); setSaveMsg("");
   }
 
@@ -160,9 +162,12 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
     if (!s) return;
     setCompanyMd(""); setUncMd(""); setSectorData(null); setSaveMsg("");
     setRunStatus("running");
-    dive.run(s);   // Company Profile (subject as company)
-    scan.run(s);   // Sector Scan (subject as sector)
-    runUNC(s);     // UNC Partnership Profile
+    if (mode === "company") {
+      dive.run(s);   // Company Profile
+      runUNC(s);     // UNC Partnership Profile
+    } else {
+      scan.run(s);   // Sector Scan + Database
+    }
   }
 
   // Sync live hook output into local state only while a run is in flight, so
@@ -170,10 +175,10 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   useEffect(() => { if (runStatus === "running") setCompanyMd(dive.markdown); }, [dive.markdown, runStatus]);
   useEffect(() => { if (runStatus === "running" && scan.data) setSectorData(scan.data); }, [scan.data, runStatus]);
 
-  const liveDone =
-    (dive.status === "done" || dive.status === "error") &&
-    (scan.status === "done" || scan.status === "error") &&
-    (uncStatus === "done" || uncStatus === "error");
+  const liveDone = mode === "company"
+    ? (dive.status === "done" || dive.status === "error") &&
+      (uncStatus === "done" || uncStatus === "error")
+    : (scan.status === "done" || scan.status === "error");
   useEffect(() => { if (runStatus === "running" && liveDone) setRunStatus("done"); }, [runStatus, liveDone]);
 
   // ── Database rows derived from the sector scan ─────────────────────────
@@ -192,7 +197,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   // ── Save / reopen a run ────────────────────────────────────────────────
   async function saveRun() {
     if (!current) return;
-    const bundle: RunBundle = { subject, companyMd, uncMd, sectorData, savedAt: Date.now() };
+    const bundle: RunBundle = { subject, mode, companyMd, uncMd, sectorData, savedAt: Date.now() };
     setSaveMsg("Saving…");
     await saveProfileToProject(currentUid(), current.id, {
       companyName: subject || "Pipeline run",
@@ -211,6 +216,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
       const b = JSON.parse(sp.reportMarkdown) as RunBundle;
       setRunStatus("done");
       setSubject(b.subject || "");
+      setMode(b.mode ?? "company");
       setCompanyMd(b.companyMd || "");
       setUncMd(b.uncMd || "");
       setUncStatus(b.uncMd ? "done" : "idle");
@@ -313,13 +319,36 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
 
         {/* Run bar */}
         <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginBottom: 10 }}>
+          {/* Company / Sector toggle */}
+          <div role="tablist" aria-label="Pipeline mode" style={{ display: "inline-flex", background: "#ececf0", borderRadius: 999, padding: 3, flexShrink: 0 }}>
+            {(["company", "sector"] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="tab"
+                aria-selected={mode === m}
+                data-testid={`mode-tab-${m}`}
+                onClick={() => setMode(m)}
+                disabled={runStatus === "running"}
+                style={{
+                  border: "none", cursor: "pointer", borderRadius: 999, padding: "7px 16px",
+                  fontSize: 13, fontWeight: 600, textTransform: "capitalize",
+                  background: mode === m ? "#fff" : "transparent",
+                  color: mode === m ? "#1d1d1f" : "#8a8a92",
+                  boxShadow: mode === m ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                }}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") runAll(); }}
-            placeholder="Company or sector name — e.g. Apple, Oncology…"
+            placeholder={mode === "company" ? "Company name — e.g. Apple…" : "Sector — e.g. Oncology…"}
             aria-label="Pipeline subject"
-            style={{ flex: 1, minWidth: 260, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: "11px 15px", fontSize: 15, outline: "none", background: "#fff", fontFamily: FONT }}
+            style={{ flex: 1, minWidth: 200, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: "11px 15px", fontSize: 15, outline: "none", background: "#fff", fontFamily: FONT }}
           />
           <button
             data-testid="run-pipeline"
@@ -327,7 +356,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
             disabled={!subject.trim() || runStatus === "running"}
             style={{ border: "none", cursor: "pointer", borderRadius: 12, padding: "11px 24px", fontSize: 14, fontWeight: 600, color: "#fff", background: "#1d1d1f", whiteSpace: "nowrap" }}
           >
-            {runStatus === "running" ? "Running…" : "Run full pipeline"}
+            {runStatus === "running" ? "Running…" : "Run pipeline"}
           </button>
           {runStatus === "done" && (
             <button data-testid="save-run" onClick={saveRun} className={pill} style={pillStyle}>Save to project</button>
@@ -335,7 +364,9 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
           {saveMsg && <span style={{ fontSize: 12, color: "#5b6cff" }}>{saveMsg}</span>}
         </div>
         <p style={{ fontSize: 12, color: "#9a9aa2", margin: "0 0 22px" }}>
-          Runs all four — Company Profile, UNC Profile, Sector Scan, and Database — for the subject. Each is downloadable below.
+          {mode === "company"
+            ? "Company mode: runs Company Profile + UNC Partnership Profile."
+            : "Sector mode: runs Sector Scan + Database."}
         </p>
 
         {/* Saved runs in this project */}
@@ -358,50 +389,59 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
           <div data-testid="pipeline-results" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <Panel
               title="Company Profile"
-              note={dive.status === "streaming" || (runStatus === "running" && !companyMd) ? "Generating…" : undefined}
+              note={mode === "company" && (dive.status === "streaming" || (runStatus === "running" && !companyMd)) ? "Generating…" : undefined}
               actions={companyActions}
             >
-              {companyMd
-                ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
-                : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No company profile yet.</p>}
+              {mode !== "company"
+                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the company profile.</p>
+                : companyMd
+                  ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
+                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No company profile yet.</p>}
             </Panel>
 
             <Panel
               title="UNC Partnership Profile"
-              note={uncStatus === "loading" ? "Generating…" : uncStatus === "error" ? "Partnership data unavailable." : undefined}
+              note={mode === "company" && uncStatus === "loading" ? "Generating…" : mode === "company" && uncStatus === "error" ? "Partnership data unavailable." : undefined}
               actions={uncActions}
             >
-              {uncMd
-                ? <div className="workspace-md"><MarkdownArticle markdown={uncMd.replace(/^#\s+.*\n?/, "")} /></div>
-                : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC profile yet.</p>}
+              {mode !== "company"
+                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the UNC profile.</p>
+                : uncMd
+                  ? <div className="workspace-md"><MarkdownArticle markdown={uncMd.replace(/^#\s+.*\n?/, "")} /></div>
+                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC profile yet.</p>}
             </Panel>
 
             <Panel
               title="Sector Scan"
-              note={scan.status === "running" ? "Generating…" : scan.status === "error" ? (scan.error || "Sector scan unavailable.") : undefined}
+              note={mode === "sector" && scan.status === "running" ? "Generating…" : mode === "sector" && scan.status === "error" ? (scan.error || "Sector scan unavailable.") : undefined}
               actions={sectorActions}
             >
-              {sectorData
-                ? <Report data={sectorData} hideToc />
-                : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No sector scan yet.</p>}
+              {mode !== "sector"
+                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the sector scan.</p>
+                : sectorData
+                  ? <Report data={sectorData} hideToc />
+                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No sector scan yet.</p>}
             </Panel>
 
             <Panel
               title="Database"
-              note={`${dbRows.length} new ${dbRows.length === 1 ? "company" : "companies"} from this run · merged into the Database tab`}
+              note={mode === "sector" ? `${dbRows.length} new ${dbRows.length === 1 ? "company" : "companies"} from this run · merged into the Database tab` : undefined}
               actions={dbActions}
             >
-              {dbRows.length > 0 ? (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                  {dbRows.slice(0, 30).map((r) => (
-                    <li key={r.account} style={{ fontSize: 12.5, background: "#eef0ff", color: "#4451c8", borderRadius: 999, padding: "3px 10px" }}>{r.account}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>
-                  No new companies{sectorData ? " — all already in the Database." : " yet."} Excel export still includes the full Database{` (${dateStamp}).`}
-                </p>
-              )}
+              {mode !== "sector"
+                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the database.</p>
+                : dbRows.length > 0
+                  ? (
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexWrap: "wrap", gap: 8 }}>
+                      {dbRows.slice(0, 30).map((r) => (
+                        <li key={r.account} style={{ fontSize: 12.5, background: "#eef0ff", color: "#4451c8", borderRadius: 999, padding: "3px 10px" }}>{r.account}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>
+                      No new companies{sectorData ? " — all already in the Database." : " yet."} Excel export still includes the full Database{` (${dateStamp}).`}
+                    </p>
+                  )}
             </Panel>
           </div>
         )}
