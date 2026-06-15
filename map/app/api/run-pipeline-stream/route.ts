@@ -29,16 +29,19 @@ const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.ver
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
 export async function POST(req: NextRequest) {
-  // Auth optional — keyless pipeline; verify a token if present, else anonymous.
-  const decoded = await verifyAuth(req);
-  const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'pipeline', 3);
-  if (!allowed) return rateLimitResponse(retryAfterSeconds);
-
+  // Validate input FIRST — abusive/malformed requests get a clean 4xx without
+  // spending rate-limit budget (they never reach the expensive backend).
   const parsed = await readJsonBody(req);
   if (!parsed.ok) return jsonError(parsed.status, parsed.error);
   const valid = validatePipeline(parsed.value);
   if (!valid.ok) return jsonError(valid.status, valid.error);
   const body = valid.value;
+
+  // Auth optional — keyless pipeline; verify a token if present, else anonymous.
+  // Rate-limit only valid requests, per client.
+  const decoded = await verifyAuth(req);
+  const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'pipeline', 10);
+  if (!allowed) return rateLimitResponse(retryAfterSeconds);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 295_000);

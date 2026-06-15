@@ -18,16 +18,17 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
+  // Validate input FIRST — a bad request shouldn't spend rate-limit budget.
+  const company = req.nextUrl.searchParams.get("company")?.trim() ?? "";
+  if (!company) {
+    return new Response("Missing ?company=", { status: 400 });
+  }
+
   // Auth is optional — the pipeline is free + keyless. Verify a token when sent,
   // otherwise proceed anonymously (rate-limited per client IP).
   const decoded = await verifyAuth(req);
   const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'generate', 10);
   if (!allowed) return rateLimitResponse(retryAfterSeconds);
-
-  const company = req.nextUrl.searchParams.get("company")?.trim() ?? "";
-  if (!company) {
-    return new Response("Missing ?company=", { status: 400 });
-  }
 
   const encoder = new TextEncoder();
   const stream = new ReadableStream<Uint8Array>({
