@@ -100,7 +100,12 @@ function GlobalHeader({
         zIndex: 100,
         display: "flex",
         alignItems: "center",
-        padding: "0 22px",
+        // Pad the flanks past the notch / Dynamic Island in landscape; the
+        // base 22px still applies on every non-notched device.
+        paddingTop: 0,
+        paddingBottom: 0,
+        paddingLeft: "max(22px, env(safe-area-inset-left))",
+        paddingRight: "max(22px, env(safe-area-inset-right))",
         background: "#ffffff",
         borderBottom: "1px solid #e5e5ea",
         fontFamily: FONT,
@@ -263,13 +268,16 @@ export default function MapHome() {
   // The card body is always the scroll container — in every view the canvas
   // is capped to the viewport, which keeps Report's sticky download bar and
   // in-page citation anchors working identically everywhere.
-  const canvasMax = `calc(100vh - ${HEADER_H + 48}px)`;
+  // dvh (not vh) so the canvas matches the *visible* area on iOS Safari, whose
+  // collapsing toolbar otherwise pushes the canvas bottom (and the sticky
+  // download bar) off-screen.
+  const canvasMax = `calc(100dvh - ${HEADER_H + 48}px)`;
 
   return (
     <div
       style={{
         fontFamily: FONT,
-        minHeight: "100vh",
+        minHeight: "100dvh",
         color: "#1d1d1f",
         // Ultra-soft tinted washes give the glass panels something to refract.
         background:
@@ -288,7 +296,17 @@ export default function MapHome() {
       {/* All three views stay mounted; toggling display from none re-runs the
           .ws-view opacity/transform entrance without unmounting anything, so
           component state and scroll positions survive every switch. */}
-      <main className="ws-main" style={{ padding: `${HEADER_H + 24}px 28px 36px` }}>
+      <main
+        className="ws-main"
+        style={{
+          // Top clears the fixed header; bottom adds the home-indicator inset
+          // so content isn't hidden behind it on gesture-nav iPhones.
+          paddingTop: HEADER_H + 24,
+          paddingRight: "max(28px, env(safe-area-inset-right))",
+          paddingBottom: "calc(36px + env(safe-area-inset-bottom))",
+          paddingLeft: "max(28px, env(safe-area-inset-left))",
+        }}
+      >
         <div
           className="ws-view"
           style={{ display: view === "dashboard" ? "block" : "none" }}

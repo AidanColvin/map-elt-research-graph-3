@@ -283,7 +283,7 @@ function SectorScanApp({ embedded = false }: { embedded?: boolean }) {
       style={{
         ...styles.main,
         // Sit flush under the dashboard's fixed 52px header when embedded.
-        ...(embedded ? { minHeight: 'calc(100vh - 52px)', paddingTop: 16 } : {}),
+        ...(embedded ? { minHeight: 'calc(100dvh - 52px)', paddingTop: 16 } : {}),
       }}
     >
       {/* When embedded in the Map dashboard the global header already shows the
@@ -448,7 +448,7 @@ function SectorScanApp({ embedded = false }: { embedded?: boolean }) {
 
 const styles: Record<string, React.CSSProperties> = {
   main: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
     display: 'flex',
     flexDirection: 'column',
     padding: '32px 24px',
