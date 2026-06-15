@@ -17,6 +17,7 @@
     "@sentry/nextjs": "^8.55.2",
     "docx": "^9.7.1",
     "firebase": "^12.14.0",
+    "firebase-admin": "^14.0.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",
     "next": "^15.1.6",

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readJsonBody, validatePipeline } from '@/lib/proxyGuard';
+import { verifyAuth } from '@/lib/verifyAuth';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 // Never cache this route. Every search must hit the backend and return a
 // freshly generated report — we explicitly opt out of all Next.js caching so
@@ -28,8 +30,14 @@ const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.ver
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
 export async function POST(req: NextRequest) {
-  // Size-cap + parse + shape-validate before any upstream work (the proxy is
-  // unauthenticated and the backend fan-out is expensive).
+  let decoded;
+  try { decoded = await verifyAuth(req); }
+  catch (r) { return r as Response; }
+
+  const { allowed, retryAfterSeconds } = checkRateLimit(decoded.uid, 'pipeline', 3);
+  if (!allowed) return rateLimitResponse(retryAfterSeconds);
+
+  // Size-cap + parse + shape-validate before any upstream work.
   const parsed = await readJsonBody(req);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   const valid = validatePipeline(parsed.value);

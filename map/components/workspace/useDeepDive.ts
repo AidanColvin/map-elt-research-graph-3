@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { friendlyError, friendlyHttp } from "@/lib/error-copy";
+import { authFetch } from "@/lib/authFetch";
 
 export type DeepDiveStatus = "idle" | "loading" | "streaming" | "done" | "error";
 
@@ -40,7 +41,7 @@ export function useDeepDive(): DeepDiveState {
     setStatus("loading");
 
     try {
-      const res = await fetch(`/api/generate?company=${encodeURIComponent(trimmed)}`, {
+      const res = await authFetch(`/api/generate?company=${encodeURIComponent(trimmed)}`, {
         signal: controller.signal,
       });
       if (!res.ok || !res.body) {

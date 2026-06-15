@@ -1,5 +1,7 @@
 import { NextRequest } from 'next/server';
 import { readJsonBody, validatePipeline } from '@/lib/proxyGuard';
+import { verifyAuth } from '@/lib/verifyAuth';
+import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
 
 // takes: a status and message
 // does: builds a JSON error Response (this route otherwise streams SSE)
@@ -27,6 +29,13 @@ const BACKEND_URL = process.env.BACKEND_API_URL || 'https://map-backend-iota.ver
 const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 
 export async function POST(req: NextRequest) {
+  let decoded;
+  try { decoded = await verifyAuth(req); }
+  catch (r) { return r as Response; }
+
+  const { allowed, retryAfterSeconds } = checkRateLimit(decoded.uid, 'pipeline', 3);
+  if (!allowed) return rateLimitResponse(retryAfterSeconds);
+
   const parsed = await readJsonBody(req);
   if (!parsed.ok) return jsonError(parsed.status, parsed.error);
   const valid = validatePipeline(parsed.value);
