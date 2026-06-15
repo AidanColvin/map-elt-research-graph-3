@@ -20,6 +20,7 @@ import {
   type Project, type SavedProfile,
 } from "@/src/firebase/db";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { authFetch } from "@/lib/authFetch";
 import { CanvasCard, FONT } from "./ui";
 
 const EMPTY_SIGNALS: UNCSignals = {
@@ -143,7 +144,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   async function runUNC(name: string) {
     setUncStatus("loading"); setUncMd("");
     try {
-      const res = await fetch("/api/partnerships", {
+      const res = await authFetch("/api/partnerships", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: name, type: "company" }),
       });
