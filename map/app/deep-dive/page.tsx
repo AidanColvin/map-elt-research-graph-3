@@ -5,6 +5,7 @@ import MarkdownArticle, { slugify } from "@/app/components/MarkdownArticle";
 import CompanyLogo from "@/app/components/CompanyLogo";
 import IntroSplash from "@/app/components/IntroSplash";
 import { CURATED, findCurated } from "@/lib/registry";
+import { authFetch } from "@/lib/authFetch";
 
 type Status = "idle" | "loading" | "streaming" | "done" | "error";
 
@@ -54,7 +55,7 @@ function DeepDiveApp({ embedded = false }: { embedded?: boolean }) {
     setStatus("loading");
 
     try {
-      const res = await fetch(`/api/generate?company=${encodeURIComponent(trimmed)}`);
+      const res = await authFetch(`/api/generate?company=${encodeURIComponent(trimmed)}`);
       if (!res.ok || !res.body) {
         setStatus("error");
         setMarkdown(`> Could not generate a report (HTTP ${res.status}).`);
