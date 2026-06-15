@@ -20,7 +20,7 @@ import type { MapUser } from "@/components/AuthGate";
  * local mirror.
  */
 
-export type SavedKind = "company" | "sector";
+export type SavedKind = "company" | "sector" | "partnership";
 
 export interface SavedReport {
   id: string; // `${kind}:${normalizedQuery}` — re-saving the same subject updates in place

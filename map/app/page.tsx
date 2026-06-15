@@ -201,6 +201,7 @@ export default function MapHome() {
   const [view, setView] = useState<View>("dashboard");
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
+  const [partnershipDraft, setPartnershipDraft] = useState("");
   const dive = useDeepDive();
   const scan = useSectorScan();
   // Per-user saved reports (Firestore for signed-in accounts, device-local for
@@ -223,7 +224,12 @@ export default function MapHome() {
   //       and focuses that view, so a user can pick a project back up to review
   // returns: nothing
   function openProject(r: SavedReport) {
-    if (r.kind === "company") {
+    if (r.kind === "partnership") {
+      // Re-open a saved UNC report in the UNC view; PartnershipsView re-runs the
+      // live lookup for the subject so the evidence is current.
+      setPartnershipDraft(r.query);
+      setView("partnerships");
+    } else if (r.kind === "company") {
       setCompanyDraft(r.query);
       dive.loadSaved(r.query, r.content);
       setView("company");
@@ -354,7 +360,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <PartnershipsView />
+          <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
         </div>
 
         <div

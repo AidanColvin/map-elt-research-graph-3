@@ -238,7 +238,11 @@ function ProjectRow({
   onOpen: () => void;
   onRemove: () => void;
 }) {
-  const isCompany = report.kind === "company";
+  // Kind → pill label + colors. Partnership (UNC) reports get a distinct blue.
+  const kindPill =
+    report.kind === "company" ? { label: "Company", color: "#3730a3", bg: "rgba(99,102,241,0.12)" }
+    : report.kind === "partnership" ? { label: "UNC", color: "#4451c8", bg: "rgba(91,108,255,0.12)" }
+    : { label: "Sector", color: "#9a3412", bg: "rgba(249,115,22,0.12)" };
   return (
     <div
       style={{
@@ -277,11 +281,11 @@ function ProjectRow({
             textTransform: "uppercase",
             padding: "3px 7px",
             borderRadius: 999,
-            color: isCompany ? "#3730a3" : "#9a3412",
-            background: isCompany ? "rgba(99,102,241,0.12)" : "rgba(249,115,22,0.12)",
+            color: kindPill.color,
+            background: kindPill.bg,
           }}
         >
-          {isCompany ? "Company" : "Sector"}
+          {kindPill.label}
         </span>
         <span style={{ minWidth: 0 }}>
           <span
