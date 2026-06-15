@@ -22,7 +22,7 @@ interface PI { name: string; org: string; project_title: string; grant_url: stri
 // unc_signal is the matched facility/collaborator NAME (a string), or "" — not a
 // boolean. Truthiness, not `=== true`, is the correct UNC-site test.
 interface Trial { nct_id: string; title: string; phase: string; status: string; lead_sponsor: string; collaborators: string[]; unc_signal: string | boolean; url: string; }
-interface PartnerData {
+export interface PartnerData {
   query: string;
   resolved_name?: string;
   type: PartnerType;
@@ -129,7 +129,7 @@ const CHIP_CLASS = "rounded-full bg-white/80 border border-black/[0.06] hover:sh
 //       project snapshots all serialize. Mirrors the on-screen sections so the
 //       file matches what the user sees. Every line traces to a primary source.
 // returns: the report Markdown string
-function buildPartnershipMarkdown(data: PartnerData): string {
+export function buildPartnershipMarkdown(data: PartnerData): string {
   const resolvedName = data.resolved_name ?? data.query;
   const paperCount = data.clinical.count;
   const secMentions = data.financial.quotes.length;
