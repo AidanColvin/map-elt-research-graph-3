@@ -61,6 +61,12 @@ function projectsKey(uid: string): string {
 function profilesKey(uid: string): string {
   return `map:saved_profiles:${scope(uid)}`;
 }
+// Tombstones: ids of projects the user deleted. listProjects always filters
+// these out, so a deleted project can't be resurrected by the Firestore merge
+// (the remote delete is best-effort and may lag or be blocked by rules).
+function deletedProjectsKey(uid: string): string {
+  return `map:projects_deleted:${scope(uid)}`;
+}
 
 // takes: a localStorage key
 // does: reads and parses the stored array, tolerating any corruption
@@ -184,7 +190,10 @@ export async function listProjects(uid: string): Promise<Project[]> {
   const key = projectsKey(uid);
   const local = readLocal<Project>(key);
   const remote = uid ? await fsListProjects(uid) : [];
-  const merged = mergeById(local, remote).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const tombstoned = new Set(readLocal<string>(deletedProjectsKey(uid)));
+  const merged = mergeById(local, remote)
+    .filter((p) => !tombstoned.has(p.id))
+    .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   if (remote.length) writeLocal(key, merged); // refresh the mirror with cross-device items
   return merged;
 }
@@ -236,6 +245,11 @@ export async function listSavedProfiles(uid: string, projectId?: string): Promis
 // returns: a Promise resolving to true (the local delete always succeeds)
 export async function deleteProject(uid: string, projectId: string): Promise<boolean> {
   if (!projectId) return false;
+  // Remember the deletion so the Firestore merge in listProjects can't bring it
+  // back (the remote delete below is best-effort and may lag or be blocked).
+  const dKey = deletedProjectsKey(uid);
+  const tombstones = readLocal<string>(dKey);
+  if (!tombstones.includes(projectId)) writeLocal(dKey, [projectId, ...tombstones]);
   // Remove the project itself from the local mirror.
   const pKey = projectsKey(uid);
   writeLocal(pKey, readLocal<Project>(pKey).filter((p) => p.id !== projectId));
