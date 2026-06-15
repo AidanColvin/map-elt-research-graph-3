@@ -8,7 +8,9 @@ import { useSectorScan } from "./useSectorScan";
 import { buildPartnershipMarkdown, type PartnerData } from "./PartnershipsView";
 import { detectSubjectKind } from "./sectors";
 import CompanyReportCard from "./CompanyReportCard";
+import SectorReportHeader from "./SectorReportHeader";
 import { buildCardData, cardToMarkdown, type CompanyCardData } from "@/lib/companyCard";
+import { buildSectorReport, type SectorReportModel } from "@/lib/sectorReport";
 import { mergeCompaniesIntoDB, validateIncomingCompany } from "@/lib/dedup";
 import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
 import type { AccountProfile } from "./accountProfile";
@@ -128,7 +130,12 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
     setCurrent(p);
     resetRun();
     const profiles = await listSavedProfiles(currentUid(), p.id);
-    setSavedRuns(profiles.filter((s) => s.ticker === BUNDLE_TICKER));
+    const runs = profiles.filter((s) => s.ticker === BUNDLE_TICKER);
+    setSavedRuns(runs);
+    // Auto-generate the report on open — no need to retype the name and press
+    // Run. The project name is the subject; "auto" detects company vs sector.
+    // Skip when the project already has saved runs (open those instead).
+    if (runs.length === 0 && p.name.trim()) runSubject(p.name.trim(), "auto");
   }
 
   async function createNew() {
@@ -174,11 +181,18 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   }
 
   function runAll() {
-    const s = subject.trim();
+    runSubject(subject.trim(), mode);
+  }
+
+  // takes: a subject string and the chosen mode ("auto" detects)
+  // does: kicks off the matching pipeline (company profile + UNC, or sector
+  //       scan + database). Used by the Run button and by auto-run on open.
+  function runSubject(s: string, chosen: "auto" | "company" | "sector") {
     if (!s) return;
+    setSubject(s);
     // In "auto" mode, decide company vs sector from the text (e.g. "health
     // tech" → sector); otherwise honor the user's forced choice.
-    const eff: "company" | "sector" = mode === "auto" ? detectSubjectKind(s) : mode;
+    const eff: "company" | "sector" = chosen === "auto" ? detectSubjectKind(s) : chosen;
     setResolvedMode(eff);
     setCompanyMd(""); setUncMd(""); setSectorData(null); setSaveMsg("");
     setRunStatus("running");
@@ -230,6 +244,11 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
     if (!sectorData) return [];
     const profiles: any[] = (sectorData as any).section4_profiles || [];
     return profiles.slice(0, 10).map((p) => buildCardData(p, sectorData));
+  }, [sectorData]);
+
+  const sectorModel = useMemo<SectorReportModel | null>(() => {
+    if (!sectorData) return null;
+    return buildSectorReport(sectorData);
   }, [sectorData]);
 
   // ── Save / reopen a run ────────────────────────────────────────────────
@@ -536,6 +555,11 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
                     Condensed sector overview, then one sourced card per company. Every claim links to a primary public source. Download the full report above.
                   </p>
                 </div>
+                {sectorModel && (
+                  <div style={{ borderTop: "1px solid #ececf0", marginTop: 14, paddingTop: 22 }}>
+                    <SectorReportHeader m={sectorModel} />
+                  </div>
+                )}
                 {cards.map((c, i) => (
                   <CompanyReportCard
                     key={`${c.name}-${i}`}

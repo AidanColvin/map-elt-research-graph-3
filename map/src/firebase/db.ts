@@ -259,9 +259,11 @@ export async function deleteProject(uid: string, projectId: string): Promise<boo
   const profiles = readLocal<SavedProfile>(sKey);
   const owned = profiles.filter((p) => p.projectId === projectId);
   writeLocal(sKey, profiles.filter((p) => p.projectId !== projectId));
-  // Best-effort Firestore cleanup (never awaited by the UI path).
-  void fsDeleteProject(uid, projectId).catch(() => {});
-  for (const p of owned) void fsDeleteProfile(uid, p.id).catch(() => {});
+  // Firestore cleanup — awaited (time-bounded) so a signed-in user's delete is
+  // pushed to the server before the list refreshes. Failures are swallowed; the
+  // tombstone above guarantees the project stays gone in this browser regardless.
+  await fsDeleteProject(uid, projectId).catch(() => {});
+  await Promise.all(owned.map((p) => fsDeleteProfile(uid, p.id).catch(() => {})));
   return true;
 }
 
