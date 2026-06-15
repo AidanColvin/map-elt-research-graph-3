@@ -33,6 +33,7 @@ const ALWAYS_PUBLIC = [
 const PUBLIC_API = [
   '/api/generate',
   '/api/partnerships',
+  '/api/talking-points',
   '/api/run-pipeline',        // also covers /api/run-pipeline-stream (prefix)
   '/api/freshness',
 ];

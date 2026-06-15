@@ -109,6 +109,57 @@ def _query_legacy(name: str, endpoint: str) -> List[dict]:
     return (data or {}).get("patents") or []
 
 
+def fetch_unc_patents(company_name: str, max_results: int = 5) -> List[dict]:
+    """UNC-assigned patents that may overlap with the company's sector.
+
+    Searches PatentsView for patents assigned to UNC Chapel Hill whose title
+    contains keywords from the company name. Returns UNCPatent-shaped dicts
+    with title, patent_id, date, school. Returns [] when no API key is set or
+    the search returns nothing.
+    """
+    api_key = os.environ.get("PATENTSVIEW_API_KEY", "").strip()
+    if not api_key:
+        return []
+    unc_assignees = [
+        "University of North Carolina at Chapel Hill",
+        "University of North Carolina Chapel Hill",
+        "University of North Carolina",
+    ]
+    results: List[dict] = []
+    for assignee in unc_assignees:
+        if results:
+            break
+        try:
+            q = {
+                "_and": [
+                    {"_text_phrase": {"assignees.assignee_organization": assignee}},
+                    {"_text_any": {"patent_title": company_name}},
+                ]
+            }
+            f = ["patent_id", "patent_title", "patent_date", "assignees.assignee_organization"]
+            params = {"q": json.dumps(q), "f": json.dumps(f),
+                      "o": json.dumps({"size": max_results})}
+            headers = dict(HEADERS)
+            headers["X-Api-Key"] = api_key
+            r = requests.get(SEARCH_API, headers=headers, params=params, timeout=TIMEOUT)
+            r.raise_for_status()
+            patents = (r.json() or {}).get("patents") or []
+            for p in patents:
+                org = ""
+                assignees_list = p.get("assignees") or []
+                if assignees_list and isinstance(assignees_list, list):
+                    org = (assignees_list[0].get("assignee_organization") or "")
+                results.append({
+                    "patent_id": p.get("patent_id") or "",
+                    "title": p.get("patent_title") or "",
+                    "date": p.get("patent_date") or "",
+                    "school": org or assignee,
+                })
+        except Exception as e:
+            print(f"UNC PatentsView error ({assignee}): {e}")
+    return results
+
+
 def fetch_patents(company_name: str) -> dict:
     """IP portfolio summary for a company. Never raises.
 

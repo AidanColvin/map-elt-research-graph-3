@@ -19,8 +19,10 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
 from aria_pi.clients.web_search_client import WebSearchClient
-from aria_pi.clients.nih_reporter_client import NIHReporterClient, unc_pis_from_grants
-from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
+from aria_pi.clients.nih_reporter_client import NIHReporterClient, unc_pis_from_grants, fetch_unc_faculty_leads
+from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient, fetch_unc_sponsored_trials
+from aria_pi.clients.patents import fetch_unc_patents
+from aria_pi.clients.relationship_detector import fetch_relationship_signals
 from aria_pi.sectors import seeds_for
 from aria_pi.utils.name_resolver import normalize_company_name
 
@@ -242,6 +244,13 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     ecosystem = results.get("ecosystem") or []
     nih = results.get("nih_grants") or {"grants": [], "pis": []}
     trials = results.get("trials") or {"all_count": 0, "unc_trials": []}
+    unc_faculty_leads = fetch_unc_faculty_leads(company_name)
+    unc_patents = fetch_unc_patents(company_name)
+    unc_joint_trials = fetch_unc_sponsored_trials(target)
+    relationship_signals = fetch_relationship_signals(
+        company_name, financial, coi, trials["unc_trials"]
+    )
+
     return {
         "query": company_name,
         "resolved_name": target,
@@ -256,6 +265,10 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
         "nih_pis": nih["pis"],
         "trials": trials["unc_trials"],
         "trials_total": trials["all_count"],
+        "unc_faculty_leads": unc_faculty_leads,
+        "unc_patents": unc_patents,
+        "unc_joint_trials": unc_joint_trials,
+        "relationship_signals": relationship_signals,
         "mention_count": clinical["count"] + coi["count"] + len(financial["quotes"]) + len(ecosystem),
     }
 
