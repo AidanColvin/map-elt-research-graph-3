@@ -143,6 +143,9 @@ async def run_pipeline(req: PipelineRequest):
 
         # 3. Source-blocklist validation
         report["_validation"] = _validate_report_sources(report, tagger)
+
+        # 3b. Condensed 18–22 page brief (Markdown) alongside the full report.
+        report["condensed_report_markdown"] = builder.build_condensed_report(report, company_data)
         report["_meta"] = {
             "mode": "free",
             "seed_companies": seeds[:10],
@@ -252,6 +255,8 @@ async def run_pipeline_stream(req: PipelineRequest):
 
             yield _sse({"type": "stage", "key": "verifying"})
             report["_validation"] = _validate_report_sources(report, tagger)
+            report["condensed_report_markdown"] = builder.build_condensed_report(
+                report, company_data)
             report["_meta"] = {
                 "mode": "free",
                 "seed_companies": seeds,

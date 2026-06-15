@@ -6,7 +6,7 @@ import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { useDeepDive } from "./useDeepDive";
 import { useSectorScan } from "./useSectorScan";
 import { buildPartnershipMarkdown, type PartnerData } from "./PartnershipsView";
-import { sectorProfileToAccountRow, type UNCSignals } from "@/lib/sector-package";
+import { mergeCompaniesIntoDB, validateIncomingCompany } from "@/lib/dedup";
 import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
 import type { AccountProfile } from "./accountProfile";
 import {
@@ -23,9 +23,6 @@ import { getFirebaseAuth } from "@/lib/firebase";
 import { authFetch } from "@/lib/authFetch";
 import { CanvasCard, FONT } from "./ui";
 
-const EMPTY_SIGNALS: UNCSignals = {
-  paperCount: 0, secMentions: 0, nihGrants: 0, uncTrials: 0, topSchools: [], isPartner: false,
-};
 const BUNDLE_TICKER = "project-bundle";
 
 // takes: nothing
@@ -182,14 +179,20 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   useEffect(() => { if (runStatus === "running" && liveDone) setRunStatus("done"); }, [runStatus, liveDone]);
 
   // ── Database rows derived from the sector scan ─────────────────────────
+  // Every company from the run is validated (legal name + identifier + citable
+  // source, revenue coerced to a number or blank) and then de-duplicated
+  // against the existing Database before it can reach onNewRows — invalid and
+  // duplicate companies are dropped, never shown.
   const dbRows = useMemo<AccountProfile[]>(() => {
     if (!sectorData) return [];
     const date = new Date().toISOString().split("T")[0];
-    const rows = (sectorData.section4_profiles || []).map((p) =>
-      sectorProfileToAccountRow(p, sectorData.report_meta?.sector || subject, EMPTY_SIGNALS, date),
-    );
-    const existing = new Set(ACCOUNTS.map((a) => a.account.toLowerCase().trim()));
-    return rows.filter((r) => r.account && !existing.has(r.account.toLowerCase().trim()));
+    const sector = sectorData.report_meta?.sector || subject;
+    const validated = (sectorData.section4_profiles || [])
+      .map((p) => validateIncomingCompany(p, sector, date))
+      .filter((r): r is AccountProfile => r !== null);
+    const merged = mergeCompaniesIntoDB(ACCOUNTS, validated);
+    // The additions are everything mergeCompaniesIntoDB appended past ACCOUNTS.
+    return merged.slice(ACCOUNTS.length);
   }, [sectorData, subject]);
 
   useEffect(() => { if (dbRows.length && onNewRows) onNewRows(dbRows); }, [dbRows, onNewRows]);
@@ -296,10 +299,20 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
         { label: "Markdown", fn: () => downloadMarkdownText(uncMd, `${subjTitle} — UNC Profile`) },
       ]
     : [];
+  // The backend attaches the condensed 18–22 page brief as an extra field on
+  // the report payload; it rides along on sectorData untouched by the renderer.
+  const condensedMd = (sectorData as { condensed_report_markdown?: string } | null)
+    ?.condensed_report_markdown || "";
   const sectorActions = sectorData
     ? [
-        { label: "PDF", fn: () => downloadPdf(sectorData) },
-        { label: "DOCX", fn: () => downloadDocx(sectorData) },
+        { label: "Full Report (PDF)", fn: () => downloadPdf(sectorData) },
+        { label: "Full Report (DOCX)", fn: () => downloadDocx(sectorData) },
+        ...(condensedMd
+          ? [
+              { label: "Brief (PDF)", fn: () => downloadMarkdownPdf(condensedMd, `${subjTitle} — Brief`) },
+              { label: "Brief (DOCX)", fn: () => downloadMarkdownDocx(condensedMd, `${subjTitle} — Brief`) },
+            ]
+          : []),
         { label: "Excel", fn: () => downloadExcel(sectorData) },
       ]
     : [];

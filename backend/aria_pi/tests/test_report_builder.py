@@ -281,3 +281,60 @@ def test_profile_includes_phase_summary_and_unc_site_fields():
     assert profile["financial_flag"] is None
     assert "Active UNC Trial Site" in profile["overview"]["text"]
     assert "**Pipeline:**" in profile["overview"]["text"]
+
+
+# ── Condensed brief ──────────────────────────────────────────────────────────
+
+def test_build_condensed_report_structure(company_fixture):
+    """
+    Takes: A realistic single-company dataset.
+    Does: Builds the full report, then the condensed brief from it.
+    Returns: A Markdown string with the cover, priority matrix, profiles, UNC
+             section, OSP flag (active NIH grant), and references present.
+    """
+    builder = ReportBuilder()
+    report = builder.build("biotech", {"sector": "biotech",
+                                       "companies": [company_fixture]})
+    md = builder.build_condensed_report(report, [company_fixture])
+    assert isinstance(md, str) and md.strip()
+    assert "# biotech Partnership Intelligence" in md
+    assert "## Priority Targets" in md
+    assert "## Sector Overview" in md
+    assert "## UNC Research Capacity" in md
+    assert "## References" in md
+    # Moderna has an active NIH grant → it must be flagged for OSP review.
+    assert "research.unc.edu/osp" in md
+    # Top-of-matrix signal is the strongest one (NIH grant present).
+    assert "NIH grant" in md
+    # FY2023 revenue $6.7B is below $10B → Translational tier.
+    assert "Translational" in md
+
+
+def test_build_condensed_report_never_raises_on_empty():
+    """
+    Takes: Empty sector data.
+    Does: Builds the condensed brief.
+    Returns: A safe, non-empty Markdown stub (never raises).
+    """
+    builder = ReportBuilder()
+    md = builder.build_condensed_report({}, [])
+    assert isinstance(md, str) and md.strip()
+
+
+def test_build_condensed_report_strategic_tier():
+    """
+    Takes: A company with revenue above $10B.
+    Does: Builds the condensed brief.
+    Returns: A brief marking the company Strategic.
+    """
+    builder = ReportBuilder()
+    big = {
+        "name": "BigPharma", "facts": {"legal_name": "BigPharma Inc", "cik": "9",
+            "xbrl": {"revenue": {"value": 40_000_000_000, "fy": 2024}}},
+        "trials": [], "unc_trials": [], "pubmed": [], "pubmed_coi": [],
+        "nih_grants": [], "unc_alumni": [],
+    }
+    md = builder.build_condensed_report(
+        {"report_meta": {"sector": "pharma", "date": "06/15/2026"},
+         "section4_profiles": [], "references": []}, [big])
+    assert "Strategic" in md

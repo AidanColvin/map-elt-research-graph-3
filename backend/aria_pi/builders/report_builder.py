@@ -84,6 +84,343 @@ class ReportBuilder:
         report["section7_verification"] = self._section7(report)
         return report
 
+    # ── Condensed brief (18–22 pages) ───────────────────────────────────────
+    def build_condensed_report(self, sector_data: dict, unc_data=None) -> str:
+        """Build a condensed, page-budgeted Markdown brief (~18–22 pages).
+
+        Returns a Markdown string covering a cover page, a one-table priority
+        matrix, a 2-page sector overview, one-page profiles for the top 10
+        companies (ranked by signal strength), a UNC partnership section, and a
+        trimmed references list.
+
+        Args:
+          sector_data: the assembled report dict from build().
+          unc_data:    the raw per-company data list (each item with
+                       nih_grants/pubmed/trials/facts) — carries the UNC signal
+                       counts used for ranking and the priority matrix. Falls
+                       back to the report's profiles when absent.
+
+        Never raises — any failure yields a short, valid Markdown stub so the
+        pipeline response is always well-formed.
+        """
+        try:
+            return self._build_condensed(sector_data or {}, unc_data or [])
+        except Exception as e:  # pragma: no cover - defensive: never crash the pipeline
+            print(f"build_condensed_report failed: {e}")
+            meta = (sector_data or {}).get("report_meta", {}) or {}
+            sector = meta.get("sector", "Sector")
+            return (f"# {sector} Partnership Intelligence\n\n"
+                    "_Condensed brief could not be assembled from the available "
+                    "data. See the full report for complete coverage._\n")
+
+    def _build_condensed(self, report: dict, companies: list) -> str:
+        meta = report.get("report_meta", {}) or {}
+        sector = meta.get("sector", "Sector")
+        date = meta.get("date", datetime.now().strftime("%m/%d/%Y"))
+        s1 = report.get("section1_overview", {}) or {}
+        s5 = report.get("section5_value_prop", {}) or {}
+        profiles = report.get("section4_profiles", []) or []
+
+        # If raw company data wasn't supplied, derive a thin stand-in from the
+        # report profiles so the brief still renders (with fewer signals).
+        companies = list(companies or []) or [self._profile_to_company_stub(p) for p in profiles]
+
+        # Rank by signal strength: NIH grants, then PubMed, then trials.
+        ranked = sorted(companies, key=_signal_rank, reverse=True)
+        top10 = ranked[:10]
+
+        # Verification tallies for the cover page.
+        v = report.get("_validation", {}) or {}
+        verified, total_claims = v.get("verified", 0), v.get("total_claims", 0)
+        unc_ties = sum(1 for c in companies if _has_unc_tie(c))
+        osp_companies = [_cname(c) for c in companies if _active_nih(c)]
+
+        out: List[str] = []
+
+        # ── PAGE 1: COVER ──
+        out.append(f"# {sector} Partnership Intelligence")
+        out.append("")
+        out.append("Prepared for: UNC Office of Technology Commercialization")
+        out.append(f"Date: {date}")
+        out.append(f"Companies reviewed: {len(companies)} | "
+                   f"UNC ties documented: {unc_ties} | "
+                   f"Claims double-sourced: {verified}/{total_claims}")
+        out.append("")
+        out.append("---")
+        out.append("")
+
+        # ── PAGE 2: PRIORITY MATRIX ──
+        out.append("## Priority Targets")
+        out.append("")
+        out.append("| Company | Tier | Strongest Signal | UNC Contact | First Move |")
+        out.append("|---|---|---|---|---|")
+        for c in ranked:
+            out.append("| " + " | ".join([
+                _md(_cname(c)), _tier(c), _strongest_signal(c),
+                _unc_contact(c), _first_move(c),
+            ]) + " |")
+        out.append("")
+        if osp_companies:
+            out.append(f"⚠ Verify before outreach: {', '.join(osp_companies)} — "
+                       "contact research.unc.edu/osp")
+            out.append("")
+        out.append("---")
+        out.append("")
+
+        # ── PAGES 3–4: SECTOR OVERVIEW ──
+        out.append("## Sector Overview")
+        out.append("")
+        definition = (s1.get("definition", {}) or {}).get("text", "")
+        if definition:
+            out.append(_first_sentences(definition, 2))
+            out.append("")
+        why_now = s1.get("why_now", []) or []
+        if why_now:
+            out.append("**Why now**")
+            for w in why_now[:2]:
+                out.append(f"- {_first_sentences(w.get('signal', ''), 1)}")
+            out.append("")
+        nc = (s1.get("nc_context", {}) or {}).get("text", "")
+        if nc:
+            out.append(f"**NC context.** {_first_sentences(nc, 3)}")
+            out.append("")
+        units = s1.get("unc_units", []) or []
+        if units:
+            out.append("**UNC units active**")
+            out.append("")
+            out.append("| Unit | Focus |")
+            out.append("|---|---|")
+            for u in units[:4]:
+                out.append(f"| {_md(u.get('unit', ''))} | {_md(u.get('focus', ''))} |")
+            out.append("")
+        # Revenue + R&D bar charts (top 10), using the export's ```chart``` block.
+        rev_chart = _bar_chart("Revenue by company ($B, top 10)", top10, "revenue")
+        rd_chart = _bar_chart("R&D expense by company ($B, top 10)", top10, "rd_expense")
+        if rev_chart:
+            out.append(rev_chart)
+            out.append("")
+        if rd_chart:
+            out.append(rd_chart)
+            out.append("")
+        out.append("---")
+        out.append("")
+
+        # ── PAGES 5–14: COMPANY PROFILES (top 10, one page each) ──
+        for c in top10:
+            out.extend(self._condensed_profile(c))
+            out.append("")
+            out.append("---")
+            out.append("")
+
+        # ── PAGES 15–18: UNC PARTNERSHIP SECTION ──
+        out.extend(self._condensed_unc_section(top10, s5))
+        out.append("---")
+        out.append("")
+
+        # ── PAGES 19–20: REFERENCES ──
+        out.append("## References")
+        out.append("")
+        refs = report.get("references", []) or []
+        for i, r in enumerate(refs[:30], start=1):
+            src = r.get("publisher", "Source")
+            url = r.get("url", "")
+            if not url:
+                continue
+            out.append(f"[{i}] {src}. Accessed {date}. {url}")
+        out.append("")
+
+        return "\n".join(out).strip() + "\n"
+
+    def _condensed_profile(self, c: dict) -> List[str]:
+        facts = c.get("facts", {}) or {}
+        xbrl = facts.get("xbrl") or {}
+        name = _cname(c)
+        ticker = ",".join(str(t) for t in (facts.get("tickers") or []) if t) or "—"
+        tie = "Yes" if _has_unc_tie(c) else "No"
+        legal = facts.get("legal_name", name)
+        sic = facts.get("sic", "") or "—"
+        hq = _fmt_hq(facts.get("hq", "")) if facts.get("hq") else "—"
+        rev = (xbrl.get("revenue") or {})
+        rd = (xbrl.get("rd_expense") or {})
+        net = (xbrl.get("net_income") or {})
+        rev_s = f"{_fmt_usd(rev.get('value'))}" if rev.get("value") else "—"
+        rev_fy = rev.get("fy", "")
+        rd_s = f"{_fmt_usd(rd.get('value'))}" if rd.get("value") else "—"
+
+        rows: List[str] = []
+        rows.append(f"## {name} | {ticker} | {_tier(c)} | UNC Tie: {tie}")
+        rows.append("")
+        rows.append(f"**{legal} · {sic} · HQ: {hq} · FY{rev_fy} revenue: {rev_s} · R&D: {rd_s}**")
+        rows.append("")
+
+        # Facts table
+        _, _, top_term, top_term_n = _partnership_language(c.get("tenk_text") or "")
+        collab = c.get("collab_8ks") or {}
+        deal = (f"{collab.get('most_recent_8k_date')}" if collab.get("most_recent_8k_date")
+                else "No collaboration filing found (2018–present)")
+        latest_8k = next((f.get("date") for f in (facts.get("recent_filings") or [])
+                          if f.get("form") == "8-K"), "—")
+        rows.append("| Field | Value |")
+        rows.append("|---|---|")
+        rows.append(f"| CIK | {_md(str(facts.get('cik') or '—'))} |")
+        rows.append(f"| Net income | {net.get('value') and _fmt_usd(net['value']) or '—'} |")
+        if top_term:
+            rows.append(f'| Partnership language | "{top_term}" appears {top_term_n} times in 10-K |')
+        else:
+            rows.append("| Partnership language | Not detected in 10-K |")
+        rows.append(f"| Deal track | {_md(deal)} |")
+        rows.append(f"| Latest 8-K | {_md(str(latest_8k))} |")
+        rows.append("")
+
+        # UNC Contacts
+        rows.append("**UNC Contacts**")
+        rows.append("")
+        grants = c.get("nih_grants") or []
+        papers = c.get("pubmed") or []
+        if grants:
+            for g in grants[:3]:
+                dept = g.get("department") or g.get("organization") or "UNC Chapel Hill"
+                title = _truncate(g.get("title", ""), 80)
+                rows.append(f"- {g.get('pi', 'UNC PI')}, {dept} — "
+                            f"{g.get('project_num', '')}, FY{g.get('fiscal_year', '')}: {title}")
+        elif papers:
+            for p in papers[:3]:
+                authors = p.get("authors") or []
+                surname = (authors[0].split()[-1] if authors and authors[0] else "UNC author")
+                rows.append(f"- {surname} — co-authored: "
+                            f"{_truncate(p.get('title', ''), 80)} ({p.get('year', 'n.d.')})")
+        else:
+            rows.append("No documented UNC connection. Recommend cold outreach.")
+        rows.append("")
+
+        # Active Pipeline — only recruiting/active trials started within 5 years.
+        active_trials = [t for t in (c.get("trials") or []) if _trial_active(t)]
+        if active_trials:
+            rows.append("**Active Pipeline**")
+            rows.append("")
+            for t in active_trials[:2]:
+                rows.append(f"- {t.get('nct_id', '')}: {_truncate(t.get('title', ''), 60)} "
+                            f"({t.get('status', '')})")
+            rows.append("")
+
+        # OSP Flag — only if active NIH grant.
+        if _active_nih(c):
+            rows.append("**OSP Flag**")
+            rows.append("")
+            rows.append("⚠ Active NIH grant detected — verify with UNC OSP before "
+                        "outreach: research.unc.edu/osp")
+            rows.append("")
+        return rows
+
+    def _condensed_unc_section(self, top10: List[dict], s5: dict) -> List[str]:
+        out: List[str] = []
+        out.append("## UNC Research Capacity")
+        out.append("")
+
+        # Faculty contacts (from NIH grants), sorted by fiscal year desc, max 15.
+        out.append("### Faculty Contacts with Verified Sector Relevance")
+        out.append("")
+        out.append("| PI Name | Department | Grant # | Title | FY | Award |")
+        out.append("|---|---|---|---|---|---|")
+        faculty: List[dict] = []
+        for c in top10:
+            for g in c.get("nih_grants") or []:
+                if g.get("pi"):
+                    faculty.append(g)
+        faculty.sort(key=lambda g: str(g.get("fiscal_year", "")), reverse=True)
+        for g in faculty[:15]:
+            dept = g.get("department") or g.get("organization") or "UNC Chapel Hill"
+            out.append("| " + " | ".join([
+                _md(g.get("pi", "")), _md(dept), _md(g.get("project_num", "")),
+                _md(_truncate(g.get("title", ""), 80)), _md(str(g.get("fiscal_year", ""))),
+                _md(str(g.get("award_amount", "") or "—")),
+            ]) + " |")
+        if not faculty:
+            out.append("| — | — | — | No verified NIH-funded UNC faculty in this set | — | — |")
+        out.append("")
+
+        # UNC-sponsored trials: joint first (⭐), max 10.
+        out.append("### UNC-Sponsored Clinical Trials in This Sector")
+        out.append("")
+        out.append("| NCT ID | Title | PI | Status |")
+        out.append("|---|---|---|---|")
+        unc_trials: List[tuple] = []
+        for c in top10:
+            for t in c.get("unc_trials") or []:
+                joint = bool(t.get("is_joint"))
+                unc_trials.append((joint, t))
+        unc_trials.sort(key=lambda x: x[0], reverse=True)
+        if unc_trials:
+            for joint, t in unc_trials[:10]:
+                star = "⭐ " if joint else ""
+                out.append("| " + " | ".join([
+                    _md(t.get("nct_id", "")), _md(star + _truncate(t.get("title", ""), 80)),
+                    _md(t.get("pi", "") or "—"), _md(t.get("status", "") or "—"),
+                ]) + " |")
+        else:
+            out.append("| — | No UNC-sponsored trials found in this sector | — | — |")
+        out.append("")
+
+        # UNC patent portfolio — the report doesn't carry IPC-level patent rows,
+        # so we state that plainly rather than fabricate.
+        out.append("### UNC Patent Portfolio")
+        out.append("")
+        out.append("No UNC patents found in this sector's IPC classes.")
+        out.append("")
+
+        # Fixed data-assets table.
+        out.append("### UNC Data Assets Available to Partners")
+        out.append("")
+        out.append("| Asset | Held By |")
+        out.append("|---|---|")
+        for asset, holder in [
+            ("Carolina Data Warehouse for Health (CDWH)", "NC TraCS / UNC Health"),
+            ("NC AHEC Network Data", "NC AHEC Program"),
+            ("UNC Lineberger Cancer Registry", "UNC Lineberger"),
+            ("UNC Biospecimen Processing Facility", "UNC School of Medicine"),
+            ("UNC Sheps Center Rural Health Data", "Cecil G. Sheps Center"),
+        ]:
+            out.append(f"| {asset} | {holder} |")
+        out.append("")
+
+        # Fixed partnership-models table.
+        out.append("### Partnership Models")
+        out.append("")
+        out.append("| Model | UNC Unit |")
+        out.append("|---|---|")
+        for model, unit in [
+            ("Sponsored Research Agreement", "UNC Office of Sponsored Research"),
+            ("License / IP Commercialization", "UNC Office of Technology Commercialization"),
+            ("Data Access Agreement", "NC TraCS Institute"),
+            ("Clinical Research Collaboration", "UNC Health / NC TraCS"),
+        ]:
+            out.append(f"| {model} | {unit} |")
+        out.append("")
+        return out
+
+    @staticmethod
+    def _profile_to_company_stub(p: dict) -> dict:
+        """Build a minimal raw-company-shaped dict from a report profile.
+
+        Used only when build_condensed_report is called without the raw company
+        data — keeps the brief renderable from the report alone.
+        """
+        facts = p.get("facts", {}) or {}
+        # Report facts are a {key:{value,source}} table; lift values back out.
+        def fval(k):
+            cell = facts.get(k)
+            return cell.get("value") if isinstance(cell, dict) else None
+        return {
+            "name": p.get("company_name", ""),
+            "facts": {"legal_name": p.get("company_name", ""),
+                      "sic": p.get("sector_tag", ""), "cik": fval("cik")},
+            "trials": [{"title": r.get("program", ""), "status": "", "url": ""}
+                       for r in (p.get("pipeline") or [])],
+            "unc_trials": [], "pubmed": [], "nih_grants": [],
+            "_existing_unc_tie": bool(p.get("existing_unc_tie")),
+            "_partnership_type": p.get("partnership_type", ""),
+        }
+
     # ── Section helpers ─────────────────────────────────────────────────────
     def _sector_ctx(self, sector: str) -> dict:
         # Normalize via canonical_sector first so "banking" -> "finance", etc.
@@ -815,6 +1152,121 @@ class ReportBuilder:
                     g.get("url", ""), "NIH Reporter",
                     str(g.get("fiscal_year", "")))
         return refs[:30]
+
+
+# ── Condensed-brief helpers ─────────────────────────────────────────────────
+
+def _cname(c: dict) -> str:
+    return c.get("name") or (c.get("facts", {}) or {}).get("legal_name") or "Unknown"
+
+
+def _signal_rank(c: dict) -> tuple:
+    """Rank key: NIH grants, then PubMed hits, then trials — all descending."""
+    return (len(c.get("nih_grants") or []),
+            len(c.get("pubmed") or []),
+            len(c.get("trials") or []))
+
+
+def _company_revenue(c: dict):
+    return (((c.get("facts") or {}).get("xbrl") or {}).get("revenue") or {}).get("value")
+
+
+def _tier(c: dict) -> str:
+    """Strategic if latest revenue exceeds $10B, else Translational."""
+    rev = _company_revenue(c)
+    try:
+        return "Strategic" if rev and float(rev) > 10e9 else "Translational"
+    except (TypeError, ValueError):
+        return "Translational"
+
+
+def _strongest_signal(c: dict) -> str:
+    if c.get("nih_grants"):
+        return "NIH grant"
+    if c.get("pubmed"):
+        return "PubMed co-auth"
+    if c.get("trials"):
+        return "Clinical trial"
+    return "Sector match"
+
+
+def _active_nih(c: dict) -> bool:
+    return any(str(g.get("fiscal_year", "")) for g in (c.get("nih_grants") or []))
+
+
+def _has_unc_tie(c: dict) -> bool:
+    if c.get("_existing_unc_tie"):
+        return True
+    return bool(c.get("nih_grants") or c.get("pubmed") or c.get("unc_trials"))
+
+
+def _unc_contact(c: dict) -> str:
+    grants = c.get("nih_grants") or []
+    if grants:
+        g = grants[0]
+        return f"{g.get('pi', 'UNC PI')} ({g.get('project_num', '')})"
+    papers = c.get("pubmed") or []
+    if papers:
+        authors = papers[0].get("authors") or []
+        surname = authors[0].split()[-1] if authors and authors[0] else "UNC author"
+        return f"{surname} (PubMed)"
+    return "—"
+
+
+def _first_move(c: dict) -> str:
+    if c.get("nih_grants"):
+        return "Email PI re: active grant"
+    if c.get("pubmed"):
+        return "Reference co-authored paper"
+    return "Cold outreach — no tie found"
+
+
+def _trial_active(t: dict) -> bool:
+    status = (t.get("status") or "").lower()
+    if "recruit" not in status and "active" not in status:
+        return False
+    # Within 5 years of the brief's generation year, when a start year is known.
+    start = str(t.get("start_date") or t.get("start") or "")
+    year = next((int(tok) for tok in [start[:4]] if tok.isdigit()), None)
+    if year is None:
+        return True  # status qualifies; no date to disqualify it
+    return year >= datetime.now().year - 5
+
+
+def _md(s) -> str:
+    """Escape a value for safe inclusion in a Markdown table cell."""
+    return str(s if s is not None else "").replace("|", "\\|").replace("\n", " ").strip()
+
+
+def _truncate(s: str, n: int) -> str:
+    s = (s or "").strip()
+    return s if len(s) <= n else s[: n - 1].rstrip() + "…"
+
+
+def _first_sentences(text: str, n: int) -> str:
+    """Return the first `n` sentences of text (best-effort, period-delimited)."""
+    parts = [p.strip() for p in (text or "").replace("\n", " ").split(". ") if p.strip()]
+    if not parts:
+        return ""
+    out = ". ".join(parts[:n]).strip()
+    return out if out.endswith(".") else out + "."
+
+
+def _bar_chart(title: str, companies: List[dict], xbrl_key: str) -> str:
+    """Emit a ```chart``` bar-chart block (values in $B) the exporter renders.
+
+    Returns "" when no company in the set has a value for `xbrl_key`.
+    """
+    xs, vals = [], []
+    for c in companies:
+        v = (((c.get("facts") or {}).get("xbrl") or {}).get(xbrl_key) or {}).get("value")
+        if v:
+            xs.append(_cname(c))
+            vals.append(round(float(v) / 1e9, 2))
+    if not xs:
+        return ""
+    spec = {"type": "bar", "title": title, "x": xs, "series": [{"values": vals}]}
+    return "```chart\n" + json.dumps(spec) + "\n```"
 
 
 def _know_company(facts: dict, rev: dict, edgar_url: str) -> dict:
