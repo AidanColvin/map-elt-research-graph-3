@@ -11,18 +11,17 @@ import { readCurated } from "@/lib/curated";
 import { buildLiveReport } from "@/lib/generate";
 import { buildLeadership } from "@/lib/leadership";
 import type { CuratedMeta } from "@/lib/types";
-import { verifyAuth } from "@/lib/verifyAuth";
+import { verifyAuth, clientKey } from "@/lib/verifyAuth";
 import { checkRateLimit, rateLimitResponse } from "@/lib/rateLimit";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: NextRequest) {
-  let decoded;
-  try { decoded = await verifyAuth(req); }
-  catch (r) { return r as Response; }
-
-  const { allowed, retryAfterSeconds } = checkRateLimit(decoded.uid, 'generate', 10);
+  // Auth is optional — the pipeline is free + keyless. Verify a token when sent,
+  // otherwise proceed anonymously (rate-limited per client IP).
+  const decoded = await verifyAuth(req);
+  const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'generate', 10);
   if (!allowed) return rateLimitResponse(retryAfterSeconds);
 
   const company = req.nextUrl.searchParams.get("company")?.trim() ?? "";

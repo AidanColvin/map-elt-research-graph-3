@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReportData } from "@/components/Report";
 import { friendlyError } from "@/lib/error-copy";
+import { authFetch } from "@/lib/authFetch";
 
 export type SectorScanStatus = "idle" | "running" | "done" | "error";
 
@@ -89,7 +90,7 @@ export function useSectorScan(): SectorScanState {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 300_000);
-      const res = await fetch("/api/run-pipeline-stream", {
+      const res = await authFetch("/api/run-pipeline-stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sector: name }),
@@ -135,7 +136,7 @@ export function useSectorScan(): SectorScanState {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 300_000);
-      const res = await fetch("/api/run-pipeline", {
+      const res = await authFetch("/api/run-pipeline", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sector: name }),
