@@ -276,8 +276,9 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
       const b = JSON.parse(sp.reportMarkdown) as RunBundle;
       setRunStatus("done");
       setSubject(b.subject || "");
-      setMode(b.mode ?? "company");
-      setResolvedMode(b.mode ?? "company");
+      const savedMode = b.mode ?? (b.sectorData ? "sector" : "company");
+      setMode(savedMode);
+      setResolvedMode(b.sectorData ? "sector" : savedMode);
       setCompanyMd(b.companyMd || "");
       setUncMd(b.uncMd || "");
       setUncStatus(b.uncMd ? "done" : "idle");
@@ -496,11 +497,20 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
             {/* Partnership Report — shown first for sector runs so it's the primary output */}
             {resolvedMode === "sector" && cards.length > 0 && (
               <section style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "22px 26px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
-                <div style={{ marginBottom: 4 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
-                  <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
-                    Sector overview then one sourced card per company. Every claim links to a primary public source.
-                  </p>
+                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap", marginBottom: 4 }}>
+                  <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
+                    <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
+                      Sector overview then one sourced card per company. Every claim links to a primary public source.
+                    </p>
+                  </div>
+                  {partnershipReportMd && (
+                    <div style={{ display: "flex", gap: 7, flexShrink: 0 }}>
+                      <button onClick={() => downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "none", background: "#1d1d1f", color: "#fff" }}>↓ PDF</button>
+                      <button onClick={() => downloadMarkdownText(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ Markdown</button>
+                      <button onClick={() => downloadMarkdownDocx(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ DOCX</button>
+                    </div>
+                  )}
                 </div>
                 {sectorModel && (
                   <div style={{ borderTop: "1px solid #ececf0", marginTop: 14, paddingTop: 22 }}>
