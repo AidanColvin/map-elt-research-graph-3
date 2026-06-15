@@ -22,6 +22,20 @@ interface PI { name: string; org: string; project_title: string; grant_url: stri
 // unc_signal is the matched facility/collaborator NAME (a string), or "" — not a
 // boolean. Truthiness, not `=== true`, is the correct UNC-site test.
 interface Trial { nct_id: string; title: string; phase: string; status: string; lead_sponsor: string; collaborators: string[]; unc_signal: string | boolean; url: string; }
+interface ConfirmedInteractions {
+  found: boolean;
+  partner: string;
+  partner_type: string;
+  unc_unit: string;
+  engagement_type: string;
+  relationship_status: string;
+  best_evidence: string;
+  best_source_validity: string;
+  best_source_url: string;
+  best_snippet: string;
+  notes: string;
+}
+
 interface PartnerData {
   query: string;
   resolved_name?: string;
@@ -36,6 +50,7 @@ interface PartnerData {
   nih_pis?: PI[];
   trials?: Trial[];
   trials_total?: number;
+  confirmed_interactions?: ConfirmedInteractions;
 }
 
 // Static UNC partnership assets — copied VERBATIM from the backend
@@ -749,6 +764,92 @@ export default function PartnershipsView({
                 </Card>
               </div>
             </div>
+
+            {/* ── Confirmed UNC Interaction on File ──────────────────────── */}
+            {data.confirmed_interactions?.found && (
+              <div
+                data-testid="card-confirmed-interaction"
+                style={{
+                  background: "#f0fdf4",
+                  border: "1px solid #6ee7b7",
+                  borderLeft: "4px solid #047857",
+                  borderRadius: 18,
+                  padding: 22,
+                  boxShadow: "0 8px 30px rgba(0,0,0,0.04)",
+                  marginBottom: 8,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#047857", margin: 0 }}>
+                      Confirmed UNC Interaction on File
+                    </p>
+                    <p style={{ fontSize: 13, color: "#065f46", margin: "4px 0 0" }}>
+                      Manually verified by the UNC Innovate Carolina partnerships team
+                    </p>
+                  </div>
+                  <span
+                    data-testid="confirmed-badge"
+                    style={{
+                      fontSize: 11.5, fontWeight: 600, letterSpacing: "0.04em", whiteSpace: "nowrap",
+                      background: "#dcfce7", color: "#047857", border: "1px solid #6ee7b7",
+                      borderRadius: 999, padding: "4px 12px",
+                    }}
+                  >
+                    ● {data.confirmed_interactions.relationship_status || "Confirmed"}
+                  </span>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))", gap: "12px 24px", margin: "18px 0 0" }}>
+                  {data.confirmed_interactions.unc_unit && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b7280", margin: 0 }}>UNC Unit</p>
+                      <p style={{ fontSize: 13.5, fontWeight: 500, margin: "3px 0 0" }}>{data.confirmed_interactions.unc_unit}</p>
+                    </div>
+                  )}
+                  {data.confirmed_interactions.engagement_type && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b7280", margin: 0 }}>Engagement Type</p>
+                      <p style={{ fontSize: 13.5, fontWeight: 500, margin: "3px 0 0" }}>{data.confirmed_interactions.engagement_type}</p>
+                    </div>
+                  )}
+                  {data.confirmed_interactions.partner_type && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b7280", margin: 0 }}>Partner Type</p>
+                      <p style={{ fontSize: 13.5, fontWeight: 500, margin: "3px 0 0" }}>{data.confirmed_interactions.partner_type}</p>
+                    </div>
+                  )}
+                  {data.confirmed_interactions.best_evidence && (
+                    <div>
+                      <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "#6b7280", margin: 0 }}>Evidence Level</p>
+                      <p style={{ fontSize: 13.5, fontWeight: 500, margin: "3px 0 0" }}>{data.confirmed_interactions.best_evidence}</p>
+                    </div>
+                  )}
+                </div>
+
+                {data.confirmed_interactions.best_snippet && (
+                  <blockquote style={{ margin: "16px 0 0", padding: "12px 16px", background: "#fff", borderLeft: "3px solid #6ee7b7", borderRadius: "0 8px 8px 0", fontSize: 13, color: "#374151", lineHeight: 1.55, fontStyle: "italic" }}>
+                    &ldquo;{data.confirmed_interactions.best_snippet}&rdquo;
+                  </blockquote>
+                )}
+
+                {data.confirmed_interactions.best_source_url && (
+                  <div style={{ marginTop: 14 }}>
+                    <a
+                      href={data.confirmed_interactions.best_source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ fontSize: 12.5, fontWeight: 500, color: "#047857", textDecoration: "none", background: "#fff", border: "1px solid #6ee7b7", borderRadius: 999, padding: "6px 14px", display: "inline-block" }}
+                    >
+                      View source →
+                    </a>
+                    <span style={{ fontSize: 11.5, color: "#9a9aa2", marginLeft: 10 }}>
+                      {data.confirmed_interactions.best_source_validity || "External source"}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* ── Section D — Why UNC is a fit (always shown) ─────────────── */}
             <div ref={whyRef} style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)", marginTop: 8 }}>
