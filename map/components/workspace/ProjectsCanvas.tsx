@@ -492,6 +492,32 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
           <p style={{ fontSize: 13.5, color: "#9a9aa2" }}>Type a subject and run the pipeline, or open a saved run above.</p>
         ) : (
           <div data-testid="pipeline-results" style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+
+            {/* Partnership Report — shown first for sector runs so it's the primary output */}
+            {resolvedMode === "sector" && cards.length > 0 && (
+              <section style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "22px 26px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+                <div style={{ marginBottom: 4 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
+                  <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
+                    Sector overview then one sourced card per company. Every claim links to a primary public source.
+                  </p>
+                </div>
+                {sectorModel && (
+                  <div style={{ borderTop: "1px solid #ececf0", marginTop: 14, paddingTop: 22 }}>
+                    <SectorReportHeader m={sectorModel} />
+                  </div>
+                )}
+                {cards.map((c, i) => (
+                  <CompanyReportCard
+                    key={`${c.name}-${i}`}
+                    data={c}
+                    onDownloadPDF={() => downloadMarkdownPdf(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
+                    onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
+                  />
+                ))}
+              </section>
+            )}
+
             <Panel
               title="Company Profile"
               note={resolvedMode === "company" && (dive.status === "streaming" || (runStatus === "running" && !companyMd)) ? "Generating…" : undefined}
@@ -549,30 +575,6 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
                   )}
             </Panel>
 
-            {/* Per-company partnership report cards (sector runs) */}
-            {resolvedMode === "sector" && cards.length > 0 && (
-              <section style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "22px 26px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
-                <div style={{ marginBottom: 4 }}>
-                  <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
-                  <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
-                    Condensed sector overview, then one sourced card per company. Every claim links to a primary public source. Download the full report above.
-                  </p>
-                </div>
-                {sectorModel && (
-                  <div style={{ borderTop: "1px solid #ececf0", marginTop: 14, paddingTop: 22 }}>
-                    <SectorReportHeader m={sectorModel} />
-                  </div>
-                )}
-                {cards.map((c, i) => (
-                  <CompanyReportCard
-                    key={`${c.name}-${i}`}
-                    data={c}
-                    onDownloadPDF={() => downloadMarkdownPdf(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
-                    onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
-                  />
-                ))}
-              </section>
-            )}
           </div>
         )}
       </div>
