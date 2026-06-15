@@ -13,6 +13,7 @@ interface SnapshotData {
   financial?: { quotes?: unknown[] };
   unc_units?: { unit: string; count: number }[];
   links?: { pubmed?: string; edgar?: string; unc_web?: string };
+  confirmed_interactions?: { found: boolean; engagement_type?: string };
 }
 
 // takes: a count and a label
@@ -120,6 +121,18 @@ export default function UNCReportSnapshot({ company }: { company: string }) {
         >
           {depth.label}
         </span>
+        {data.confirmed_interactions?.found && (
+          <span
+            data-testid="report-confirmed-badge"
+            style={{
+              fontSize: 11.5, fontWeight: 600, letterSpacing: "0.04em", whiteSpace: "nowrap",
+              background: "#dcfce7", color: "#047857", border: "1px solid #6ee7b7",
+              borderRadius: 999, padding: "4px 12px", marginLeft: 8,
+            }}
+          >
+            ✓ Confirmed Partner
+          </span>
+        )}
       </div>
 
       <div style={{ display: "flex", flexWrap: "wrap", gap: 28, margin: "18px 0 0" }}>
