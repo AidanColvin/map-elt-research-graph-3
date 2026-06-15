@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import InteractiveAccountsTable from "./InteractiveAccountsTable";
-import { ACCOUNTS } from "./accountsData";
+import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
 import type { AccountProfile } from "./accountProfile";
 import {
   downloadAccountsExcel,
@@ -16,8 +16,11 @@ import { CanvasCard } from "./ui";
 //       interactive table (live search, type filters, sortable columns, CSV +
 //       Excel / PDF / Markdown exports of the currently filtered set)
 // returns: the database canvas card element
-export default function AccountsCanvas() {
+export default function AccountsCanvas({ extraRows = [] }: { extraRows?: AccountProfile[] }) {
   const [busy, setBusy] = useState<string | null>(null);
+  // Merge any session-added rows (e.g. from a sector Package) ahead of render,
+  // deduped by company name against the static Database.
+  const allAccounts = getUniqueAccounts(ACCOUNTS, extraRows);
 
   // takes: a format key, its async export function, and the rows to export
   // does: runs the export once, holding a busy flag so a second click cannot
@@ -36,7 +39,7 @@ export default function AccountsCanvas() {
   return (
     <CanvasCard title="Database">
       <InteractiveAccountsTable
-        accounts={ACCOUNTS}
+        accounts={allAccounts}
         busyExport={busy}
         onExportExcel={(rows) => run("Excel", downloadAccountsExcel, rows)}
         onExportPdf={(rows) => run("PDF", downloadAccountsPdf, rows)}

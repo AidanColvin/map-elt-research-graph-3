@@ -14,7 +14,9 @@ import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { useSavedReports } from "@/components/workspace/useSavedReports";
 import type { SavedReport } from "@/lib/savedReports";
 import type { ReportData } from "@/components/Report";
-import { FONT } from "@/components/workspace/ui";
+import { FONT, cardStyle } from "@/components/workspace/ui";
+import type { AccountProfile } from "@/components/workspace/accountProfile";
+import { getUniqueAccounts } from "@/components/workspace/accountsData";
 
 // Single Apple-style nav bar: the logo, the view tabs, and the Profile button
 // all sit on one horizontal axis (no separate stacked sub-nav).
@@ -202,6 +204,8 @@ export default function MapHome() {
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
   const [partnershipDraft, setPartnershipDraft] = useState("");
+  // Companies added to the Database this session by a sector Package run.
+  const [packageRows, setPackageRows] = useState<AccountProfile[]>([]);
   const dive = useDeepDive();
   const scan = useSectorScan();
   // Per-user saved reports (Firestore for signed-in accounts, device-local for
@@ -334,6 +338,7 @@ export default function MapHome() {
             onSelectCompany={selectCompany}
             activeCompany={dive.company}
             saved={saved}
+            onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))}
           />
         </div>
 
@@ -346,7 +351,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <AccountsCanvas />
+          <AccountsCanvas extraRows={packageRows} />
         </div>
 
         {/* Partnerships is an in-app view (not a route), so switching to it
@@ -360,7 +365,11 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
+          {/* White canvas panel — matches the Company view so the UNC page reads
+              on white, not the grey page background. */}
+          <section style={{ ...cardStyle, padding: "26px 28px 36px" }}>
+            <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
+          </section>
         </div>
 
         <div
