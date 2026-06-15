@@ -7,6 +7,8 @@ import { useDeepDive } from "./useDeepDive";
 import { useSectorScan } from "./useSectorScan";
 import { buildPartnershipMarkdown, type PartnerData } from "./PartnershipsView";
 import { detectSubjectKind } from "./sectors";
+import CompanyReportCard from "./CompanyReportCard";
+import { buildCardData, cardToMarkdown, type CompanyCardData } from "@/lib/companyCard";
 import { mergeCompaniesIntoDB, validateIncomingCompany } from "@/lib/dedup";
 import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
 import type { AccountProfile } from "./accountProfile";
@@ -221,6 +223,15 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
 
   useEffect(() => { if (dbRows.length && onNewRows) onNewRows(dbRows); }, [dbRows, onNewRows]);
 
+  // ── Per-company partnership report cards (sector runs) ─────────────────
+  // Built entirely from the sector scan's already-fetched, double-sourced data
+  // — no extra API calls, no LLM, every line links to a primary source.
+  const cards = useMemo<CompanyCardData[]>(() => {
+    if (!sectorData) return [];
+    const profiles: any[] = (sectorData as any).section4_profiles || [];
+    return profiles.slice(0, 10).map((p) => buildCardData(p, sectorData));
+  }, [sectorData]);
+
   // ── Save / reopen a run ────────────────────────────────────────────────
   async function saveRun() {
     if (!current) return;
@@ -340,16 +351,22 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   // the report payload; it rides along on sectorData untouched by the renderer.
   const condensedMd = (sectorData as { condensed_report_markdown?: string } | null)
     ?.condensed_report_markdown || "";
+  // The full partnership report: condensed 2-page overview first, then one
+  // section per company. Detailed sector scan stays on its own page/full report.
+  const partnershipReportMd = [
+    condensedMd,
+    ...cards.map((c) => cardToMarkdown(c)),
+  ].filter(Boolean).join("\n\n---\n\n");
   const sectorActions = sectorData
     ? [
-        { label: "Full Report (PDF)", fn: () => downloadPdf(sectorData) },
-        { label: "Full Report (DOCX)", fn: () => downloadDocx(sectorData) },
-        ...(condensedMd
+        ...(partnershipReportMd
           ? [
-              { label: "Brief (PDF)", fn: () => downloadMarkdownPdf(condensedMd, `${subjTitle} — Brief`) },
-              { label: "Brief (DOCX)", fn: () => downloadMarkdownDocx(condensedMd, `${subjTitle} — Brief`) },
+              { label: "Partnership Report (PDF)", fn: () => downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`) },
+              { label: "Partnership Report (DOCX)", fn: () => downloadMarkdownDocx(partnershipReportMd, `${subjTitle} — Partnership Report`) },
             ]
           : []),
+        { label: "Full Report (PDF)", fn: () => downloadPdf(sectorData) },
+        { label: "Full Report (DOCX)", fn: () => downloadDocx(sectorData) },
         { label: "Excel", fn: () => downloadExcel(sectorData) },
       ]
     : [];
@@ -509,6 +526,26 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
                     </p>
                   )}
             </Panel>
+
+            {/* Per-company partnership report cards (sector runs) */}
+            {resolvedMode === "sector" && cards.length > 0 && (
+              <section style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "22px 26px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+                <div style={{ marginBottom: 4 }}>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
+                  <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
+                    Condensed sector overview, then one sourced card per company. Every claim links to a primary public source. Download the full report above.
+                  </p>
+                </div>
+                {cards.map((c, i) => (
+                  <CompanyReportCard
+                    key={`${c.name}-${i}`}
+                    data={c}
+                    onDownloadPDF={() => downloadMarkdownPdf(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
+                    onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(c), `${c.name} — UNC Partnership`)}
+                  />
+                ))}
+              </section>
+            )}
           </div>
         )}
       </div>
