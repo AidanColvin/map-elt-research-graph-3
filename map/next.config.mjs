@@ -27,8 +27,13 @@ const nextConfig = {
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
-      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com",
-      "frame-src 'none'",
+      "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseapp.com https://accounts.google.com",
+      // Firebase signInWithPopup loads an invisible auth-relay iframe from the
+      // Firebase authDomain (*.firebaseapp.com) plus Google's account chooser to
+      // deliver the popup result back to the app. 'none' here silently breaks
+      // Google/Microsoft sign-in (popup hangs, then reports "cancelled"), so the
+      // OAuth helper origins must be allowed.
+      "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://apis.google.com",
     ].join("; ");
     return [
       {
