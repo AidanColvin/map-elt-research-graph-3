@@ -115,3 +115,26 @@ class NIHReporterClient:
                 "url": f"https://reporter.nih.gov/project-details/{proj_num}" if proj_num else "https://reporter.nih.gov",
             })
         return grants
+
+
+def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dict]:
+    """UNCFacultyLead list from NIH grants mentioning the company at UNC.
+
+    Maps the existing grant records to the UNCFacultyLead shape expected by
+    the talking-points assembler: pi_name, pi_email, department, grant_number,
+    project_title, fiscal_year, award_amount.
+    """
+    client = NIHReporterClient()
+    grants = client.unc_grants_mentioning(company_name, max_results=max_results)
+    leads = []
+    for g in grants:
+        leads.append({
+            "pi_name": g.get("pi") or "",
+            "pi_email": "",  # NIH Reporter does not expose PI email publicly
+            "department": g.get("department") or "",
+            "grant_number": g.get("project_num") or "",
+            "project_title": g.get("title") or "",
+            "fiscal_year": g.get("fiscal_year") or "",
+            "award_amount": None,  # not returned by this search endpoint
+        })
+    return leads
