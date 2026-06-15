@@ -85,6 +85,7 @@ function GlobalHeader({
   } as const;
   return (
     <header
+      className="ws-header"
       style={{
         position: "fixed",
         top: 0,
@@ -119,6 +120,7 @@ function GlobalHeader({
         >
           <LogoMark />
           <span
+            className="ws-wordmark"
             style={{
               fontSize: 15,
               fontWeight: 600,
@@ -134,6 +136,7 @@ function GlobalHeader({
 
       {/* Center zone — view tabs on the same axis as the logo. */}
       <nav
+        className="ws-nav"
         aria-label="Workspace views"
         style={{
           display: "flex",
@@ -158,6 +161,8 @@ function GlobalHeader({
       <div style={{ ...flank, justifyContent: "flex-end" }}>
         <button
           onClick={onProfile}
+          className="ws-account-btn"
+          aria-label="Account"
           aria-current={view === "account" ? "page" : undefined}
           style={{
             display: "flex", alignItems: "center", gap: 7,
@@ -173,8 +178,9 @@ function GlobalHeader({
             background: view === "account" ? "#007aff" : "#1d1d1f",
             color: "#fff", display: "flex", alignItems: "center",
             justifyContent: "center", fontSize: 12, fontWeight: 600,
+            flexShrink: 0,
           }}>A</span>
-          Account
+          <span className="ws-account-label">Account</span>
         </button>
       </div>
     </header>
@@ -269,7 +275,7 @@ export default function MapHome() {
       {/* All three views stay mounted; toggling display from none re-runs the
           .ws-view opacity/transform entrance without unmounting anything, so
           component state and scroll positions survive every switch. */}
-      <main style={{ padding: `${HEADER_H + 24}px 28px 36px` }}>
+      <main className="ws-main" style={{ padding: `${HEADER_H + 24}px 28px 36px` }}>
         <div
           className="ws-view"
           style={{ display: view === "dashboard" ? "block" : "none" }}

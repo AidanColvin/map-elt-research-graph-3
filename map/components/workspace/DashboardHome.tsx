@@ -41,7 +41,7 @@ export default function DashboardHome({
   }
 
   return (
-    <div style={{
+    <div className="dash-home" style={{
       maxWidth: 720,
       margin: "0 auto",
       padding: "48px 32px 32px",

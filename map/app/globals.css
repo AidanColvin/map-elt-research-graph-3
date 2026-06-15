@@ -1258,6 +1258,36 @@ select.ws-input {
 .db-table tbody tr:hover td {
   background: rgba(0, 122, 255, 0.03);
 }
+/* Sticky first column (Company) so the name stays anchored while the row scrolls
+   horizontally — essential on phones where the 7-column table overflows. */
+.db-table thead th:first-child,
+.db-table tbody td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: #fff;
+}
+.db-table thead th:first-child {
+  z-index: 3;
+  background: rgba(248, 248, 250, 0.98);
+}
+.db-table tbody td:first-child {
+  box-shadow: 1px 0 0 rgba(0, 0, 0, 0.05);
+}
+
+/* ----------------------------- mobile (phones) ----------------------------- */
+/* iPads (>= 768px) keep the full desktop layout; these target phone widths. */
+@media (max-width: 640px) {
+  .ws-header { padding: 0 12px !important; }
+  .ws-wordmark { display: none; }
+  .ws-nav { gap: 2px !important; overflow-x: auto; }
+  .ws-nav-item { padding: 6px 9px !important; font-size: 13px !important; }
+  .ws-account-label { display: none; }
+  .ws-account-btn { padding: 5px !important; }
+  /* Tighten the workspace gutter so cards aren't squeezed. */
+  .ws-main { padding-left: 12px !important; padding-right: 12px !important; }
+  .dash-home { padding: 32px 18px 28px !important; }
+}
 
 /* Inline company autocomplete ghost — mirrors .ws-input metrics exactly so the
    gray prediction lines up with the typed text. Sits beneath the transparent

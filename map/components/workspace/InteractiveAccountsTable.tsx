@@ -206,11 +206,11 @@ export default function InteractiveAccountsTable({
               fontFamily: FONT, color: "#1d1d1f", background: "#fff",
             }}
           />
-          <div style={{ display: "inline-flex", padding: 3, background: "#f0f0f2", borderRadius: 999, gap: 2 }}>
+          <div style={{ display: "flex", padding: 3, background: "#f0f0f2", borderRadius: 999, gap: 2, maxWidth: "100%", overflowX: "auto" }}>
             {FILTERS.map((f) => (
               <button key={f.key} onClick={() => setFilter(f.key)} style={{
                 padding: "6px 14px", fontSize: 13.5, fontWeight: 600, border: "none",
-                borderRadius: 999, cursor: "pointer",
+                borderRadius: 999, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap",
                 background: filter === f.key ? (f.key === "all" ? "#007aff" : "#fff") : "transparent",
                 color: filter === f.key ? (f.key === "all" ? "#fff" : "#1d1d1f") : "#6e6e73",
                 boxShadow: filter === f.key && f.key !== "all" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
