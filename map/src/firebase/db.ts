@@ -127,6 +127,13 @@ async function fsDeleteProfile(uid: string, profileId: string): Promise<void> {
   await withTimeout(deleteDoc(doc(db, "users", uid, "saved_profiles", profileId)));
 }
 
+async function fsDeleteProject(uid: string, projectId: string): Promise<void> {
+  const db = getFirebaseDb();
+  if (!db || !uid) return;
+  const { doc, deleteDoc } = await import("firebase/firestore");
+  await withTimeout(deleteDoc(doc(db, "users", uid, "projects", projectId)));
+}
+
 async function fsListProjects(uid: string): Promise<Project[]> {
   const db = getFirebaseDb();
   if (!db || !uid) return [];
@@ -221,6 +228,27 @@ export async function listSavedProfiles(uid: string, projectId?: string): Promis
   if (remote.length) writeLocal(key, merged);
   if (projectId) merged = merged.filter((p) => p.projectId === projectId);
   return merged;
+}
+
+// takes: uid (string; may be empty), projectId (string)
+// does: deletes a project and every saved snapshot inside it — local mirror
+//       updated immediately, Firestore cleaned up best-effort in the background
+// returns: a Promise resolving to true (the local delete always succeeds)
+export async function deleteProject(uid: string, projectId: string): Promise<boolean> {
+  if (!projectId) return false;
+  // Remove the project itself from the local mirror.
+  const pKey = projectsKey(uid);
+  writeLocal(pKey, readLocal<Project>(pKey).filter((p) => p.id !== projectId));
+  // Remove its saved snapshots from the local mirror, and remember their ids
+  // so we can delete the matching Firestore docs.
+  const sKey = profilesKey(uid);
+  const profiles = readLocal<SavedProfile>(sKey);
+  const owned = profiles.filter((p) => p.projectId === projectId);
+  writeLocal(sKey, profiles.filter((p) => p.projectId !== projectId));
+  // Best-effort Firestore cleanup (never awaited by the UI path).
+  void fsDeleteProject(uid, projectId).catch(() => {});
+  for (const p of owned) void fsDeleteProfile(uid, p.id).catch(() => {});
+  return true;
 }
 
 // takes: uid (string), profileId (string)
