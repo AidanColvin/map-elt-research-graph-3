@@ -20,16 +20,17 @@ const BYPASS_TOKEN = process.env.VERCEL_AUTOMATION_BYPASS_SECRET || '';
 //       and relays its JSON response (no caching)
 // returns: the backend's partnership payload, or an error status on failure
 export async function POST(req: NextRequest) {
-  // Auth optional — keyless pipeline; verify a token if present, else anonymous.
-  const decoded = await verifyAuth(req);
-  const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'partnerships', 20);
-  if (!allowed) return rateLimitResponse(retryAfterSeconds);
-
+  // Validate input FIRST — rejects don't spend rate-limit budget.
   const parsed = await readJsonBody(req);
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: parsed.status });
   const valid = validatePartnership(parsed.value);
   if (!valid.ok) return NextResponse.json({ error: valid.error }, { status: valid.status });
   const body = valid.value;
+
+  // Auth optional — keyless pipeline; verify a token if present, else anonymous.
+  const decoded = await verifyAuth(req);
+  const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'partnerships', 20);
+  if (!allowed) return rateLimitResponse(retryAfterSeconds);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 295_000);
