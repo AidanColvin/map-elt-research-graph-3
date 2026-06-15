@@ -124,7 +124,19 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   async function refreshProjects() {
     setProjects(await listProjects(currentUid()));
   }
-  useEffect(() => { refreshProjects(); }, []);
+  useEffect(() => {
+    (async () => {
+      const uid = currentUid();
+      const seedKey = `map_seeded_examples_${uid}`;
+      const existing = await listProjects(uid);
+      if (existing.length === 0 && !localStorage.getItem(seedKey)) {
+        localStorage.setItem(seedKey, "1");
+        await createProject(uid, "Technology");
+        await createProject(uid, "Artificial Intelligence");
+      }
+      await refreshProjects();
+    })();
+  }, []);
 
   async function openProject(p: Project) {
     setCurrent(p);
