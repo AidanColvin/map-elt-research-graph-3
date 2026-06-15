@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import type { AccountProfile } from "./accountProfile";
 import { FONT } from "./ui";
 
@@ -12,7 +12,11 @@ import { FONT } from "./ui";
  */
 
 type Kind = "public" | "private" | "nonprofit" | "government";
-type SortKey = "account" | "exchange" | "sector" | "structure" | "hq" | "employees" | "revenue";
+type SortKey =
+  | "account" | "exchange" | "sector" | "secondary" | "structure" | "ownership"
+  | "parent" | "hq" | "employees" | "revenue" | "founded" | "keyProducts"
+  | "businessSplit" | "description" | "website" | "aliases" | "researchBy"
+  | "dateOfResearch" | "resources" | "report";
 
 // takes: one account row
 // does: classifies it into a coarse ownership type by scanning the structure,
@@ -140,15 +144,33 @@ export default function InteractiveAccountsTable({
       );
     });
     const dir = sortDir === "asc" ? 1 : -1;
+    const str = (e: typeof enriched[number]): string => {
+      switch (sortKey) {
+        case "exchange":      return e.exchange;
+        case "sector":        return e.a.topIndustrySectorProfile;
+        case "secondary":     return e.a.secondaryIndustrySectorProfile;
+        case "structure":     return e.kind;
+        case "ownership":     return e.a.ownership;
+        case "parent":        return e.a.parentAccount;
+        case "hq":            return e.hq;
+        case "founded":       return e.a.founded;
+        case "keyProducts":   return e.a.keyProducts;
+        case "businessSplit": return e.a.businessSplit;
+        case "description":   return e.a.description;
+        case "website":       return e.a.website;
+        case "aliases":       return e.a.companyAliases;
+        case "researchBy":    return e.a.researchBy;
+        case "dateOfResearch":return e.a.dateOfResearch;
+        case "resources":     return e.a.resources;
+        case "report":        return e.a.linkToReport;
+        default:              return e.a.account;
+      }
+    };
     list = [...list].sort((x, y) => {
       switch (sortKey) {
         case "employees": return (x.emp - y.emp) * dir;
         case "revenue":   return (x.rev - y.rev) * dir;
-        case "exchange":  return x.exchange.localeCompare(y.exchange) * dir;
-        case "sector":    return x.a.topIndustrySectorProfile.localeCompare(y.a.topIndustrySectorProfile) * dir;
-        case "structure": return x.kind.localeCompare(y.kind) * dir;
-        case "hq":        return x.hq.localeCompare(y.hq) * dir;
-        default:          return x.a.account.localeCompare(y.a.account) * dir;
+        default:          return str(x).localeCompare(str(y)) * dir;
       }
     });
     return list;
@@ -181,14 +203,77 @@ export default function InteractiveAccountsTable({
 
   const filteredRows = rows.map((e) => e.a);
 
-  const cols: { key: SortKey; label: string; align?: "right" }[] = [
-    { key: "account", label: "Company" },
-    { key: "exchange", label: "Ticker" },
-    { key: "sector", label: "Sector" },
-    { key: "structure", label: "Structure" },
-    { key: "hq", label: "HQ" },
-    { key: "employees", label: "Employees", align: "right" },
-    { key: "revenue", label: "Revenue", align: "right" },
+  type Enr = (typeof enriched)[number];
+
+  // Reusable cell renderers — plain text (em-dash when empty), external links.
+  const txt = (v: string, width?: number): ReactNode => (
+    <span
+      title={width && v ? v : undefined}
+      style={{
+        color: v ? "#4b4b51" : "#c7c7cc",
+        ...(width ? { display: "block", maxWidth: width, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : {}),
+      }}
+    >
+      {v || "—"}
+    </span>
+  );
+  const link = (href: string, label: string): ReactNode =>
+    href && /^https?:\/\//.test(href) ? (
+      <a href={href} target="_blank" rel="noreferrer" title={href} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 500 }}>
+        {label} ↗
+      </a>
+    ) : (
+      <span style={{ color: "#c7c7cc" }}>{href || "—"}</span>
+    );
+  const host = (url: string): string => {
+    try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "Website"; }
+  };
+
+  const cols: { key: SortKey; label: string; align?: "right"; cell: (e: Enr) => ReactNode }[] = [
+    {
+      key: "account", label: "Company",
+      cell: (e) => (
+        <>
+          <div style={{ fontWeight: 600, color: "#1d1d1f", fontSize: 14 }}>{e.a.account}</div>
+          {e.alias && <div style={{ fontSize: 12, color: "#a0a0a5", marginTop: 1 }}>{e.alias}</div>}
+        </>
+      ),
+    },
+    {
+      key: "exchange", label: "Ticker",
+      cell: (e) => <span style={{ color: e.exchange ? "#2563eb" : "#c7c7cc", fontWeight: 500 }}>{e.exchange || "—"}</span>,
+    },
+    { key: "sector", label: "Sector", cell: (e) => txt(e.a.topIndustrySectorProfile) },
+    { key: "secondary", label: "Secondary Sector", cell: (e) => txt(e.a.secondaryIndustrySectorProfile, 220) },
+    {
+      key: "structure", label: "Structure",
+      cell: (e) => {
+        const ks = KIND_STYLE[e.kind];
+        return (
+          <span style={{
+            display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 600,
+            borderRadius: 999, border: `1px solid ${ks.color}55`, color: ks.color,
+          }}>
+            {ks.label}
+          </span>
+        );
+      },
+    },
+    { key: "ownership", label: "Ownership", cell: (e) => txt(e.a.ownership, 220) },
+    { key: "parent", label: "Parent Account", cell: (e) => txt(e.a.parentAccount, 180) },
+    { key: "hq", label: "HQ", cell: (e) => txt(e.hq) },
+    { key: "employees", label: "Employees", align: "right", cell: (e) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.a.approximateEmployees || "—"}</span> },
+    { key: "revenue", label: "Revenue", align: "right", cell: (e) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.a.approximateRevenue || "—"}</span> },
+    { key: "founded", label: "Founded", cell: (e) => txt(e.a.founded) },
+    { key: "keyProducts", label: "Key Products", cell: (e) => txt(e.a.keyProducts, 260) },
+    { key: "businessSplit", label: "Business Split", cell: (e) => txt(e.a.businessSplit, 200) },
+    { key: "description", label: "Description", cell: (e) => txt(e.a.description, 340) },
+    { key: "website", label: "Website", cell: (e) => link(e.a.website, host(e.a.website)) },
+    { key: "aliases", label: "Company Aliases", cell: (e) => txt(e.a.companyAliases, 200) },
+    { key: "researchBy", label: "Research by", cell: (e) => txt(e.a.researchBy, 180) },
+    { key: "dateOfResearch", label: "Date of Research", cell: (e) => txt(e.a.dateOfResearch) },
+    { key: "resources", label: "Resources", cell: (e) => txt(e.a.resources, 260) },
+    { key: "report", label: "Link to Report", cell: (e) => link(e.a.linkToReport, "Report") },
   ];
 
   return (
@@ -257,36 +342,15 @@ export default function InteractiveAccountsTable({
             </tr>
           </thead>
           <tbody>
-            {rows.map((e) => {
-              const ks = KIND_STYLE[e.kind];
-              return (
-                <tr key={e.a.account}>
-                  <td>
-                    <div style={{ fontWeight: 600, color: "#1d1d1f", fontSize: 14 }}>{e.a.account}</div>
-                    {e.alias && <div style={{ fontSize: 12, color: "#a0a0a5", marginTop: 1 }}>{e.alias}</div>}
+            {rows.map((e) => (
+              <tr key={e.a.account}>
+                {cols.map((c) => (
+                  <td key={c.key} style={{ textAlign: c.align ?? "left" }}>
+                    {c.cell(e)}
                   </td>
-                  <td style={{ color: e.exchange ? "#2563eb" : "#c7c7cc", fontWeight: 500 }}>
-                    {e.exchange || "—"}
-                  </td>
-                  <td style={{ color: "#4b4b51" }}>{e.a.topIndustrySectorProfile || "—"}</td>
-                  <td>
-                    <span style={{
-                      display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 600,
-                      borderRadius: 999, border: `1px solid ${ks.color}55`, color: ks.color,
-                    }}>
-                      {ks.label}
-                    </span>
-                  </td>
-                  <td style={{ color: "#4b4b51" }}>{e.hq || "—"}</td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {e.a.approximateEmployees || "—"}
-                  </td>
-                  <td style={{ textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
-                    {e.a.approximateRevenue || "—"}
-                  </td>
-                </tr>
-              );
-            })}
+                ))}
+              </tr>
+            ))}
             {rows.length === 0 && (
               <tr><td colSpan={cols.length} style={{ textAlign: "center", padding: 40, color: "#a0a0a5" }}>
                 No companies match your search.
