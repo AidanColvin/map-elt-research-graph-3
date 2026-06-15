@@ -528,62 +528,27 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
               </section>
             )}
 
-            <Panel
-              title="Company Profile"
-              note={resolvedMode === "company" && (dive.status === "streaming" || (runStatus === "running" && !companyMd)) ? "Generating…" : undefined}
-              actions={companyActions}
-            >
-              {resolvedMode !== "company"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the company profile.</p>
-                : companyMd
+            {resolvedMode !== "sector" && <>
+              <Panel
+                title="Company Profile"
+                note={dive.status === "streaming" || (runStatus === "running" && !companyMd) ? "Generating…" : undefined}
+                actions={companyActions}
+              >
+                {companyMd
                   ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
                   : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No company profile yet.</p>}
-            </Panel>
+              </Panel>
 
-            <Panel
-              title="UNC Partnership Profile"
-              note={resolvedMode === "company" && uncStatus === "loading" ? "Generating…" : resolvedMode === "company" && uncStatus === "error" ? "Partnership data unavailable." : undefined}
-              actions={uncActions}
-            >
-              {resolvedMode !== "company"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Company search to populate the UNC profile.</p>
-                : uncMd
+              <Panel
+                title="UNC Partnership Profile"
+                note={uncStatus === "loading" ? "Generating…" : uncStatus === "error" ? "Partnership data unavailable." : undefined}
+                actions={uncActions}
+              >
+                {uncMd
                   ? <div className="workspace-md"><MarkdownArticle markdown={uncMd.replace(/^#\s+.*\n?/, "")} /></div>
                   : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC profile yet.</p>}
-            </Panel>
-
-            <Panel
-              title="Sector Scan"
-              note={resolvedMode === "sector" && scan.status === "running" ? "Generating…" : resolvedMode === "sector" && scan.status === "error" ? (scan.error || "Sector scan unavailable.") : undefined}
-              actions={sectorActions}
-            >
-              {resolvedMode !== "sector"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the sector scan.</p>
-                : sectorData
-                  ? <Report data={sectorData} hideToc />
-                  : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No sector scan yet.</p>}
-            </Panel>
-
-            <Panel
-              title="Database"
-              note={resolvedMode === "sector" ? `${dbRows.length} new ${dbRows.length === 1 ? "company" : "companies"} from this run · merged into the Database tab` : undefined}
-              actions={dbActions}
-            >
-              {resolvedMode !== "sector"
-                ? <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>Run a Sector scan to populate the database.</p>
-                : dbRows.length > 0
-                  ? (
-                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexWrap: "wrap", gap: 8 }}>
-                      {dbRows.slice(0, 30).map((r) => (
-                        <li key={r.account} style={{ fontSize: 12.5, background: "#eef0ff", color: "#4451c8", borderRadius: 999, padding: "3px 10px" }}>{r.account}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>
-                      No new companies{sectorData ? " — all already in the Database." : " yet."} Excel export still includes the full Database{` (${dateStamp}).`}
-                    </p>
-                  )}
-            </Panel>
+              </Panel>
+            </>}
 
           </div>
         )}
