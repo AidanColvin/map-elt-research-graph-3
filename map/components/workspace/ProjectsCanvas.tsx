@@ -106,6 +106,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   const [current, setCurrent] = useState<Project | null>(null);
   const [savedRuns, setSavedRuns] = useState<SavedProfile[]>([]);
   const [newName, setNewName] = useState("");
+  const [newVisibility, setNewVisibility] = useState<"public" | "private">("private");
 
   const [subject, setSubject] = useState("");
   // `mode` is what the user picked: "auto" (detect from the text) or a forced
@@ -156,8 +157,9 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   async function createNew() {
     const name = newName.trim();
     if (!name) return;
-    const id = await createProject(currentUid(), name);
+    const id = await createProject(currentUid(), name, newVisibility);
     setNewName("");
+    setNewVisibility("private");
     await refreshProjects();
     const fresh = (await listProjects(currentUid())).find((p) => p.id === id);
     if (fresh) await openProject(fresh);
@@ -321,6 +323,24 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
               aria-label="New project name"
               style={{ flex: 1, minWidth: 240, border: "1px solid rgba(0,0,0,0.12)", borderRadius: 12, padding: "11px 15px", fontSize: 15, outline: "none", background: "#fff", fontFamily: FONT }}
             />
+            <div role="group" aria-label="Visibility" style={{ display: "inline-flex", background: "#ececf0", borderRadius: 999, padding: 3, flexShrink: 0 }}>
+              {(["private", "public"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setNewVisibility(v)}
+                  style={{
+                    border: "none", cursor: "pointer", borderRadius: 999, padding: "7px 14px",
+                    fontSize: 13, fontWeight: 600, textTransform: "capitalize",
+                    background: newVisibility === v ? "#fff" : "transparent",
+                    color: newVisibility === v ? "#1d1d1f" : "#8a8a92",
+                    boxShadow: newVisibility === v ? "0 1px 4px rgba(0,0,0,0.1)" : "none",
+                  }}
+                >
+                  {v === "private" ? "🔒 Private" : "🌐 Public"}
+                </button>
+              ))}
+            </div>
             <button
               data-testid="create-project"
               onClick={createNew}
@@ -342,7 +362,12 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
                     onClick={() => openProject(p)}
                     style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: "16px 36px 16px 18px", fontFamily: FONT }}
                   >
-                    <p style={{ fontSize: 15, fontWeight: 600, margin: 0, color: "#1d1d1f" }}>{p.name}</p>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <p style={{ fontSize: 15, fontWeight: 600, margin: 0, color: "#1d1d1f" }}>{p.name}</p>
+                      <span style={{ fontSize: 11, fontWeight: 500, padding: "2px 7px", borderRadius: 999, background: p.visibility === "public" ? "#eef5ff" : "#f2f2f7", color: p.visibility === "public" ? "#3b6fd4" : "#8a8a92" }}>
+                        {p.visibility === "public" ? "🌐 Public" : "🔒 Private"}
+                      </span>
+                    </div>
                     <p style={{ fontSize: 12, color: "#9a9aa2", margin: "4px 0 0" }}>
                       Created {new Date(p.createdAt).toLocaleDateString()}
                     </p>
