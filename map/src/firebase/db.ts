@@ -19,6 +19,7 @@ export interface Project {
   id: string;
   name: string;
   createdAt: number;
+  visibility: "public" | "private";
 }
 
 export interface SavedProfile {
@@ -116,7 +117,7 @@ async function fsSetProject(uid: string, p: Project): Promise<void> {
   const db = getFirebaseDb();
   if (!db || !uid) return;
   const { doc, setDoc } = await import("firebase/firestore");
-  await withTimeout(setDoc(doc(db, "users", uid, "projects", p.id), { name: p.name, createdAt: p.createdAt }));
+  await withTimeout(setDoc(doc(db, "users", uid, "projects", p.id), { name: p.name, createdAt: p.createdAt, visibility: p.visibility }));
 }
 
 async function fsSetProfile(uid: string, r: SavedProfile): Promise<void> {
@@ -146,7 +147,10 @@ async function fsListProjects(uid: string): Promise<Project[]> {
   const { collection, getDocs } = await import("firebase/firestore");
   const snap = await withTimeout(getDocs(collection(db, "users", uid, "projects")));
   if (!snap) return [];
-  return snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<Project, "id">) }));
+  return snap.docs.map((d) => {
+    const data = d.data() as Omit<Project, "id">;
+    return { id: d.id, ...data, visibility: data.visibility ?? "private" };
+  });
 }
 
 async function fsListProfiles(uid: string): Promise<SavedProfile[]> {
@@ -174,8 +178,8 @@ function mergeById<T extends { id: string }>(a: T[], b: T[]): T[] {
 //       to Firestore in the background — so the call returns instantly and never
 //       hangs on the network
 // returns: a Promise resolving to the new projectId (never null)
-export async function createProject(uid: string, name: string): Promise<string> {
-  const project: Project = { id: makeId("proj"), name: name.trim() || "Untitled project", createdAt: Date.now() };
+export async function createProject(uid: string, name: string, visibility: "public" | "private" = "private"): Promise<string> {
+  const project: Project = { id: makeId("proj"), name: name.trim() || "Untitled project", createdAt: Date.now(), visibility };
   const key = projectsKey(uid);
   writeLocal(key, [project, ...readLocal<Project>(key)]);
   void fsSetProject(uid, project).catch(() => {}); // best-effort, not awaited
@@ -188,7 +192,7 @@ export async function createProject(uid: string, name: string): Promise<string> 
 // returns: a Promise resolving to Project[]
 export async function listProjects(uid: string): Promise<Project[]> {
   const key = projectsKey(uid);
-  const local = readLocal<Project>(key);
+  const local = readLocal<Project>(key).map((p) => ({ ...p, visibility: p.visibility ?? "private" }));
   const remote = uid ? await fsListProjects(uid) : [];
   const tombstoned = new Set(readLocal<string>(deletedProjectsKey(uid)));
   const merged = mergeById(local, remote)
