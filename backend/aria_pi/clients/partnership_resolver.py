@@ -19,6 +19,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from aria_pi.clients.pubmed_client import PubMedClient
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
 from aria_pi.clients.web_search_client import WebSearchClient
+from aria_pi.clients.nih_reporter_client import NIHReporterClient, unc_pis_from_grants
+from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient
 from aria_pi.sectors import seeds_for
 from aria_pi.utils.name_resolver import normalize_company_name
 
@@ -177,21 +179,55 @@ def resolve_pubmed_bundle(company_name: str, pubmed: PubMedClient) -> dict:
     }
 
 
+# takes: a company name (str) and an NIHReporterClient
+# does: fetches UNC-awarded NIH grants whose text mentions the company and the
+#       named UNC PIs on those grants
+# returns: a dict { grants: [grant dicts], pis: [PI dicts] } — safe-empty on error
+def safe_nih(company_name: str, client: NIHReporterClient) -> dict:
+    """Fetch NIH grants mentioning company at UNC. Returns safe empty on failure."""
+    try:
+        grants = client.unc_grants_mentioning(company_name, max_results=5) or []
+        pis = unc_pis_from_grants(grants, limit=3)
+        return {"grants": grants, "pis": pis}
+    except Exception as e:
+        print(f"NIH safe error for {company_name}: {e}")
+        return {"grants": [], "pis": []}
+
+
+# takes: a company name (str) and a ClinicalTrialsClient
+# does: finds trials the company sponsors and keeps the subset where UNC is a
+#       listed site/collaborator (unc_signal is the matched facility/collab name)
+# returns: a dict { all_count: int, unc_trials: [trial dicts] } — safe-empty on error
+def safe_trials(company_name: str, client: ClinicalTrialsClient) -> dict:
+    """Fetch clinical trials where company sponsors and UNC is a site. Returns safe empty on failure."""
+    try:
+        all_trials = client.search_by_sponsor(company_name) or []
+        unc_trials = [t for t in all_trials if t.get("unc_signal")]
+        return {"all_count": len(all_trials), "unc_trials": unc_trials[:4]}
+    except Exception as e:
+        print(f"Trials safe error for {company_name}: {e}")
+        return {"all_count": 0, "unc_trials": []}
+
+
 # takes: the user's company query (str) and an optional resolved official name
 #        (str) to feed the strict SEC/Web clients
 # does: fans out concurrently — PubMed gets the ORIGINAL query (it tolerates
 #       typos), while SEC EDGAR + web search get the resolved official name so a
-#       small typo no longer returns nothing from the exact-match clients
+#       small typo no longer returns nothing from the exact-match clients. NIH
+#       RePORTER + ClinicalTrials.gov add grant/trial-level UNC signals.
 # returns: the full company partnership record, including `resolved_name`
 def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     target = sec_web_name or company_name
     pubmed, sec, web = PubMedClient(), SECEdgarClient(), WebSearchClient()
+    nih_client, trials_client = NIHReporterClient(), ClinicalTrialsClient()
     results = {}
-    with ThreadPoolExecutor(max_workers=3) as ex:
+    with ThreadPoolExecutor(max_workers=5) as ex:
         futures = {
             ex.submit(resolve_pubmed_bundle, company_name, pubmed): "pubmed",
             ex.submit(resolve_sec_verbatim, target, sec): "financial",
             ex.submit(resolve_ecosystem, target, web): "ecosystem",
+            ex.submit(safe_nih, company_name, nih_client): "nih_grants",
+            ex.submit(safe_trials, target, trials_client): "trials",
         }
         for fut in as_completed(futures):
             results[futures[fut]] = fut.result()
@@ -204,6 +240,8 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     unc_units = results.get("unc_units") or []
     financial = results.get("financial") or {"quotes": [], "filing_url": "", "cik": ""}
     ecosystem = results.get("ecosystem") or []
+    nih = results.get("nih_grants") or {"grants": [], "pis": []}
+    trials = results.get("trials") or {"all_count": 0, "unc_trials": []}
     return {
         "query": company_name,
         "resolved_name": target,
@@ -214,6 +252,10 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
         "unc_units": unc_units,
         "financial": financial,
         "ecosystem": ecosystem,
+        "nih_grants": nih["grants"],
+        "nih_pis": nih["pis"],
+        "trials": trials["unc_trials"],
+        "trials_total": trials["all_count"],
         "mention_count": clinical["count"] + coi["count"] + len(financial["quotes"]) + len(ecosystem),
     }
 

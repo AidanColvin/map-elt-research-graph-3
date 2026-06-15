@@ -101,3 +101,34 @@ test('typo fix lets the strict SEC client surface verbatim text (Liquidia)', asy
   await expect(financial).toContainText(/University of North Carolina/i);
   await expect(financial).not.toContainText('No verbatim SEC mentions found');
 });
+
+test('partner status banner shows Active for Eli Lilly', async ({ page }) => {
+  test.setTimeout(120000);
+  await signInGuest(page);
+  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByLabel('Partnership search').fill('Eli Lilly');
+  await page.getByRole('button', { name: /^Search$/ }).click();
+  await page.getByTestId('results-canvas').waitFor({ state: 'visible', timeout: 90000 });
+  const banner = page.getByTestId('partner-status-banner');
+  await expect(banner).toBeVisible();
+  await expect(banner).toContainText('Active');
+  await expect(banner).toContainText('UNC PARTNER');
+});
+
+test('NIH staff section shows PI name from grant data', async ({ page }) => {
+  test.setTimeout(120000);
+  await signInGuest(page);
+  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
+  await page.getByLabel('Partnership search').fill('Eli Lilly');
+  await page.getByRole('button', { name: /^Search$/ }).click();
+  await page.getByTestId('results-canvas').waitFor({ state: 'visible', timeout: 90000 });
+  const body = await page.locator('body').innerText();
+  expect(body).toContain("D'Alessio D");
+  expect(body).toContain('UNC RESEARCH CONTACTS');
+  expect(body).toContain('ACTIVE PROGRAMS');
+  // Eli Lilly resolves as a partner, so Section D frames as "Deepen the
+  // relationship" (the "Why UNC" framing is the non-partner variant).
+  expect(body).toContain('DEEPEN THE RELATIONSHIP');
+});
