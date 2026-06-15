@@ -332,10 +332,11 @@ export default function PartnershipsView({
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", width: "100%", fontFamily: FONT, color: "#1d1d1f" }}>
-      {/* Static intelligence header — frames the source provenance for every
-          signal below. Sources reflect what the resolver actually queries. */}
-      <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)", marginBottom: 22 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>UNC Partnership Intelligence</h2>
+      {/* Static intelligence header — flat on the white canvas (matches the
+          Company view's eyebrow/title treatment, no card chrome). */}
+      <div style={{ marginBottom: 22 }}>
+        <Eyebrow style={{ letterSpacing: "0.14em" }}>Company Profile · UNC</Eyebrow>
+        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: "10px 0 0" }}>UNC Partnership Intelligence</h2>
         <p style={{ fontSize: 14, color: "#6b6b73", margin: "6px 0 0", maxWidth: 640 }}>
           Signals derived from PubMed co-authorship, NIH RePORTER grants, ClinicalTrials.gov, disclosed conflicts of interest, and verbatim SEC filing mentions — every fact links to its primary source.
         </p>

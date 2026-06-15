@@ -10,6 +10,8 @@ import type { SavedReportsState } from "./useSavedReports";
 import { SavedStrip, SaveControl, VerifyPill } from "./SavedReports";
 import { savedId, fetchSignature, type SavedReport } from "@/lib/savedReports";
 import { CanvasCard, Loading, FONT } from "./ui";
+import PackageButton from "./PackageButton";
+import type { AccountProfile } from "./accountProfile";
 
 // One-click sector starting points offered on the idle hero.
 const POPULAR_SECTORS = [
@@ -142,6 +144,7 @@ export default function SectorCanvas({
   onSelectCompany,
   activeCompany,
   saved,
+  onNewRows,
 }: {
   scan: SectorScanState;
   draft: string;
@@ -149,6 +152,7 @@ export default function SectorCanvas({
   onSelectCompany: (company: string) => void;
   activeCompany?: string;
   saved: SavedReportsState;
+  onNewRows?: (rows: AccountProfile[]) => void;
 }) {
   const sectorItems = saved.saved.filter((r) => r.kind === "sector");
   const [verifyNote, setVerifyNote] = useState("");
@@ -269,6 +273,14 @@ export default function SectorCanvas({
           <div style={{ padding: "0 28px" }}>
             <Report data={scan.data} hideToc />
           </div>
+          {onNewRows && (
+            <div
+              data-testid="package-section"
+              style={{ margin: "0 28px", marginTop: 32, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.06)" }}
+            >
+              <PackageButton reportData={scan.data} sector={scan.sector} onNewRows={onNewRows} />
+            </div>
+          )}
         </>
       )}
     </CanvasCard>

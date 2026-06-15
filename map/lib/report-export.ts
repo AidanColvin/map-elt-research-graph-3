@@ -842,3 +842,26 @@ export async function downloadPdf(rawData: any) {
   renderBlocksToPdf(doc, blocks);
   saveBlob(doc.save(), `${reportFilename(rawData)}.pdf`);
 }
+
+// takes: a Markdown string and a display title
+// does: renders the Markdown to PDF bytes via the same PdfDoc pipeline as
+//       downloadMarkdownPdf, but WITHOUT triggering a browser download — for
+//       bundling many PDFs into a ZIP (see lib/sector-package.ts)
+// returns: the PDF file bytes
+export function markdownToPdfBytes(markdown: string, title: string): Uint8Array {
+  const blocks = parseMarkdownBlocks(markdown);
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, blocks, title);
+  return doc.saveBytes();
+}
+
+// takes: the structured sector ReportData (raw)
+// does: renders the sector report to PDF bytes via the same pipeline as
+//       downloadPdf, but WITHOUT triggering a browser download — for ZIP bundling
+// returns: the PDF file bytes
+export function sectorReportToPdfBytes(rawData: any): Uint8Array {
+  const { blocks } = buildBlocks(rawData);
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, blocks);
+  return doc.saveBytes();
+}
