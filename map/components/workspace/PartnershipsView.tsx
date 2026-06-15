@@ -111,6 +111,16 @@ export default function PartnershipsView() {
 
   return (
     <div style={{ maxWidth: 1100, margin: "0 auto", width: "100%", fontFamily: FONT, color: "#1d1d1f" }}>
+      {/* Static intelligence header — frames the source provenance for every
+          signal below. Sources reflect what the resolver actually queries. */}
+      <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)", marginBottom: 22 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", margin: 0 }}>UNC Partnership Intelligence</h2>
+        <p style={{ fontSize: 14, color: "#6b6b73", margin: "6px 0 0", maxWidth: 620 }}>
+          Signals derived from PubMed co-authorship, disclosed conflicts of interest, and verbatim SEC filing mentions — every fact links to its primary source.
+        </p>
+        <hr style={{ border: "none", borderTop: "1px solid rgba(0,0,0,0.06)", margin: "16px 0 0" }} />
+      </div>
+
       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.22em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>
         UNC × Industry
       </p>
@@ -222,6 +232,35 @@ export default function PartnershipsView() {
 
       {status === "done" && data && (
         <div data-testid="results-canvas" style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+          {/* Relationship-depth badge — a client-side read of how substantiated
+              the UNC link is, from the same fields rendered below: co-authored
+              paper count (clinical.count) and whether any verbatim SEC mention
+              exists (financial.quotes). Company searches only. */}
+          {data.type === "company" && (() => {
+            const papers = data.clinical?.count ?? 0;
+            const hasSec = (data.financial?.quotes?.length ?? 0) > 0;
+            const depth =
+              papers > 3 || hasSec
+                ? { label: "Active", bg: "#ecfdf5", color: "#047857", border: "#6ee7b7" }
+                : papers >= 1
+                ? { label: "Exploratory", bg: "#fffbeb", color: "#b45309", border: "#fcd34d" }
+                : { label: "None confirmed", bg: "#f3f4f6", color: "#6b7280", border: "#e5e7eb" };
+            return (
+              <div style={{ display: "flex", justifyContent: "flex-end" }}>
+                <span
+                  data-testid="depth-badge"
+                  style={{
+                    fontSize: 11.5, fontWeight: 600, letterSpacing: "0.04em",
+                    background: depth.bg, color: depth.color, border: `1px solid ${depth.border}`,
+                    borderRadius: 999, padding: "4px 12px",
+                  }}
+                >
+                  Relationship depth · {depth.label}
+                </span>
+              </div>
+            );
+          })()}
+
           {/* Typo correction notice — shown only when the backend resolved the
               query to a different official company name. */}
           {data.resolved_name &&
