@@ -153,7 +153,8 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const contacts: CardContact[] = uncPis.slice(0, 6).map((p) => ({
     pi: p.name || "",
     unit: trunc(p.org || "UNC Chapel Hill", 40),
-    grant: grantIdFromUrl(p.grant_url || ""),
+    grant: p.grant_num || grantIdFromUrl(p.grant_url || ""),
+    fy: p.fiscal_year || "",
     topic: trunc(p.project_title || "", 60),
     url: p.grant_url || "https://reporter.nih.gov",
   })).filter((c) => c.pi);

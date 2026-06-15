@@ -79,13 +79,14 @@ function ContactsTable({ rows }: { rows: CardContact[] }) {
   const td = { fontSize: 12, color: MUTED, padding: "7px 8px 7px 0", borderBottom: `1px solid ${BORDER}`, verticalAlign: "top" as const };
   return (
     <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead><tr><th style={th}>PI</th><th style={th}>Unit</th><th style={th}>Grant</th><th style={th}>Topic</th></tr></thead>
+      <thead><tr><th style={th}>PI</th><th style={th}>Unit</th><th style={th}>Grant</th><th style={th}>FY</th><th style={th}>Topic</th></tr></thead>
       <tbody>
         {rows.map((r, i) => (
           <tr key={i}>
             <td style={{ ...td, color: INK, fontWeight: 500 }}><A href={r.url}>{r.pi}</A></td>
             <td style={td}>{r.unit}</td>
             <td style={{ ...td, fontFamily: "ui-monospace, monospace", fontSize: 11 }}>{r.grant || "—"}</td>
+            <td style={td}>{r.fy || "—"}</td>
             <td style={td}>{r.topic || "—"}</td>
           </tr>
         ))}
