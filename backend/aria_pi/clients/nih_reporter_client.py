@@ -43,6 +43,10 @@ def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
                 "org": org,
                 "project_title": g.get("title") or "",
                 "grant_url": g.get("url") or "https://reporter.nih.gov",
+                # Enrichment for the report's faculty table / priority matrix —
+                # the grant number and fiscal year, when the source carried them.
+                "grant_num": g.get("project_num") or "",
+                "fiscal_year": str(g.get("fiscal_year") or ""),
             })
             if len(pis) >= limit:
                 break
