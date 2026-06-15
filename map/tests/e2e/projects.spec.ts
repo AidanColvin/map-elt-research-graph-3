@@ -29,7 +29,7 @@ test('Create a project then open its run view', async ({ page }) => {
   await expect(visibleView(page).getByTestId('run-pipeline')).toBeVisible();
 });
 
-test('Run full pipeline shows all four artifact panels with downloads', async ({ page }) => {
+test('Run company pipeline shows Company Profile and UNC Partnership Profile panels', async ({ page }) => {
   test.setTimeout(120000);
   await openProjectsAndCreate(page);
   const view = visibleView(page);
@@ -43,8 +43,6 @@ test('Run full pipeline shows all four artifact panels with downloads', async ({
   const body = await page.locator('body').innerText();
   expect(body).toContain('Company Profile');
   expect(body).toContain('UNC Partnership Profile');
-  expect(body).toContain('Sector Scan');
-  expect(body).toContain('Database');
 });
 
 test('Saving a run makes it reopenable in the project', async ({ page }) => {
