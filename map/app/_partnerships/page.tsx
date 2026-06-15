@@ -77,7 +77,7 @@ function Chrome() {
 // returns: the Partnerships page element
 export default function PartnershipsPage() {
   return (
-    <div style={{ fontFamily: FONT, minHeight: "100vh", color: "#1d1d1f", background: "#f5f5f7" }}>
+    <div style={{ fontFamily: FONT, minHeight: "100dvh", color: "#1d1d1f", background: "#f5f5f7" }}>
       <Chrome />
       <main style={{ padding: `${HEADER_H + SUBNAV_H + 32}px 28px 48px` }}>
         <PartnershipsView />

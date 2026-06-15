@@ -78,11 +78,11 @@ function loadUsers(): Record<string, string> {
 
 const S = {
   wrap: {
-    minHeight: "100vh",
+    minHeight: "100dvh",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "32px 20px",
+    padding: "max(32px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left))",
     background: "var(--bg, #faf9f7)",
     color: "var(--ink, #1d1d1f)",
     fontFamily: "var(--sans)",
@@ -100,7 +100,8 @@ const S = {
     border: "1px solid #d4d4d4",
     borderRadius: 10,
     padding: "11px 13px",
-    fontSize: 15,
+    // 16px (not 15) so iOS doesn't zoom the page when the field is focused.
+    fontSize: 16,
     marginBottom: 10,
     background: "#fff",
     outline: "none",

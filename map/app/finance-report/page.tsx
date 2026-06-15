@@ -52,7 +52,7 @@ export default function FinanceReportPage() {
     });
 
   return (
-    <div style={{ fontFamily: "var(--font-inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif)", background: "#f5f5f7", minHeight: "100vh" }}>
+    <div style={{ fontFamily: "var(--font-inter, -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif)", background: "#f5f5f7", minHeight: "100dvh" }}>
       {/* Nav bar */}
       <header style={{ background: "rgba(255,255,255,0.85)", backdropFilter: "blur(20px)", borderBottom: "1px solid rgba(0,0,0,0.08)", position: "sticky", top: 0, zIndex: 100, height: 54, display: "flex", alignItems: "center", padding: "0 32px", gap: 12 }}>
         <a href="/" style={{ display: "flex", alignItems: "center", gap: 8, textDecoration: "none", color: "inherit" }}>
