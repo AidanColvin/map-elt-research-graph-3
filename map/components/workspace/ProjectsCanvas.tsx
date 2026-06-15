@@ -16,7 +16,7 @@ import {
 import { downloadExcel } from "@/lib/report-excel";
 import { downloadAccountsExcel } from "./accountsExport";
 import {
-  createProject, listProjects, saveProfileToProject, listSavedProfiles,
+  createProject, listProjects, saveProfileToProject, listSavedProfiles, deleteProject,
   type Project, type SavedProfile,
 } from "@/src/firebase/db";
 import { getFirebaseAuth } from "@/lib/firebase";
@@ -132,6 +132,18 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
     await refreshProjects();
     const fresh = (await listProjects(currentUid())).find((p) => p.id === id);
     if (fresh) await openProject(fresh);
+  }
+
+  // takes: the project to delete and the originating click event
+  // does: confirms, then permanently removes the project (and its saved runs);
+  //       if it's the open one, returns to the picker. Stops propagation so the
+  //       card's open-on-click doesn't fire.
+  async function removeProject(p: Project, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (!window.confirm(`Delete project "${p.name}"? This also removes its saved runs and can't be undone.`)) return;
+    await deleteProject(currentUid(), p.id);
+    if (current?.id === p.id) setCurrent(null);
+    await refreshProjects();
   }
 
   function resetRun() {
@@ -265,17 +277,29 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 12 }}>
               {projects.map((p) => (
-                <button
-                  key={p.id}
-                  data-testid="project-card"
-                  onClick={() => openProject(p)}
-                  style={{ textAlign: "left", cursor: "pointer", background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: "16px 18px", fontFamily: FONT }}
-                >
-                  <p style={{ fontSize: 15, fontWeight: 600, margin: 0, color: "#1d1d1f" }}>{p.name}</p>
-                  <p style={{ fontSize: 12, color: "#9a9aa2", margin: "4px 0 0" }}>
-                    Created {new Date(p.createdAt).toLocaleDateString()}
-                  </p>
-                </button>
+                <div key={p.id} style={{ position: "relative" }}>
+                  <button
+                    data-testid="project-card"
+                    onClick={() => openProject(p)}
+                    style={{ width: "100%", textAlign: "left", cursor: "pointer", background: "#fff", border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: "16px 36px 16px 18px", fontFamily: FONT }}
+                  >
+                    <p style={{ fontSize: 15, fontWeight: 600, margin: 0, color: "#1d1d1f" }}>{p.name}</p>
+                    <p style={{ fontSize: 12, color: "#9a9aa2", margin: "4px 0 0" }}>
+                      Created {new Date(p.createdAt).toLocaleDateString()}
+                    </p>
+                  </button>
+                  <button
+                    data-testid="delete-project"
+                    onClick={(e) => removeProject(p, e)}
+                    aria-label={`Delete project ${p.name}`}
+                    title="Delete project"
+                    style={{ position: "absolute", top: 10, right: 10, width: 24, height: 24, display: "flex", alignItems: "center", justifyContent: "center", border: "none", background: "transparent", color: "#c7c7cc", fontSize: 16, lineHeight: 1, cursor: "pointer", borderRadius: 6 }}
+                    onMouseEnter={(e) => { e.currentTarget.style.color = "#ff3b30"; e.currentTarget.style.background = "#fff0ef"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.color = "#c7c7cc"; e.currentTarget.style.background = "transparent"; }}
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
             </div>
           )}
