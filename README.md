@@ -438,10 +438,17 @@ npm run dev
 Tests:
 
 ```bash
+# backend (pytest)
 cd backend && ./run_tests.sh   # or: pytest
+
+# frontend
+cd map
+npm run test:unit              # Vitest unit tests (markdownSafe, format, sec)
+npm test                       # Playwright e2e (boots a dev server, fully mocked)
+npm run typecheck              # tsc --noEmit
 ```
 
-The suite covers every client (SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER, web search, Claude stub), the report builder, the source tagger, sector resolution, the orchestrator, and the stage modules.
+The backend suite covers every client (SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER, web search, Claude stub), the report builder, the source tagger, sector resolution, the orchestrator, and the stage modules. The frontend has Vitest unit tests for the pure library functions and Playwright end-to-end specs that mock every API and external host so they run offline and deterministically. Both suites run on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`); the build is type-gated.
 
 ## Environment variables
 

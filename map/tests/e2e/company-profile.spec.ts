@@ -1,51 +1,22 @@
 import { test, expect, Page } from '@playwright/test';
+import { mockBackend, gotoWorkspace, clickNav, visibleView } from './helpers';
 
-const BASE = 'http://localhost:3000';
-const EMAIL = process.env.TEST_EMAIL ?? '';
-const PASSWORD = process.env.TEST_PASSWORD ?? '';
+// Arm offline backend + image-host mocks before every test so company deep
+// dives, freshness checks, and logos never touch a real backend or the network.
+test.beforeEach(async ({ page }) => {
+  await mockBackend(page);
+});
 
-// Map gates the workspace behind an auth screen that offers either email/
-// password OR a "Continue as guest" entry. Tests have no real credentials, so
-// we use guest mode by default and only sign in with email/password when both
-// TEST_EMAIL and TEST_PASSWORD are supplied. An intro splash animates first,
-// so every locator is given a generous timeout.
+// Enter the workspace as a guest (skips the intro splash + auth gate). See
+// helpers.ts for the gate-handling rationale.
 async function signIn(page: Page) {
-  // `networkidle` is unreliable against a Next dev server (the HMR websocket
-  // keeps the network "busy"), so wait on DOM content instead. An intro splash
-  // animates before the auth gate, so we wait for whichever appears first: the
-  // guest button (auth gate) or the workspace nav (already authenticated).
-  await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-  const guest = page.getByRole('button', { name: /continue as guest/i });
-  const nav = page.locator('nav').first();
-
-  await Promise.race([
-    guest.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
-    nav.waitFor({ state: 'visible', timeout: 30000 }).catch(() => {}),
-  ]);
-
-  if (await guest.isVisible().catch(() => false)) {
-    if (EMAIL && PASSWORD) {
-      await page.locator('input[type="email"]').first().fill(EMAIL);
-      await page.locator('input[type="password"]').first().fill(PASSWORD);
-      await page.getByRole('button', { name: /^log in$/i }).click();
-    } else {
-      await guest.click();
-    }
-  }
-  await nav.waitFor({ state: 'visible', timeout: 20000 });
+  await gotoWorkspace(page);
 }
 
+// The top-nav tab is labelled "Company" in the live build.
 async function goToCompanyProfile(page: Page) {
-  const tab = page.locator('text="Company Profile"').first();
-  await tab.click();
-  await page.waitForTimeout(1500);
-}
-
-// Map keeps every workspace view mounted and toggles display, so a bare
-// `button:has-text("Apple")` can resolve to a hidden Apple button in another
-// view. Scope interactions to the currently-visible view to avoid that.
-function visibleView(page: Page) {
-  return page.locator('.ws-view:visible');
+  await clickNav(page, 'Company');
+  await page.waitForTimeout(1000);
 }
 
 test('company profile idle state shows hero headline', async ({ page }) => {
@@ -136,9 +107,9 @@ test('after viewing a report the report persists when user returns', async ({ pa
     await appleChip.click();
     await page.waitForTimeout(8000);
   }
-  await page.locator('text="Dashboard"').first().click();
+  await clickNav(page, 'Dashboard');
   await page.waitForTimeout(1000);
-  await page.locator('text="Company Profile"').first().click();
+  await clickNav(page, 'Company');
   await page.waitForTimeout(1500);
   const body = await page.locator('body').innerText();
   expect(body.toLowerCase()).toContain('apple');
@@ -152,13 +123,11 @@ test('other nav tabs still work after company profile changes', async ({ page })
   const NOT_FOUND = 'This page could not be found';
   await signIn(page);
   await goToCompanyProfile(page);
-  await page.locator('text="Sector Scan"').first().click();
+  await clickNav(page, 'Sector');
   await page.waitForTimeout(2000);
   let body = await page.locator('body').innerText();
   expect(body).not.toContain(NOT_FOUND);
-  // NOTE: the "Companies" tab was deactivated from the public sub-nav in PR #6
-  // (code retained behind a commented VIEWS entry), so it is no longer clickable.
-  await page.locator('text="Dashboard"').first().click();
+  await clickNav(page, 'Dashboard');
   await page.waitForTimeout(2000);
   body = await page.locator('body').innerText();
   expect(body).not.toContain(NOT_FOUND);

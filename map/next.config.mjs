@@ -5,9 +5,10 @@ const nextConfig = {
   outputFileTracingIncludes: {
     "/**": ["./content/reports/**/*"],
   },
-  // The sector-scan code was authored under a non-strict tsconfig; the merged
-  // app keeps the strict config for new code but does not block deploys on it.
-  typescript: { ignoreBuildErrors: true },
+  // Type errors now block the build (the source is type-clean). ESLint is still
+  // not a deploy gate: the legacy sector-scan code carries many style-only lint
+  // warnings that would otherwise block deploys without affecting correctness.
+  typescript: { ignoreBuildErrors: false },
   eslint: { ignoreDuringBuilds: true },
   // Security headers applied to every response. The CSP is intentionally
   // pragmatic: 'unsafe-inline' is required for Next's inline bootstrap and the
@@ -46,4 +47,13 @@ const nextConfig = {
   },
 };
 
-export default nextConfig;
+// Wrap with Sentry so server/edge errors and (when a DSN is set) source-mapped
+// stack traces are captured. Source-map upload only runs when SENTRY_AUTH_TOKEN
+// is present; otherwise the build proceeds normally and Sentry stays a no-op.
+import { withSentryConfig } from "@sentry/nextjs";
+
+export default withSentryConfig(nextConfig, {
+  silent: true,
+  disableLogger: true,
+  sourcemaps: { disable: !process.env.SENTRY_AUTH_TOKEN },
+});

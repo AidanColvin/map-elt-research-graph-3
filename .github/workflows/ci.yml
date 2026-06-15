@@ -47,15 +47,16 @@ jobs:
           cache-dependency-path: map/package-lock.json
       - name: Install dependencies
         run: npm ci
-      - name: Type check (informational)
+      - name: Type check
         run: npm run typecheck
-        continue-on-error: true
+      - name: Unit tests (vitest)
+        run: npm run test:unit
       - name: Build
         run: npm run build
       - name: Install Playwright browser
         run: npm run test:install
-      - name: Run security e2e (deterministic, offline-safe)
-        run: npx playwright test security.spec.ts
+      - name: Run e2e (mocked, offline-safe)
+        run: npx playwright test --workers=1
       - name: Upload Playwright report
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
