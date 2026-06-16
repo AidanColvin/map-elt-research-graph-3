@@ -210,6 +210,7 @@ export default function MapHome() {
   const [view, setView] = useState<View>("dashboard");
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
+  const [projectsQuery, setProjectsQuery] = useState("");
   const [partnershipDraft, setPartnershipDraft] = useState("");
   // Companies added to the Database this session by a sector Package run.
   const [packageRows, setPackageRows] = useState<AccountProfile[]>([]);
@@ -313,14 +314,12 @@ export default function MapHome() {
         >
           <DashboardHome
             onRunCompany={(name) => {
-              setCompanyDraft(name);
-              dive.run(name);
-              setView("company");
+              setProjectsQuery(name);
+              setView("projects");
             }}
             onRunSector={(name) => {
-              setSectorDraft(name);
-              scan.run(name);
-              setView("sector");
+              setProjectsQuery(name);
+              setView("projects");
             }}
             onOpenCompanyView={() => setView("company")}
             onOpenSectorView={() => setView("sector")}
@@ -402,7 +401,11 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <ProjectsCanvas onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))} />
+          <ProjectsCanvas
+            onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))}
+            initialQuery={projectsQuery}
+            onQueryConsumed={() => setProjectsQuery("")}
+          />
         </div>
 
         <div
