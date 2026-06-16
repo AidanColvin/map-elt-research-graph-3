@@ -10,6 +10,7 @@
 import type { ReportData, CitationIndex } from '@/components/Report';
 import { normalize, buildCitationIndex, parseMoney, fmtUsd } from '@/components/Report';
 import { PdfDoc, wrapText, textWidth } from '@/lib/pdf-writer';
+import type { SectorReportModel } from '@/lib/sectorReport';
 
 // ── Block intermediate representation ──────────────────────────────────────
 export type ChartSeries = { label: string; value: number; color?: string };
@@ -23,7 +24,8 @@ export type Block =
   | { t: 'table'; headers: string[]; rows: string[][] }
   | { t: 'refs'; items: { id: number; text: string; url: string }[] }
   | { t: 'pagebreak' }
-  | { t: 'chart'; chartKind: 'bars' | 'donut'; title: string; subtitle?: string; series: ChartSeries[]; money?: boolean; solid?: boolean };
+  | { t: 'statgrid'; cells: { n: string; l: string }[] }
+  | { t: 'chart'; chartKind: 'bars' | 'donut'; title: string; subtitle?: string; series: ChartSeries[]; money?: boolean; solid?: boolean; barColor?: [number, number, number] };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -389,6 +391,26 @@ function renderBlocksToPdf(doc: PdfDoc, blocks: Block[], titleOverride?: string,
         y += 6;
         break;
       case 'pagebreak': doc.addPage(); y = margin; break;
+      case 'statgrid': {
+        // A row of bordered stat boxes, mirroring the on-screen stat strip
+        // (big number over a small uppercase label).
+        const cells = b.cells.length ? b.cells : [{ n: '0', l: '' }];
+        const gap = 8;
+        const boxW = (contentW - gap * (cells.length - 1)) / cells.length;
+        const boxH = 50;
+        ensure(boxH + 12);
+        const top = y;
+        for (let i = 0; i < cells.length; i++) {
+          const x = margin + i * (boxW + gap);
+          doc.rect(x, doc.height - top - boxH, boxW, boxH, [0.98, 0.98, 0.98]);
+          doc.text(cells[i].n, x + 11, baseline(top + 10, 17), { size: 17, bold: true, color: [0.11, 0.11, 0.11] });
+          let lbl = cells[i].l.toUpperCase();
+          while (textWidth(lbl, 7) > boxW - 18 && lbl.length > 3) lbl = lbl.slice(0, -1);
+          doc.text(lbl, x + 11, baseline(top + 34, 7), { size: 7, color: [0.54, 0.54, 0.57] });
+        }
+        y = top + boxH + 14;
+        break;
+      }
       case 'table': renderPdfTable(doc, b, margin, contentW, () => y, (v) => { y = v; }, ensure, baseline); break;
       case 'chart': renderPdfChart(doc, b, margin, contentW, () => y, (v) => { y = v; }, ensure, baseline); break;
     }
@@ -505,7 +527,7 @@ function renderPdfChart(
     const trackY = doc.height - (y + rowH / 2 + 4);
     doc.rect(barX, trackY, barMax, 8, [0.93, 0.93, 0.93]);
     const w = Math.max(2, (d.value / max) * barMax);
-    doc.rect(barX, trackY, w, 8, [0.04, 0.04, 0.04]);
+    doc.rect(barX, trackY, w, 8, b.barColor ?? [0.04, 0.04, 0.04]);
     // Value.
     doc.text(fmtVal(d.value), barX + barMax + 6, baseline(midTop, 8.5), { size: 8.5, bold: true });
     setY(y + rowH);
@@ -799,6 +821,117 @@ export function parseMarkdownBlocks(md: string): Block[] {
 // returns: nothing (saves "<title>-deep-dive.pdf")
 export async function downloadMarkdownPdf(markdown: string, title: string) {
   const blocks = parseMarkdownBlocks(markdown);
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, blocks, title);
+  saveBlob(doc.save(), `${markdownExportName(title)}.pdf`);
+}
+
+// Page-matching bar colors (same hues as the on-screen SectorReportHeader:
+// revenue ≈ #93b8f5 blue, R&D ≈ #9ed8bf green).
+const REV_BAR: [number, number, number] = [0.576, 0.722, 0.961];
+const RD_BAR: [number, number, number] = [0.62, 0.847, 0.749];
+
+// takes: the SectorReportModel that drives the on-screen Partnership Report
+// does: builds the same sections the page shows — title, stat strip, contact
+//       tiers, OSP note, revenue/R&D bar charts (colored), priority matrix,
+//       alignment chart, faculty, and data assets — as PDF blocks
+// returns: a Block[] ready for renderBlocksToPdf
+export function sectorModelToBlocks(m: SectorReportModel): Block[] {
+  const b: Block[] = [];
+  b.push({ t: 'p', text: `UNC PARTNERSHIP INTELLIGENCE · ${m.sector} · ${m.date} · ALL CLAIMS DOUBLE-SOURCED` });
+  b.push({ t: 'h1', text: m.sector });
+  b.push({ t: 'p', text: `${m.companiesReviewed} companies reviewed · SEC EDGAR · NIH RePORTER · PubMed · ClinicalTrials.gov` });
+
+  const revStr = m.combinedRevenueB >= 1000
+    ? `$${(m.combinedRevenueB / 1000).toFixed(1)}T`
+    : `$${m.combinedRevenueB}B`;
+  b.push({ t: 'statgrid', cells: [
+    { n: String(m.uncTies), l: 'UNC ties' },
+    { n: String(m.nihOverlaps), l: 'NIH grant overlaps' },
+    { n: String(m.pubmedPapers), l: 'Co-authored papers' },
+    { n: revStr, l: 'Combined revenue' },
+    { n: String(m.ncHeadquartered), l: 'NC-headquartered' },
+  ] });
+
+  // Quick-reference tiers.
+  b.push({ t: 'h3', text: 'Contact now — verify OSP first' });
+  b.push(m.contactNow.length
+    ? { t: 'list', items: m.contactNow.map((c) => `${c.name} · ${c.detail}`) }
+    : { t: 'p', text: 'None with active NIH grants.' });
+  b.push({ t: 'h3', text: 'Warm — paper on record' });
+  b.push(m.warm.length
+    ? { t: 'list', items: m.warm.map((c) => `${c.name} · ${c.detail}${c.nc ? ' · NC' : ''}`) }
+    : { t: 'p', text: 'None.' });
+  if (m.cold.length) {
+    b.push({ t: 'h3', text: 'No documented tie' });
+    b.push({ t: 'p', text: m.cold.join(' · ') });
+  }
+  if (m.ospCompanies.length) {
+    b.push({ t: 'p', text: `⚠ ${m.ospCompanies.length} companies have active NIH grants — contact UNC OSP (research.unc.edu/osp) before any outreach.` });
+  }
+
+  // Sector snapshot — colored revenue + R&D bars (valueB is in $B; scale to
+  // raw dollars so the money formatter renders "$716.9B" like the page).
+  b.push({ t: 'h2', text: 'Sector snapshot' });
+  if (m.revenuePeers.length) b.push({
+    t: 'chart', chartKind: 'bars', title: 'Revenue (SEC XBRL · latest FY)',
+    series: m.revenuePeers.map((p) => ({ label: p.name, value: p.valueB * 1e9 })),
+    money: true, barColor: REV_BAR,
+  });
+  if (m.rdPeers.length) b.push({
+    t: 'chart', chartKind: 'bars', title: 'R&D spend',
+    series: m.rdPeers.map((p) => ({ label: p.name, value: p.valueB * 1e9 })),
+    money: true, barColor: RD_BAR,
+  });
+
+  // Priority matrix.
+  b.push({ t: 'h2', text: 'Priority matrix' });
+  b.push(m.matrix.length
+    ? { t: 'table', headers: ['Company', 'Tier', 'Signal', 'UNC contact', 'Grant / paper', 'First move'],
+        rows: m.matrix.map((r) => [
+          r.company,
+          r.signal === 'None' ? 'Various' : r.tier,
+          r.signal,
+          r.contact || '—',
+          r.grantOrPmid || '—',
+          r.firstMove,
+        ]) }
+    : { t: 'p', text: 'No prioritized companies.' });
+
+  if (m.alignmentChart.length) b.push({
+    t: 'chart', chartKind: 'bars', title: 'UNC alignment signals by company',
+    subtitle: 'Matched grants, trials, and publications',
+    series: m.alignmentChart.map((a) => ({ label: a.name, value: a.count })),
+  });
+
+  if (m.faculty.length) {
+    b.push({ t: 'h2', text: 'UNC faculty with verified sector expertise' });
+    b.push({ t: 'table', headers: ['PI', 'Unit', 'Grant', 'Topic', 'FY', 'Company overlap'],
+      rows: m.faculty.map((f) => [f.name, f.unit, f.grant || '—', f.topic || '—', f.fy || '—', f.overlap || '—']) });
+  }
+
+  if (m.dataAssets.length) {
+    b.push({ t: 'h2', text: 'UNC data assets available to partners' });
+    b.push({ t: 'list', items: m.dataAssets.map((a) => `${a.name} — ${a.description} · held by ${a.heldBy}`) });
+  }
+
+  return b;
+}
+
+// takes: the SectorReportModel, per-company report markdown, and a title
+// does: renders a rich PDF that mirrors the on-screen Partnership Report —
+//       colored stat strip, charts, priority matrix, then one section per
+//       company — so the download reflects the page instead of flat text
+// returns: nothing (saves "<title>.pdf")
+export async function downloadPartnershipPdf(
+  m: SectorReportModel, cardMarkdowns: string[], title: string,
+) {
+  const blocks: Block[] = sectorModelToBlocks(m);
+  for (const md of cardMarkdowns) {
+    if (!md) continue;
+    blocks.push({ t: 'pagebreak' });
+    blocks.push(...parseMarkdownBlocks(md));
+  }
   const doc = new PdfDoc();
   renderBlocksToPdf(doc, blocks, title);
   saveBlob(doc.save(), `${markdownExportName(title)}.pdf`);
