@@ -26,12 +26,53 @@ body {
   margin: 0;
   padding: 0;
 }
+html {
+  /* Stop iOS from auto-inflating text when the device rotates to landscape. */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
 body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Kill the grey flash iOS paints over every tapped button/link. */
+  -webkit-tap-highlight-color: transparent;
+  /* A mis-sized child should never let the whole page scroll sideways on a
+     phone; individual scroll regions (tables, nav) opt back in locally.
+     `clip` (not `hidden`) clips the overflow without turning <body> into a
+     scroll container, so it can't break the sticky report topbar. */
+  overflow-x: clip;
+}
+
+/* iOS Safari counts the collapsible toolbar as part of `100vh`, so anything
+   sized to 100vh runs taller than the screen and hides its bottom (e.g. the
+   sticky report download bar). Dynamic viewport units (dvh) track the
+   *visible* area instead — applied in place on each rule below, with the vh
+   value kept first as a fallback for engines that lack dvh. */
+
+/* Momentum (rubber-band) scrolling inside the app's scroll containers, and a
+   guarantee that touch panning isn't swallowed. */
+.report,
+.table-wrap,
+.tree-scroll,
+.toc {
+  -webkit-overflow-scrolling: touch;
+}
+
+/* iOS zooms the page whenever a focused field's text is under 16px. Forcing
+   16px on touch pointers (covers iPhone + iPad) removes that jump without
+   touching the desktop type scale. The ghost overlay must match so the
+   autocomplete prediction stays aligned with the typed text. */
+@media (pointer: coarse) {
+  input,
+  select,
+  textarea,
+  .ws-input,
+  .ws-ghost {
+    font-size: 16px;
+  }
 }
 button {
   font-family: inherit;
@@ -185,11 +226,15 @@ a {
 /* ------------------------------- hero / idle ------------------------------- */
 .hero {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   padding: 48px 24px;
+  /* Keep the centered content clear of the notch in landscape. */
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
   background:
     radial-gradient(1200px 600px at 50% -10%, #fff 0%, var(--bg) 60%);
 }
@@ -331,6 +376,8 @@ a {
   justify-content: space-between;
   gap: 16px;
   padding: 12px 24px;
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
   background: rgba(250, 249, 247, 0.85);
   backdrop-filter: saturate(180%) blur(12px);
   border-bottom: 1px solid var(--line);
@@ -385,6 +432,7 @@ a {
   align-self: start;
   height: fit-content;
   max-height: calc(100vh - 100px);
+  max-height: calc(100dvh - 100px);
   overflow: auto;
 }
 .toc-head {
@@ -997,6 +1045,7 @@ a {
    so full-height tool screens are shortened to sit flush below it. */
 .map-embedded .hero {
   min-height: calc(100vh - 52px);
+  min-height: calc(100dvh - 52px);
 }
 
 /* Unified workspace typography: inside canvas cards the deep-dive markdown
@@ -1278,14 +1327,35 @@ select.ws-input {
 /* ----------------------------- mobile (phones) ----------------------------- */
 /* iPads (>= 768px) keep the full desktop layout; these target phone widths. */
 @media (max-width: 640px) {
-  .ws-header { padding: 0 12px !important; }
+  .ws-header {
+    padding: 0 12px !important;
+    /* Clear the notch when the phone is held in landscape. */
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
   .ws-wordmark { display: none; }
-  .ws-nav { gap: 2px !important; overflow-x: auto; }
-  .ws-nav-item { padding: 6px 9px !important; font-size: 13px !important; }
+  /* The six tabs can't all fit a phone's width, so let the nav itself shrink
+     and scroll horizontally (flex-shrink:0 inline would otherwise force the
+     whole page to scroll sideways). The scrollbar is hidden — it's a swipe. */
+  .ws-nav {
+    gap: 2px !important;
+    flex-shrink: 1 !important;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .ws-nav::-webkit-scrollbar { display: none; }
+  .ws-nav-item { padding: 6px 9px !important; font-size: 13px !important; white-space: nowrap; }
   .ws-account-label { display: none; }
   .ws-account-btn { padding: 5px !important; }
   /* Tighten the workspace gutter so cards aren't squeezed. */
-  .ws-main { padding-left: 12px !important; padding-right: 12px !important; }
+  .ws-main {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+    padding-left: max(12px, env(safe-area-inset-left)) !important;
+    padding-right: max(12px, env(safe-area-inset-right)) !important;
+  }
   .dash-home { padding: 32px 18px 28px !important; }
 }
 

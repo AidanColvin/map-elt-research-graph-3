@@ -192,7 +192,7 @@ export default function Intro({ onDone }: { onDone: () => void }) {
 
 const styles: Record<string, React.CSSProperties> = {
   wrap: {
-    minHeight: '100vh',
+    minHeight: '100dvh',
     width: '100%',
     background: '#f7f6f3',
     display: 'flex',
