@@ -45,7 +45,7 @@ export default function DashboardHome({
       maxWidth: 720,
       margin: "0 auto",
       padding: "48px 32px 32px",
-      minHeight: "calc(100vh - 54px)",
+      minHeight: "calc(100dvh - 54px)",
       display: "flex",
       flexDirection: "column",
     }}>
