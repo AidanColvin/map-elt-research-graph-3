@@ -62,10 +62,21 @@ function DownloadRow({ actions }: { actions: { label: string; fn: () => void | P
     try { await fn(); } finally { setBusy(null); }
   }
   return (
-    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-      {actions.map((a) => (
-        <button key={a.label} className={pill} style={pillStyle} disabled={!!busy} onClick={() => run(a.label, a.fn)}>
-          {busy === a.label ? "Building…" : a.label}
+    <div style={{ display: "flex", gap: 7, flexShrink: 0, flexWrap: "wrap" }}>
+      {actions.map((a, i) => (
+        <button
+          key={a.label}
+          disabled={!!busy}
+          onClick={() => run(a.label, a.fn)}
+          style={{
+            fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999,
+            cursor: busy ? "default" : "pointer", opacity: busy ? 0.6 : 1,
+            border: i === 0 ? "none" : "1px solid #ececf0",
+            background: i === 0 ? "#1d1d1f" : "#fff",
+            color: i === 0 ? "#fff" : "#1d1d1f",
+          }}
+        >
+          {busy === a.label ? "Building…" : `↓ ${a.label}`}
         </button>
       ))}
     </div>
