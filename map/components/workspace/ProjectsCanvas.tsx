@@ -140,21 +140,56 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   useEffect(() => {
     (async () => {
       const uid = currentUid();
-      // v4: different seeds for guests vs signed-in users.
-      // Guests see Information Technology, Financials, Healthcare.
-      // Signed-in users see Streaming, Artificial Intelligence.
       const isGuest = getSession()?.guest ?? true;
+      // The fixed demo set every guest sees. Signed-in users get their own
+      // starter set, seeded once, and keep anything they create afterwards.
       const guestSeeds = ["Information Technology", "Financials", "Healthcare"];
       const userSeeds = ["Streaming", "Artificial Intelligence"];
-      const seedKey = `map_seeded_examples_v4_${uid}`;
-      if (!localStorage.getItem(seedKey)) {
-        localStorage.setItem(seedKey, "1");
+
+      if (isGuest) {
+        // Guests get a deterministic, self-healing demo workspace: exactly the
+        // three curated example projects, every load. This both enforces the
+        // "guests only see these three" rule and auto-clears any stale projects
+        // left in a shared guest browser. (Guests have no account to persist to;
+        // signed-in users are the ones whose created projects are saved.)
+        const want = guestSeeds.map((n) => n.toLowerCase());
         const existing = await listProjects(uid);
-        const names = existing.map((p) => p.name.trim().toLowerCase());
-        const toSeed = (isGuest ? guestSeeds : userSeeds).filter(
-          (n) => !names.includes(n.toLowerCase())
-        );
-        for (const n of toSeed) await createProject(uid, n);
+        const byName = new Map<string, Project>();
+        for (const p of existing) {
+          const key = p.name.trim().toLowerCase();
+          // Remove anything that isn't a wanted seed, and any duplicate seed.
+          if (!want.includes(key) || byName.has(key)) {
+            await deleteProject(uid, p.id);
+          } else {
+            byName.set(key, p);
+          }
+        }
+        for (const n of guestSeeds) {
+          if (!byName.has(n.toLowerCase())) await createProject(uid, n);
+        }
+      } else {
+        // Signed-in users: seed the starter set once. Bump SEED_VERSION to
+        // re-seed. We also remove the PREVIOUS pristine auto-seeds (no saved
+        // runs) so old starters don't pile up — never touching a project the
+        // user ran or created by hand.
+        const SEED_VERSION = "v5";
+        const ALL_SEED_NAMES = [
+          "technology", "healthcare", "artificial intelligence",   // v1–v3
+          "information technology", "financials", "streaming",      // v4–v5
+        ];
+        const seedKey = `map_seeded_examples_${SEED_VERSION}_${uid}`;
+        if (!localStorage.getItem(seedKey)) {
+          localStorage.setItem(seedKey, "1");
+          const existing = await listProjects(uid);
+          for (const p of existing) {
+            if (!ALL_SEED_NAMES.includes(p.name.trim().toLowerCase())) continue;
+            const runs = await listSavedProfiles(uid, p.id);
+            if (runs.length === 0) await deleteProject(uid, p.id);
+          }
+          const remaining = (await listProjects(uid)).map((p) => p.name.trim().toLowerCase());
+          const toSeed = userSeeds.filter((n) => !remaining.includes(n.toLowerCase()));
+          for (const n of toSeed) await createProject(uid, n);
+        }
       }
       await refreshProjects();
     })();
