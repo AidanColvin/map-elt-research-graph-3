@@ -16,7 +16,7 @@ import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
 import type { AccountProfile } from "./accountProfile";
 import {
   downloadMarkdownPdf, downloadMarkdownDocx, downloadMarkdownText,
-  downloadPdf, downloadDocx,
+  downloadPdf, downloadDocx, downloadPartnershipPdf,
 } from "@/lib/report-export";
 import { downloadExcel } from "@/lib/report-excel";
 import { downloadAccountsExcel } from "./accountsExport";
@@ -497,7 +497,9 @@ export default function ProjectsCanvas({
     ? [
         ...(partnershipReportMd
           ? [
-              { label: "Partnership Report (PDF)", fn: () => downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`) },
+              { label: "Partnership Report (PDF)", fn: () => sectorModel
+                ? downloadPartnershipPdf(sectorModel, cards.map(cardToMarkdown), `${subjTitle} — Partnership Report`)
+                : downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`) },
               { label: "Partnership Report (DOCX)", fn: () => downloadMarkdownDocx(partnershipReportMd, `${subjTitle} — Partnership Report`) },
             ]
           : []),
@@ -619,7 +621,9 @@ export default function ProjectsCanvas({
                   </div>
                   {partnershipReportMd && (
                     <div style={{ display: "flex", gap: 7, flexShrink: 0 }}>
-                      <button onClick={() => downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "none", background: "#1d1d1f", color: "#fff" }}>↓ PDF</button>
+                      <button onClick={() => sectorModel
+                        ? downloadPartnershipPdf(sectorModel, cards.map(cardToMarkdown), `${subjTitle} — Partnership Report`)
+                        : downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "none", background: "#1d1d1f", color: "#fff" }}>↓ PDF</button>
                       <button onClick={() => downloadMarkdownText(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ Markdown</button>
                       <button onClick={() => downloadMarkdownDocx(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ DOCX</button>
                     </div>
