@@ -867,7 +867,7 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
     b.push({ t: 'p', text: m.cold.join(' · ') });
   }
   if (m.ospCompanies.length) {
-    b.push({ t: 'p', text: `⚠ ${m.ospCompanies.length} companies have active NIH grants — contact UNC OSP (research.unc.edu/osp) before any outreach.` });
+    b.push({ t: 'p', text: `Note: ${m.ospCompanies.length} companies have active NIH grants — contact UNC OSP (research.unc.edu/osp) before any outreach.` });
   }
 
   // Sector snapshot — colored revenue + R&D bars (valueB is in $B; scale to
