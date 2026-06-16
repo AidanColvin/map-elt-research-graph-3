@@ -73,6 +73,15 @@ SECTOR_SEEDS = {
     "robotics": ["Intuitive Surgical", "Rockwell Automation", "Teradyne", "Zebra Technologies", "Symbotic",
                  "ABB", "Cognex", "Roper Technologies", "Applied Industrial Technologies", "Watts Water Technologies",
                  "Keyence", "Yaskawa Electric", "Omron", "Brooks Automation", "Onto Innovation"],
+    # Public social media / social networking platforms that file with the SEC.
+    # Twitter/X (private), TikTok/ByteDance (private/Chinese) can't be sourced
+    # from free SEC filings, so those are excluded from this curated list.
+    # Alphabet (YouTube/Google) and Microsoft (LinkedIn) are included because
+    # they own major social platforms even though they aren't pure-play social.
+    "social media": ["Meta Platforms", "Snap", "Pinterest", "Reddit",
+                     "Alphabet", "Microsoft", "Bumble", "Match Group",
+                     "IAC", "Sprout Social", "Yelp", "ZoomInfo Technologies",
+                     "Duolingo", "Discord"],
     "telecom": ["Verizon", "AT&T", "T-Mobile US", "Cisco Systems", "Comcast",
                 "Charter Communications", "Lumen Technologies", "Crown Castle", "American Tower", "Qualcomm",
                 "DISH Network", "Telephone and Data Systems", "SBA Communications", "Calix", "Ribbon Communications"],
@@ -153,6 +162,7 @@ SECTOR_DOMAIN = {
     "technology": "tech", "software": "tech", "artificial intelligence": "tech",
     "semiconductors": "tech", "cybersecurity": "tech", "cloud computing": "tech",
     "quantum computing": "tech", "robotics": "tech", "telecom": "tech",
+    "social media": "tech",
     "fintech": "business", "finance": "business", "insurance": "business",
     "consumer": "business", "retail": "business", "industrial": "business",
     "climate tech": "energy", "energy": "energy", "automotive": "energy",
@@ -180,6 +190,7 @@ _KEYWORD_ROUTES = [
     (("fintech", "payment", "banking tech"), "fintech"),
     (("quantum",), "quantum computing"),
     (("robot", "automation"), "robotics"),
+    (("social media", "social network", "social platform", "social app"), "social media"),
     (("telecom", "wireless", "broadband", "5g", "network"), "telecom"),
     (("software", "app ", "platform", "devtool"), "software"),
     (("climate", "clean energy", "decarbon", "carbon", "solar", "renewable"), "climate tech"),
@@ -227,6 +238,9 @@ _EXACT_ALIASES = {
     "emr": "health it",
     "health it": "health it",
     "big tech": "technology",
+    "social media": "social media",
+    "social network": "social media",
+    "social networking": "social media",
     "biotechnology": "biotech",
     "pharma": "pharmaceutical",
     "health care": "healthcare",
