@@ -15,7 +15,7 @@ const TABS = [
   { label: "Dashboard", href: "/" },
   { label: "Company Profile", href: "/" },
   { label: "Sector Scan", href: "/" },
-  { label: "Companies", href: "/" },
+  { label: "Data", href: "/" },
   { label: "Partnerships", href: "/partnerships", active: true },
 ];
 
