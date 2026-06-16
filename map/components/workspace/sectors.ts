@@ -25,6 +25,8 @@ export const SECTORS = [
   "Consumer",
   "Retail",
   "Finance",
+  "Financials",
+  "Information Technology",
   "Insurance",
   "Industrial",
   "Social Media",
