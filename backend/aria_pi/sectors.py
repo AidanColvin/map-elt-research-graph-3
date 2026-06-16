@@ -73,6 +73,15 @@ SECTOR_SEEDS = {
     "robotics": ["Intuitive Surgical", "Rockwell Automation", "Teradyne", "Zebra Technologies", "Symbotic",
                  "ABB", "Cognex", "Roper Technologies", "Applied Industrial Technologies", "Watts Water Technologies",
                  "Keyence", "Yaskawa Electric", "Omron", "Brooks Automation", "Onto Innovation"],
+    # Public social media / social networking platforms that file with the SEC.
+    # Twitter/X (private), TikTok/ByteDance (private/Chinese) can't be sourced
+    # from free SEC filings, so those are excluded from this curated list.
+    # Alphabet (YouTube/Google) and Microsoft (LinkedIn) are included because
+    # they own major social platforms even though they aren't pure-play social.
+    "social media": ["Meta Platforms", "Snap", "Pinterest", "Reddit",
+                     "Alphabet", "Microsoft", "Bumble", "Match Group",
+                     "IAC", "Sprout Social", "Yelp", "ZoomInfo Technologies",
+                     "Duolingo", "Discord"],
     "telecom": ["Verizon", "AT&T", "T-Mobile US", "Cisco Systems", "Comcast",
                 "Charter Communications", "Lumen Technologies", "Crown Castle", "American Tower", "Qualcomm",
                 "DISH Network", "Telephone and Data Systems", "SBA Communications", "Calix", "Ribbon Communications"],
@@ -90,6 +99,15 @@ SECTOR_SEEDS = {
                   "L3Harris Technologies", "Textron", "Leidos Holdings", "HEICO", "TransDigm Group",
                   "Spirit AeroSystems", "Moog", "Mercury Systems", "Curtiss-Wright", "Ducommun"],
     # ── Consumer / industrial / finance ───────────────────────────────────
+    # Footwear — public SEC-filing companies only; Nike/Adidas are dual-listed
+    # (both footwear + apparel). Skechers, Foot Locker, Deckers, Wolverine
+    # World Wide, Caleres, Genesco, G-III Apparel are US-listed pure-plays.
+    "footwear": ["Nike", "Adidas", "Skechers", "Foot Locker", "Deckers Outdoor",
+                 "Wolverine World Wide", "Steve Madden", "Caleres", "Genesco", "G-III Apparel Group",
+                 "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "Vans"],
+    "shoes": ["Nike", "Adidas", "Skechers", "Foot Locker", "Deckers Outdoor",
+              "Wolverine World Wide", "Steve Madden", "Caleres", "Genesco", "G-III Apparel Group",
+              "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "Levi Strauss"],
     "consumer": ["Procter & Gamble", "Coca-Cola", "PepsiCo", "Nike", "Costco Wholesale",
                  "Unilever", "Colgate-Palmolive", "Kimberly-Clark", "Estee Lauder", "Church & Dwight",
                  "Clorox", "Hershey", "General Mills", "Hasbro", "Mattel"],
@@ -153,8 +171,10 @@ SECTOR_DOMAIN = {
     "technology": "tech", "software": "tech", "artificial intelligence": "tech",
     "semiconductors": "tech", "cybersecurity": "tech", "cloud computing": "tech",
     "quantum computing": "tech", "robotics": "tech", "telecom": "tech",
+    "social media": "tech",
     "fintech": "business", "finance": "business", "insurance": "business",
     "consumer": "business", "retail": "business", "industrial": "business",
+    "footwear": "business", "shoes": "business",
     "climate tech": "energy", "energy": "energy", "automotive": "energy",
     "aerospace": "energy",
 }
@@ -180,6 +200,7 @@ _KEYWORD_ROUTES = [
     (("fintech", "payment", "banking tech"), "fintech"),
     (("quantum",), "quantum computing"),
     (("robot", "automation"), "robotics"),
+    (("social media", "social network", "social platform", "social app"), "social media"),
     (("telecom", "wireless", "broadband", "5g", "network"), "telecom"),
     (("software", "app ", "platform", "devtool"), "software"),
     (("climate", "clean energy", "decarbon", "carbon", "solar", "renewable"), "climate tech"),
@@ -190,6 +211,7 @@ _KEYWORD_ROUTES = [
     (("bank", "asset manage", "capital market", "invest", "credit card",
       "wealth manage", "financial service"), "finance"),
     (("retail", "ecommerce", "e-commerce", "store"), "retail"),
+    (("shoe", "footwear", "sneaker", "boot", "sandal"), "footwear"),
     (("consumer", "cpg", "apparel", "food", "beverage"), "consumer"),
     (("industrial", "manufactur", "machinery", "logistics"), "industrial"),
     (("tech", "computing", "digital", "internet", "hardware", "data"), "technology"),
@@ -227,6 +249,12 @@ _EXACT_ALIASES = {
     "emr": "health it",
     "health it": "health it",
     "big tech": "technology",
+    "social media": "social media",
+    "social network": "social media",
+    "social networking": "social media",
+    "shoes": "shoes",
+    "footwear": "footwear",
+    "sneakers": "footwear",
     "biotechnology": "biotech",
     "pharma": "pharmaceutical",
     "health care": "healthcare",
