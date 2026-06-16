@@ -28,6 +28,9 @@ export const SECTORS = [
   "Insurance",
   "Industrial",
   "Social Media",
+  "Consumer Electronics",
+  "Gaming",
+  "Streaming",
 ];
 
 // Sector signal words. If a typed subject contains any of these (as a whole
@@ -55,6 +58,17 @@ const SECTOR_KEYWORDS = [
   "furniture", "home goods", "cosmetics", "beauty", "skincare",
   "jewelry", "luxury", "hotel", "hospitality", "travel", "airlines",
   "streaming", "music", "publishing", "advertising",
+  // Electronics & gaming product categories
+  "laptop", "laptops", "computer", "computers", "personal computer", "pc", "pcs",
+  "smartphone", "smartphones", "phone", "phones", "mobile phone",
+  "tablet", "tablets", "wearable", "wearables", "smartwatch",
+  "television", "televisions", "tv", "tvs", "monitor",
+  "gaming", "video game", "video games", "esports", "game console", "console",
+  "consumer electronics", "electronics",
+  // Automotive / mobility
+  "electric vehicle", "electric vehicles", "ev", "evs", "car", "cars", "truck", "trucks",
+  // Food & beverage
+  "coffee", "restaurant", "restaurants", "fast food", "grocery",
 ];
 
 // takes: a free-text subject typed into the unified Projects search
