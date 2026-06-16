@@ -25,11 +25,13 @@ const ALWAYS_PUBLIC = [
   '/api/auth',        // Firebase auth callbacks if present
 ];
 
-// The free, keyless data pipeline. These routes power the app for everyone —
-// including guests — so they must NOT require a token. Each does its own
-// optional token verification + per-client rate limiting inside the handler
-// (see lib/verifyAuth.ts). Any future user-scoped API route left off this list
-// still gets the Bearer gate below.
+// The free, keyless data pipeline. These routes are INTENTIONALLY unauthenticated
+// by design: the app uses only public data sources (SEC EDGAR, NIH, PubMed) with
+// no API keys, and is meant to work for all visitors including guests. Each route
+// does its own optional token verification + per-client IP-based rate limiting
+// (see lib/verifyAuth.ts and lib/rateLimit.ts). Any future user-scoped route
+// added here must include explicit justification; otherwise leave it off this
+// list so it falls through to the Bearer gate below.
 const PUBLIC_API = [
   '/api/generate',
   '/api/partnerships',
