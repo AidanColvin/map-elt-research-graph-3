@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Report, { type ReportData } from "@/components/Report";
 import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { useDeepDive } from "./useDeepDive";
@@ -104,13 +104,22 @@ function Panel({ title, note, actions, children }: {
   );
 }
 
-// takes: an optional new-Database-rows sink (merged into the Database tab)
+// takes: an optional new-Database-rows sink and an optional initial query from
+//        the Dashboard search bar
 // does: renders the Projects workspace — create/open projects, run the full
 //       pipeline (Company Profile + UNC Profile + Sector Scan + Database) on a
 //       typed subject, view each artifact, download as PDF/DOCX/Excel, and save
 //       the run into the project (reopen rehydrates everything offline).
 // returns: the Projects canvas element
-export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: AccountProfile[]) => void }) {
+export default function ProjectsCanvas({
+  onNewRows,
+  initialQuery,
+  onQueryConsumed,
+}: {
+  onNewRows?: (rows: AccountProfile[]) => void;
+  initialQuery?: string;
+  onQueryConsumed?: () => void;
+}) {
   const dive = useDeepDive();
   const scan = useSectorScan();
 
@@ -290,6 +299,17 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
       (uncStatus === "done" || uncStatus === "error")
     : (scan.status === "done" || scan.status === "error");
   useEffect(() => { if (runStatus === "running" && liveDone) setRunStatus("done"); }, [runStatus, liveDone]);
+
+  // When the Dashboard search bar sends a query here, auto-run it immediately.
+  const lastInitialQuery = useRef("");
+  useEffect(() => {
+    if (initialQuery && initialQuery !== lastInitialQuery.current) {
+      lastInitialQuery.current = initialQuery;
+      runSubject(initialQuery, "auto");
+      onQueryConsumed?.();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   // ── Database rows derived from the sector scan ─────────────────────────
   // Every company from the run is validated (legal name + identifier + citable
