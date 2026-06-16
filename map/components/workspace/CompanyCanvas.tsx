@@ -444,7 +444,7 @@ export default function CompanyCanvas({
           onOpenSnapshot={openSnapshot}
         />
       )}
-      {dive.status === "loading" && <Loading label={`Gathering public data on ${dive.company}…`} />}
+      {dive.status === "loading" && <Loading label={`Gathering public data on ${dive.company}…`} detail="~15 seconds" />}
       {showReport && (
         <div style={{ padding: "24px 28px 36px" }}>
           <div

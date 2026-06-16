@@ -240,7 +240,7 @@ export default function SectorCanvas({
           detail={
             scan.progress && scan.progress.total
               ? `${scan.progress.done} of ${scan.progress.total} companies`
-              : undefined
+              : "~60 seconds"
           }
         />
       )}
