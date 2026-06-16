@@ -189,7 +189,7 @@ export default function DashboardHome({
         {[
           { label: "Company Profile", sub: "Live SEC filings, charts, leadership", action: () => onOpenCompanyView() },
           { label: "Sector Scan",     sub: "Trials + grants + filings, parallel pull", action: () => onOpenSectorView() },
-          { label: "Companies",       sub: "Partner database, exportable", action: () => onOpenCompanyView() },
+          { label: "Data",            sub: "Partner database, exportable", action: () => onOpenCompanyView() },
         ].map((row, i, arr) => (
           <button key={row.label} onClick={row.action} style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",

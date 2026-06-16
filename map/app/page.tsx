@@ -34,7 +34,7 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "company", label: "Company" },
   { key: "sector", label: "Sector" },
   { key: "partnerships", label: "Partnerships" },
-  { key: "accounts", label: "Companies" },
+  { key: "accounts", label: "Data" },
   { key: "projects", label: "Projects" },
 ];
 
