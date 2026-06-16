@@ -9,7 +9,7 @@ import { buildPartnershipMarkdown, type PartnerData } from "./PartnershipsView";
 import { detectSubjectKind } from "./sectors";
 import CompanyReportCard from "./CompanyReportCard";
 import SectorReportHeader from "./SectorReportHeader";
-import { buildCardData, cardToMarkdown, type CompanyCardData } from "@/lib/companyCard";
+import { buildCardData, buildCompanyCard, cardToMarkdown, type CompanyCardData } from "@/lib/companyCard";
 import { buildSectorReport, type SectorReportModel } from "@/lib/sectorReport";
 import { mergeCompaniesIntoDB, validateIncomingCompany } from "@/lib/dedup";
 import { ACCOUNTS, getUniqueAccounts } from "./accountsData";
@@ -44,6 +44,9 @@ interface RunBundle {
   mode?: "company" | "sector";
   companyMd: string;
   uncMd: string;
+  // Raw UNC partnership payload, kept so a reopened company run can rebuild its
+  // rich card (older bundles without it fall back to the markdown panels only).
+  partnerData?: PartnerData | null;
   sectorData: ReportData | null;
   savedAt: number;
 }
@@ -138,6 +141,7 @@ export default function ProjectsCanvas({
   const [runStatus, setRunStatus] = useState<"idle" | "running" | "done">("idle");
   const [companyMd, setCompanyMd] = useState("");
   const [uncMd, setUncMd] = useState("");
+  const [partnerData, setPartnerData] = useState<PartnerData | null>(null);
   const [uncStatus, setUncStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
   const [sectorData, setSectorData] = useState<ReportData | null>(null);
   const [saveMsg, setSaveMsg] = useState("");
@@ -244,12 +248,12 @@ export default function ProjectsCanvas({
 
   function resetRun() {
     setSubject(""); setMode("auto"); setResolvedMode("company"); setRunStatus("idle");
-    setCompanyMd(""); setUncMd(""); setUncStatus("idle"); setSectorData(null); setSaveMsg("");
+    setCompanyMd(""); setUncMd(""); setPartnerData(null); setUncStatus("idle"); setSectorData(null); setSaveMsg("");
   }
 
   // ── Pipeline run ───────────────────────────────────────────────────────
   async function runUNC(name: string) {
-    setUncStatus("loading"); setUncMd("");
+    setUncStatus("loading"); setUncMd(""); setPartnerData(null);
     try {
       const res = await authFetch("/api/partnerships", {
         method: "POST", headers: { "Content-Type": "application/json" },
@@ -257,7 +261,9 @@ export default function ProjectsCanvas({
       });
       const json = await res.json().catch(() => null);
       if (!res.ok || !json?.data) { setUncStatus("error"); return; }
-      setUncMd(buildPartnershipMarkdown(json.data as PartnerData));
+      const data = json.data as PartnerData;
+      setPartnerData(data);
+      setUncMd(buildPartnershipMarkdown(data));
       setUncStatus("done");
     } catch { setUncStatus("error"); }
   }
@@ -276,7 +282,7 @@ export default function ProjectsCanvas({
     // tech" → sector); otherwise honor the user's forced choice.
     const eff: "company" | "sector" = chosen === "auto" ? detectSubjectKind(s) : chosen;
     setResolvedMode(eff);
-    setCompanyMd(""); setUncMd(""); setSectorData(null); setSaveMsg("");
+    setCompanyMd(""); setUncMd(""); setPartnerData(null); setSectorData(null); setSaveMsg("");
     setRunStatus("running");
     if (eff === "company") {
       dive.run(s);   // Company Profile
@@ -300,14 +306,31 @@ export default function ProjectsCanvas({
     : (scan.status === "done" || scan.status === "error");
   useEffect(() => { if (runStatus === "running" && liveDone) setRunStatus("done"); }, [runStatus, liveDone]);
 
-  // When the Dashboard search bar sends a query here, auto-run it immediately.
+  // When the Dashboard search bar sends a query here, open (or create) a project
+  // named after that text and auto-run the pipeline inside it — so the searched
+  // text becomes a real project page with a freshly generated report, not an
+  // invisible run behind the project picker.
   const lastInitialQuery = useRef("");
   useEffect(() => {
-    if (initialQuery && initialQuery !== lastInitialQuery.current) {
-      lastInitialQuery.current = initialQuery;
-      runSubject(initialQuery, "auto");
-      onQueryConsumed?.();
-    }
+    const q = initialQuery?.trim();
+    if (!q || initialQuery === lastInitialQuery.current) return;
+    lastInitialQuery.current = initialQuery!;
+    onQueryConsumed?.();
+    (async () => {
+      const uid = currentUid();
+      // Reuse a same-named project if one already exists (case-insensitive);
+      // openProject then loads its latest saved run or runs fresh as needed.
+      const existing = (await listProjects(uid)).find(
+        (p) => p.name.trim().toLowerCase() === q.toLowerCase(),
+      );
+      let proj = existing;
+      if (!proj) {
+        const id = await createProject(uid, q);
+        proj = (await listProjects(uid)).find((p) => p.id === id);
+      }
+      await refreshProjects();
+      if (proj) await openProject(proj);
+    })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
 
@@ -344,10 +367,19 @@ export default function ProjectsCanvas({
     return buildSectorReport(sectorData);
   }, [sectorData]);
 
+  // ── Rich card for company runs ─────────────────────────────────────────
+  // Mirrors the sector report's per-company card: financial stat tiles parsed
+  // from the Company Profile prose + UNC ties from the partnership payload.
+  const companyCard = useMemo<CompanyCardData | null>(() => {
+    if (resolvedMode === "sector") return null;
+    if (!companyMd && !partnerData) return null;
+    return buildCompanyCard(subject, companyMd, partnerData);
+  }, [resolvedMode, subject, companyMd, partnerData]);
+
   // ── Save / reopen a run ────────────────────────────────────────────────
   async function saveRun() {
     if (!current) return;
-    const bundle: RunBundle = { subject, mode: resolvedMode, companyMd, uncMd, sectorData, savedAt: Date.now() };
+    const bundle: RunBundle = { subject, mode: resolvedMode, companyMd, uncMd, partnerData, sectorData, savedAt: Date.now() };
     setSaveMsg("Saving…");
     await saveProfileToProject(currentUid(), current.id, {
       companyName: subject || "Pipeline run",
@@ -371,6 +403,7 @@ export default function ProjectsCanvas({
       setResolvedMode(b.sectorData ? "sector" : savedMode);
       setCompanyMd(b.companyMd || "");
       setUncMd(b.uncMd || "");
+      setPartnerData(b.partnerData ?? null);
       setUncStatus(b.uncMd ? "done" : "idle");
       setSectorData(b.sectorData || null);
       setSaveMsg("");
@@ -646,6 +679,24 @@ export default function ProjectsCanvas({
             )}
 
             {resolvedMode !== "sector" && <>
+              {/* Partnership Report — the board-ready card, shown first so a
+                  company run reads like the sector report's per-company cards. */}
+              {companyCard && (companyMd || uncMd) && (
+                <section style={{ background: "rgba(255,255,255,0.62)", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: "22px 26px", boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+                  <div>
+                    <h3 style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.01em", margin: 0 }}>Partnership Report</h3>
+                    <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "4px 0 0" }}>
+                      Board-ready summary sourced to SEC EDGAR, NIH RePORTER, PubMed, and ClinicalTrials.gov. Full profile below.
+                    </p>
+                  </div>
+                  <CompanyReportCard
+                    data={companyCard}
+                    onDownloadPDF={() => downloadMarkdownPdf(cardToMarkdown(companyCard), `${subjTitle} — Partnership Report`)}
+                    onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(companyCard), `${subjTitle} — Partnership Report`)}
+                  />
+                </section>
+              )}
+
               <Panel
                 title="Company Profile"
                 note={dive.status === "streaming" || (runStatus === "running" && !companyMd) ? "Generating…" : undefined}
