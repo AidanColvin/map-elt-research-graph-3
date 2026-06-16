@@ -65,6 +65,18 @@ function firstSource(sources: any): string | undefined {
   return sources.find((s) => typeof s === "string" && /^https?:\/\//.test(s));
 }
 
+// Clean a value captured from report markdown: drop a trailing "[n]" citation
+// marker, surrounding bold markers, and whitespace.
+function cleanMd(s: string): string {
+  return (s || "").replace(/\s*\[\d+\]\s*$/, "").replace(/\*\*/g, "").trim();
+}
+
+// First capture group of `re` in `md`, cleaned — or "" if no match.
+function matchMd(md: string, re: RegExp): string {
+  const m = (md || "").match(re);
+  return m ? cleanMd(m[1]) : "";
+}
+
 // takes: one raw sector-scan profile, the full report (for sector peers +
 //        talking points), all sourced from the backend
 // does: builds the card data model using only sourced facts
@@ -206,6 +218,132 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
     company, problem, goal, solution, contacts, assets, trials,
     rdPeers: rdPeersFinal, talkingPoints,
     ospFlag: grantCount > 0, ospGrantCount: grantCount,
+  };
+}
+
+// takes: the company subject, the streamed Company Profile markdown, and the
+//        resolved UNC partnership payload (PartnerData; either may be partial)
+// does: assembles the SAME CompanyCardData model the sector cards use, so a
+//       single-company run renders with the rich card layout. Financial stat
+//       tiles + meta line are read from the profile prose; UNC ties (contacts,
+//       trials, data assets, signals) come from the structured partnership data.
+//       Nothing is invented — fields with no source stay empty and the card
+//       omits their section. Sector-only pieces (R&D peer chart) are left empty.
+// returns: a CompanyCardData for one company run
+export function buildCompanyCard(subject: string, companyMd: string, partner: any): CompanyCardData {
+  const md = companyMd || "";
+  const name = (partner?.resolved_name || subject || matchMd(md, /^#\s+(.+)$/m) || "Company").trim();
+
+  // ── Financials, parsed from the Company Profile prose (live-report template).
+  const moneyRe = "(\\$[\\d.,]+\\s*(?:billion|million|trillion|[BMKT])?)";
+  const revenue = matchMd(md, new RegExp(`reported revenue of ${moneyRe}`, "i"));
+  const netIncome = matchMd(md, new RegExp(`[Nn]et income was ${moneyRe}`));
+  const netLoss = matchMd(md, new RegExp(`net loss of ${moneyRe}`, "i"));
+  const grossMargin = matchMd(md, /[Gg]ross margin was ([\d.]+%)/);
+  const totalAssets = matchMd(md, new RegExp(`[Tt]otal assets(?:\\s+were|\\s+of)?\\s+${moneyRe}`));
+
+  // ── UNC ties, from the structured partnership payload.
+  const nihPis: any[] = Array.isArray(partner?.nih_pis) ? partner.nih_pis : [];
+  const facultyLeads: any[] = Array.isArray(partner?.unc_faculty_leads) ? partner.unc_faculty_leads : [];
+  const grants: any[] = Array.isArray(partner?.nih_grants) ? partner.nih_grants : [];
+  const trials: any[] = Array.isArray(partner?.trials) ? partner.trials : [];
+  const units: any[] = Array.isArray(partner?.unc_units) ? partner.unc_units : [];
+  const signals: any[] = Array.isArray(partner?.relationship_signals) ? partner.relationship_signals : [];
+  const jointTrials: any[] = Array.isArray(partner?.unc_joint_trials) ? partner.unc_joint_trials : [];
+  const papers: number = Number(partner?.clinical?.count) || 0;
+  const secMentions: number = Array.isArray(partner?.financial?.quotes) ? partner.financial.quotes.length : 0;
+  const edgar: string | undefined = partner?.links?.edgar || undefined;
+  const pubmed: string | undefined = partner?.links?.pubmed || undefined;
+  const trialCount = Number(partner?.trials_total) || trials.length;
+
+  const uncActive = nihPis.length > 0 || grants.length > 0 || papers > 0 || jointTrials.length > 0;
+  const uncStatus: "active" | "prior" | "none" = uncActive ? "active" : secMentions > 0 ? "prior" : "none";
+
+  // Meta line — exchange/ticker, HQ, industry, fiscal year end.
+  const listing = matchMd(md, /\*\*Listing:\*\*\s*([^\n]+)/);
+  const hq = matchMd(md, /\*\*HQ:\*\*\s*([^\n]+)/);
+  const industry = matchMd(md, /\*\*Industry:\*\*\s*([^\n]+)/);
+  const fyEnd = matchMd(md, /\*\*Fiscal year end:\*\*\s*([^\n]+)/);
+  const metaLine = [listing, hq, fyEnd && `FY end ${fyEnd}`].filter(Boolean).join(" · ");
+
+  // Stat tiles — same four-up bar as the sector card. "—" when not on file.
+  const stats: CardStat[] = [
+    { value: revenue || "—", label: "Revenue" },
+    netIncome ? { value: netIncome, label: "Net income" }
+      : netLoss ? { value: `–${netLoss}`, label: "Net loss" }
+      : { value: grossMargin || "—", label: "Gross margin" },
+    { value: totalAssets || "—", label: "Total assets" },
+    { value: String(trialCount), label: trialCount === 1 ? "Active trial" : "Active trials" },
+  ];
+
+  // Signal pills (the "Active NIH"/"UNC research" ones are rendered via the
+  // status pill, so they're filtered out by the card — keep extras only).
+  const pills: string[] = [];
+  if (partner?.nc_based) pills.push("NC-headquartered");
+  if (papers > 0) pills.push(`${papers} UNC paper${papers === 1 ? "" : "s"}`);
+
+  const links: CardLink[] = [];
+  if (edgar) links.push({ label: "SEC EDGAR", url: edgar });
+  if (pubmed && papers > 0) links.push({ label: `${papers} UNC paper${papers === 1 ? "" : "s"}`, url: pubmed });
+  if (trials.length) links.push({ label: `${trials.length} trial${trials.length === 1 ? "" : "s"}`, url: trials[0]?.url || "https://clinicaltrials.gov" });
+
+  const company: CardBullet[] = [];
+  if (industry) company.push({ text: `Focus · ${industry}`, url: edgar });
+  if (trials.length) company.push({ text: `Clinical pipeline · ${trials.length} trial${trials.length === 1 ? "" : "s"} on ClinicalTrials.gov`, url: trials[0]?.url });
+  if (papers > 0) company.push({ text: `Research footprint · ${papers} UNC co-authored paper${papers === 1 ? "" : "s"} in PubMed`, url: pubmed });
+  if (secMentions > 0) company.push({ text: `Partnership signal · ${secMentions} verbatim UNC mention${secMentions === 1 ? "" : "s"} in SEC filings`, url: edgar });
+  company.push({ text: `UNC status · ${uncStatus}${grants.length ? ` · ${grants.length} NIH grant${grants.length === 1 ? "" : "s"} overlapping` : ""}`, url: grants.length ? grants[0]?.url : edgar });
+
+  // Problem — factual gaps only.
+  const problem: CardBullet[] = [];
+  if (!uncActive) problem.push({ text: "No co-authored papers, NIH grants, or trials with UNC found in public databases", url: edgar });
+  if (secMentions === 0) problem.push({ text: "No verbatim UNC mention on file in recent SEC filings", url: edgar });
+  if (trials.length) problem.push({ text: `${trials.length} active trial${trials.length === 1 ? "" : "s"} — clinical evidence is being generated now`, url: trials[0]?.url });
+
+  // Goal — sourced UNC joint trials (where the company's work meets UNC).
+  const goal: CardBullet[] = jointTrials.slice(0, 3).map((t) => ({
+    text: `${trunc(t.title || "Joint clinical trial", 64)} → UNC`,
+    url: t.url,
+  }));
+
+  // Solution — sourced relationship signals (8-K excerpts, filings).
+  const solution: CardBullet[] = signals.slice(0, 3).map((s) => ({
+    text: trunc(s.excerpt || s.filing_type || "", 140),
+    url: s.source_url,
+  })).filter((b) => b.text);
+
+  // UNC contacts — named PIs (RePORTER) then verified faculty leads.
+  const contacts: CardContact[] = [];
+  nihPis.slice(0, 6).forEach((p) => contacts.push({
+    pi: p.name || "", unit: trunc(p.org || "UNC Chapel Hill", 40),
+    grant: grantIdFromUrl(p.grant_url || ""), fy: "",
+    topic: trunc(p.project_title || "", 60), url: p.grant_url || "https://reporter.nih.gov",
+  }));
+  facultyLeads.slice(0, Math.max(0, 6 - contacts.length)).forEach((f) => contacts.push({
+    pi: f.pi_name || "", unit: trunc(f.department || "UNC Chapel Hill", 40),
+    grant: f.grant_number || "", fy: f.fiscal_year ? String(f.fiscal_year) : "",
+    topic: trunc(f.project_title || "", 60), url: undefined,
+  }));
+  const contactsFinal = contacts.filter((c) => c.pi);
+
+  // UNC data assets — units that have published on the subject.
+  const assets: CardAsset[] = units.slice(0, 5).map((u) => ({
+    name: u.unit || "", relevance: `${u.count} UNC publication${u.count === 1 ? "" : "s"} referencing ${name}`,
+    url: pubmed,
+  })).filter((a) => a.name);
+
+  // Active trials list (ClinicalTrials.gov).
+  const trialsList: CardTrial[] = trials.slice(0, 6).map((t) => ({
+    title: trunc(t.title || "Trial", 60), status: t.status || t.phase || "",
+    url: t.url || "https://clinicaltrials.gov",
+  }));
+
+  const grantCount = nihPis.length || grants.length;
+  return {
+    name, metaLine, tier: "Translational", uncStatus, pills, stats, links,
+    company, problem, goal, solution, contacts: contactsFinal, assets, trials: trialsList,
+    rdPeers: [], talkingPoints: [],
+    ospFlag: grants.length > 0, ospGrantCount: grantCount,
   };
 }
 
