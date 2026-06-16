@@ -3,7 +3,6 @@
 import { useState, useRef } from "react";
 import { OrbitNetwork } from "@/components/Chart3D";
 import { getCompanySuggestion } from "./companySuggestions";
-import { getSectorSuggestion } from "./sectors";
 
 const ORBIT_POINTS = [
   { label: "Merck",       size: 0.8,  highlight: true  },
@@ -21,26 +20,21 @@ const ORBIT_POINTS = [
 ];
 
 export default function DashboardHome({
-  onRunCompany,
-  onRunSector,
+  onRunProject,
   onOpenCompanyView,
   onOpenSectorView,
   onPrefillSector,
 }: {
-  onRunCompany:      (name: string) => void;
-  onRunSector:       (name: string) => void;
+  onRunProject:      (name: string) => void;
   onOpenCompanyView: () => void;
   onOpenSectorView:  () => void;
   onPrefillSector:   (name: string) => void;
 }) {
-  const [mode, setMode] = useState<"company" | "sector">("company");
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const suggestion = query.trim()
-    ? (mode === "company" ? getCompanySuggestion(query) : getSectorSuggestion(query))
-    : null;
+  const suggestion = query.trim() ? getCompanySuggestion(query) : null;
   const ghost = suggestion && suggestion.toLowerCase().startsWith(query.toLowerCase())
     ? suggestion.slice(query.length)
     : null;
@@ -52,8 +46,7 @@ export default function DashboardHome({
   function submit() {
     const q = query.trim();
     if (!q) return;
-    if (mode === "company") onRunCompany(q);
-    else onRunSector(q);
+    onRunProject(q);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -88,23 +81,15 @@ export default function DashboardHome({
 
       {/* Search */}
       <div style={{ marginBottom: 16 }}>
-        {/* Company / Sector toggle */}
+        {/* Project label — a search here sets up and runs a new project */}
         <div style={{
-          display: "inline-flex", padding: 3, marginBottom: 12,
-          background: "#f0f0f2", borderRadius: 999,
+          display: "inline-flex", padding: "6px 18px", marginBottom: 12,
+          background: "#fff", borderRadius: 999,
+          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
         }}>
-          {(["company", "sector"] as const).map((m) => (
-            <button key={m} onClick={() => setMode(m)} style={{
-              padding: "6px 18px", fontSize: 13.5, fontWeight: 600,
-              border: "none", borderRadius: 999, cursor: "pointer",
-              background: mode === m ? "#fff" : "transparent",
-              color: mode === m ? "#1d1d1f" : "#86868b",
-              boxShadow: mode === m ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-              transition: "all 0.15s",
-            }}>
-              {m === "company" ? "Company" : "Sector"}
-            </button>
-          ))}
+          <span style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f" }}>
+            Project
+          </span>
         </div>
 
         {/* Search input */}
@@ -143,7 +128,7 @@ export default function DashboardHome({
               onKeyDown={handleKeyDown}
               onFocus={() => setFocused(true)}
               onBlur={() => setFocused(false)}
-              placeholder={mode === "company" ? "Search a company, e.g. Pfizer" : "Search a sector, e.g. oncology"}
+              placeholder="Start a project, e.g. Pfizer or oncology"
               autoComplete="off"
               spellCheck={false}
               style={{
