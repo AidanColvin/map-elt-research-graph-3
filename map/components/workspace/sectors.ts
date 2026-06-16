@@ -27,6 +27,7 @@ export const SECTORS = [
   "Finance",
   "Insurance",
   "Industrial",
+  "Social Media",
 ];
 
 // Sector signal words. If a typed subject contains any of these (as a whole
@@ -43,9 +44,17 @@ const SECTOR_KEYWORDS = [
   "automotive", "mobility", "aerospace", "defense", "defence", "space",
   "consumer", "retail", "ecommerce", "e-commerce", "industrial", "manufacturing",
   "logistics", "supply chain", "agriculture", "agtech", "ag-bio", "gaming",
-  "entertainment", "media", "oncology", "cardiology", "neurology", "genomics",
+  "entertainment", "media", "social media", "social network",
+  "oncology", "cardiology", "neurology", "genomics",
   "gene therapy", "diagnostics", "devices", "sector", "industry", "services",
   "platforms", "saas", "edtech", "proptech", "foodtech", "nanotech",
+  // Product / lifestyle categories — prevent Wikipedia-style company misclassification
+  "shoes", "footwear", "apparel", "fashion", "clothing", "sportswear",
+  "alcohol", "beer", "wine", "spirits", "beverage", "beverages",
+  "food", "snacks", "candy", "confectionery", "dairy",
+  "furniture", "home goods", "cosmetics", "beauty", "skincare",
+  "jewelry", "luxury", "hotel", "hospitality", "travel", "airlines",
+  "streaming", "music", "publishing", "advertising",
 ];
 
 // takes: a free-text subject typed into the unified Projects search
