@@ -583,7 +583,7 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
                 actions={companyActions}
               >
                 {companyMd
-                  ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "")} /></div>
+                  ? <div className="workspace-md"><MarkdownArticle markdown={companyMd.replace(/^#\s+.*\n?/, "").replace(/^[^\n]*·[^\n]*\n?/, "")} /></div>
                   : <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No company profile yet.</p>}
               </Panel>
 
