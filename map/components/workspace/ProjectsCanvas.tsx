@@ -318,8 +318,8 @@ export default function ProjectsCanvas({
     onQueryConsumed?.();
     (async () => {
       const uid = currentUid();
-      // Reuse a same-named project if one already exists (case-insensitive);
-      // openProject then loads its latest saved run or runs fresh as needed.
+      // Reuse a same-named project if one already exists (case-insensitive) so
+      // repeat searches don't pile up duplicates; otherwise create it.
       const existing = (await listProjects(uid)).find(
         (p) => p.name.trim().toLowerCase() === q.toLowerCase(),
       );
@@ -329,7 +329,15 @@ export default function ProjectsCanvas({
         proj = (await listProjects(uid)).find((p) => p.id === id);
       }
       await refreshProjects();
-      if (proj) await openProject(proj);
+      if (!proj) return;
+      // Open the project and ALWAYS run a fresh pipeline on the typed text — a
+      // dashboard search is an explicit "run this" intent, so we never silently
+      // reopen a stale saved run here (those stay available as the run pills).
+      setCurrent(proj);
+      resetRun();
+      const profiles = await listSavedProfiles(uid, proj.id);
+      setSavedRuns(profiles.filter((s) => s.ticker === BUNDLE_TICKER));
+      runSubject(q, "auto");
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialQuery]);
