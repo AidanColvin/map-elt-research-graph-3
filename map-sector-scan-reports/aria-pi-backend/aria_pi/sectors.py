@@ -99,6 +99,15 @@ SECTOR_SEEDS = {
                   "L3Harris Technologies", "Textron", "Leidos Holdings", "HEICO", "TransDigm Group",
                   "Spirit AeroSystems", "Moog", "Mercury Systems", "Curtiss-Wright", "Ducommun"],
     # ── Consumer / industrial / finance ───────────────────────────────────
+    # Footwear — public SEC-filing companies only; Nike/Adidas are dual-listed
+    # (both footwear + apparel). Skechers, Foot Locker, Deckers, Wolverine
+    # World Wide, Caleres, Genesco, G-III Apparel are US-listed pure-plays.
+    "footwear": ["Nike", "Adidas", "Skechers", "Foot Locker", "Deckers Outdoor",
+                 "Wolverine World Wide", "Steve Madden", "Caleres", "Genesco", "G-III Apparel Group",
+                 "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "Vans"],
+    "shoes": ["Nike", "Adidas", "Skechers", "Foot Locker", "Deckers Outdoor",
+              "Wolverine World Wide", "Steve Madden", "Caleres", "Genesco", "G-III Apparel Group",
+              "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "Levi Strauss"],
     "consumer": ["Procter & Gamble", "Coca-Cola", "PepsiCo", "Nike", "Costco Wholesale",
                  "Unilever", "Colgate-Palmolive", "Kimberly-Clark", "Estee Lauder", "Church & Dwight",
                  "Clorox", "Hershey", "General Mills", "Hasbro", "Mattel"],
@@ -165,6 +174,7 @@ SECTOR_DOMAIN = {
     "social media": "tech",
     "fintech": "business", "finance": "business", "insurance": "business",
     "consumer": "business", "retail": "business", "industrial": "business",
+    "footwear": "business", "shoes": "business",
     "climate tech": "energy", "energy": "energy", "automotive": "energy",
     "aerospace": "energy",
 }
@@ -201,6 +211,7 @@ _KEYWORD_ROUTES = [
     (("bank", "asset manage", "capital market", "invest", "credit card",
       "wealth manage", "financial service"), "finance"),
     (("retail", "ecommerce", "e-commerce", "store"), "retail"),
+    (("shoe", "footwear", "sneaker", "boot", "sandal"), "footwear"),
     (("consumer", "cpg", "apparel", "food", "beverage"), "consumer"),
     (("industrial", "manufactur", "machinery", "logistics"), "industrial"),
     (("tech", "computing", "digital", "internet", "hardware", "data"), "technology"),
@@ -241,6 +252,9 @@ _EXACT_ALIASES = {
     "social media": "social media",
     "social network": "social media",
     "social networking": "social media",
+    "shoes": "shoes",
+    "footwear": "footwear",
+    "sneakers": "footwear",
     "biotechnology": "biotech",
     "pharma": "pharmaceutical",
     "health care": "healthcare",
