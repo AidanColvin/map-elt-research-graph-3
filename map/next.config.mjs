@@ -25,7 +25,7 @@ const nextConfig = {
       "form-action 'self'",
       "script-src 'self' 'unsafe-inline' https://apis.google.com https://*.firebaseapp.com",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' data: blob: https:",
+      "img-src 'self' data: blob: https://www.google.com https://icons.duckduckgo.com",
       "font-src 'self' data:",
       "connect-src 'self' https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://*.firebaseapp.com https://accounts.google.com",
       // Firebase signInWithPopup loads an invisible auth-relay iframe from the

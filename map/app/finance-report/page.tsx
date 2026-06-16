@@ -159,6 +159,13 @@ export default function FinanceReportPage() {
   );
 }
 
+function renderBold(text: string): React.ReactNode[] {
+  const parts = text.split(/\*\*(.+?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i}>{part}</strong> : <span key={i}>{part}</span>
+  );
+}
+
 function ReportSection({ heading, body }: { heading: string; body: string }) {
   if (!body.trim() && !heading) return null;
 
@@ -247,7 +254,7 @@ function ReportSection({ heading, body }: { heading: string; body: string }) {
       elements.push(<p key={elements.length} style={{ fontSize: 12, color: "#86868b", fontStyle: "italic", margin: "16px 0 0" }}>{line.replace(/^\*|\*$/g, "")}</p>);
       continue;
     }
-    elements.push(<p key={elements.length} style={{ fontSize: 14, color: "#3a3a3c", lineHeight: 1.7, margin: "6px 0" }} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>") }} />);
+    elements.push(<p key={elements.length} style={{ fontSize: 14, color: "#3a3a3c", lineHeight: 1.7, margin: "6px 0" }}>{renderBold(line)}</p>);
   }
   flushTable();
   flushList();

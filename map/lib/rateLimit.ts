@@ -16,6 +16,16 @@ interface Bucket {
 
 const store = new Map<string, Bucket>();
 
+// Purge expired buckets periodically so the Map doesn't grow without bound
+// in long-lived processes. Only matters in dev; production is serverless.
+function purgeExpired() {
+  const now = Date.now();
+  for (const [key, bucket] of store) {
+    if (now > bucket.resetAt) store.delete(key);
+  }
+}
+if (typeof setInterval !== "undefined") setInterval(purgeExpired, 60_000);
+
 export function checkRateLimit(
   uid: string,
   route: string,
