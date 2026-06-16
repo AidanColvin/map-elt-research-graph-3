@@ -22,11 +22,13 @@ export default function DashboardHome({
   onRunCompany,
   onRunSector,
   onOpenCompanyView,
+  onOpenSectorView,
   onPrefillSector,
 }: {
   onRunCompany:      (name: string) => void;
   onRunSector:       (name: string) => void;
   onOpenCompanyView: () => void;
+  onOpenSectorView:  () => void;
   onPrefillSector:   (name: string) => void;
 }) {
   const [mode, setMode] = useState<"company" | "sector">("company");
@@ -140,8 +142,8 @@ export default function DashboardHome({
         </p>
         {[
           { label: "Company Profile", sub: "Live SEC filings, charts, leadership", action: () => onOpenCompanyView() },
-          { label: "Sector Scan",     sub: "Trials + grants + filings, parallel pull", action: () => onRunSector("") },
-          { label: "Database",        sub: "Partner database, exportable", action: () => onOpenCompanyView() },
+          { label: "Sector Scan",     sub: "Trials + grants + filings, parallel pull", action: () => onOpenSectorView() },
+          { label: "Companies",       sub: "Partner database, exportable", action: () => onOpenCompanyView() },
         ].map((row, i, arr) => (
           <button key={row.label} onClick={row.action} style={{
             display: "flex", alignItems: "center", justifyContent: "space-between",
