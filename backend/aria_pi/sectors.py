@@ -309,7 +309,10 @@ _EXACT_ALIASES = {
     "financial services": "finance",
     "financial service": "finance",
     "financial": "finance",
+    "financials": "finance",
     "banking": "finance",
+    "information technology": "technology",
+    "information tech": "technology",
     # Short, unambiguous shorthands.
     "fin": "finance",
     "med": "medtech",

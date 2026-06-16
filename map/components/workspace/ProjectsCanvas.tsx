@@ -25,6 +25,7 @@ import {
   type Project, type SavedProfile,
 } from "@/src/firebase/db";
 import { getFirebaseAuth } from "@/lib/firebase";
+import { getSession } from "@/components/AuthGate";
 import { authFetch } from "@/lib/authFetch";
 import { CanvasCard, FONT } from "./ui";
 
@@ -139,14 +140,18 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   useEffect(() => {
     (async () => {
       const uid = currentUid();
-      // v3: seed Technology, Healthcare, and AI for every user.
-      // New key ensures existing users who only got v1/v2 seeds get Healthcare too.
-      const seedKey = `map_seeded_examples_v3_${uid}`;
+      // v4: different seeds for guests vs signed-in users.
+      // Guests see Information Technology, Financials, Healthcare.
+      // Signed-in users see Streaming, Artificial Intelligence.
+      const isGuest = getSession()?.guest ?? true;
+      const guestSeeds = ["Information Technology", "Financials", "Healthcare"];
+      const userSeeds = ["Streaming", "Artificial Intelligence"];
+      const seedKey = `map_seeded_examples_v4_${uid}`;
       if (!localStorage.getItem(seedKey)) {
         localStorage.setItem(seedKey, "1");
         const existing = await listProjects(uid);
         const names = existing.map((p) => p.name.trim().toLowerCase());
-        const toSeed = ["Technology", "Healthcare", "Artificial Intelligence"].filter(
+        const toSeed = (isGuest ? guestSeeds : userSeeds).filter(
           (n) => !names.includes(n.toLowerCase())
         );
         for (const n of toSeed) await createProject(uid, n);
