@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { OrbitNetwork } from "@/components/Chart3D";
+import { getCompanySuggestion } from "./companySuggestions";
+import { getSectorSuggestion } from "./sectors";
 
 const ORBIT_POINTS = [
   { label: "Merck",       size: 0.8,  highlight: true  },
@@ -34,12 +36,34 @@ export default function DashboardHome({
   const [mode, setMode] = useState<"company" | "sector">("company");
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const suggestion = query.trim()
+    ? (mode === "company" ? getCompanySuggestion(query) : getSectorSuggestion(query))
+    : null;
+  const ghost = suggestion && suggestion.toLowerCase().startsWith(query.toLowerCase())
+    ? suggestion.slice(query.length)
+    : null;
+
+  function acceptSuggestion() {
+    if (suggestion) setQuery(suggestion);
+  }
 
   function submit() {
     const q = query.trim();
     if (!q) return;
     if (mode === "company") onRunCompany(q);
     else onRunSector(q);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if ((e.key === "Tab" || e.key === "ArrowRight") && ghost) {
+      e.preventDefault();
+      acceptSuggestion();
+    } else if (e.key === "Enter") {
+      if (ghost) acceptSuggestion();
+      submit();
+    }
   }
 
   return (
@@ -95,18 +119,40 @@ export default function DashboardHome({
             <circle cx="11" cy="11" r="7" stroke="#86868b" strokeWidth="2" />
             <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#86868b" strokeWidth="2" strokeLinecap="round" />
           </svg>
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={(e) => { if (e.key === "Enter") submit(); }}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder={mode === "company" ? "Search a company, e.g. Pfizer" : "Search a sector, e.g. oncology"}
-            style={{
-              flex: 1, border: "none", outline: "none", background: "transparent",
-              fontSize: 16, color: "#1d1d1f", padding: "10px 0",
-            }}
-          />
+          {/* Ghost-text wrapper */}
+          <div style={{ flex: 1, position: "relative" }}>
+            {ghost && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", alignItems: "center",
+                  fontSize: 16, fontFamily: "inherit",
+                  whiteSpace: "pre", pointerEvents: "none", overflow: "hidden",
+                  padding: "10px 0",
+                }}
+              >
+                <span style={{ color: "transparent" }}>{query}</span>
+                <span style={{ color: "#b0b0b8" }}>{ghost}</span>
+              </div>
+            )}
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={mode === "company" ? "Search a company, e.g. Pfizer" : "Search a sector, e.g. oncology"}
+              autoComplete="off"
+              spellCheck={false}
+              style={{
+                width: "100%", border: "none", outline: "none",
+                background: "transparent", position: "relative",
+                fontSize: 16, color: "#1d1d1f", padding: "10px 0",
+              }}
+            />
+          </div>
           <button onClick={submit} disabled={!query.trim()} style={{
             padding: "10px 22px", fontSize: 14.5, fontWeight: 600,
             border: "none", borderRadius: 11, cursor: query.trim() ? "pointer" : "default",
