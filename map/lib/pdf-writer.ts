@@ -66,21 +66,39 @@ export function textWidth(str: string, size: number): number {
   return (w / 1000) * size;
 }
 
+// Unicode → WinAnsi byte for the typographic punctuation that lives in the
+// 0x80–0x9F band of WinAnsiEncoding (so it can't be emitted as the raw
+// codepoint). The fonts are declared /WinAnsiEncoding, so emitting the byte as
+// an octal escape renders the correct glyph — e.g. middle dot, em dash, curly
+// quotes — instead of the previous "?" placeholder.
+const WINANSI_PUNCT: Record<number, number> = {
+  0x2018: 0x91, 0x2019: 0x92,           // ' '  curly single quotes
+  0x201c: 0x93, 0x201d: 0x94,           // " "  curly double quotes
+  0x2013: 0x96, 0x2014: 0x97,           // – —  en / em dash
+  0x2022: 0x95,                         // •    bullet
+  0x2026: 0x85,                         // …    ellipsis
+  0x2039: 0x8b, 0x203a: 0x9b,           // ‹ ›
+  0x0152: 0x8c, 0x0153: 0x9c,           // Œ œ
+  0x20ac: 0x80,                         // €
+  0x2122: 0x99,                         // ™
+  0x2020: 0x86, 0x2021: 0x87,           // † ‡
+};
+
 /** Escape a string for a PDF literal `( ... )` string operand. */
 function escapePdfText(s: string): string {
-  // Drop characters outside the printable WinAnsi range to avoid corrupt output.
+  const oct = (byte: number) => '\\' + byte.toString(8).padStart(3, '0');
   let out = '';
   for (const ch of s) {
     const code = ch.charCodeAt(0);
     if (ch === '(' || ch === ')' || ch === '\\') out += '\\' + ch;
-    else if (code >= 32 && code <= 126) out += ch;
-    else if (code === 8217 || code === 8216) out += "'"; // curly quotes
-    else if (code === 8220 || code === 8221) out += '"';
-    else if (code === 8211 || code === 8212) out += '-'; // en/em dash
-    else if (code === 8226) out += '\\225'; // bullet (WinAnsi 149)
-    else if (code === 160) out += ' ';
-    else if (code > 126) out += '?';
-    else out += ch;
+    else if (code >= 32 && code <= 126) out += ch;            // printable ASCII
+    else if (WINANSI_PUNCT[code] != null) out += oct(WINANSI_PUNCT[code]);
+    else if (code === 160) out += ' ';                        // nbsp → space
+    // Latin-1 supplement (·, ©, ®, °, é, ñ, ü, …) maps 1:1 onto WinAnsi bytes.
+    else if (code >= 161 && code <= 255) out += oct(code);
+    // Anything else (emoji, ◉, ⚠, arrows, CJK) has no WinAnsi glyph — drop it
+    // rather than emit a stray "?".
+    else out += '';
   }
   return out;
 }
