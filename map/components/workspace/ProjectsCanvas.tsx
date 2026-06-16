@@ -139,12 +139,17 @@ export default function ProjectsCanvas({ onNewRows }: { onNewRows?: (rows: Accou
   useEffect(() => {
     (async () => {
       const uid = currentUid();
-      const seedKey = `map_seeded_examples_${uid}`;
-      const existing = await listProjects(uid);
-      if (existing.length === 0 && !localStorage.getItem(seedKey)) {
+      // v3: seed Technology, Healthcare, and AI for every user.
+      // New key ensures existing users who only got v1/v2 seeds get Healthcare too.
+      const seedKey = `map_seeded_examples_v3_${uid}`;
+      if (!localStorage.getItem(seedKey)) {
         localStorage.setItem(seedKey, "1");
-        await createProject(uid, "Technology");
-        await createProject(uid, "Artificial Intelligence");
+        const existing = await listProjects(uid);
+        const names = existing.map((p) => p.name.trim().toLowerCase());
+        const toSeed = ["Technology", "Healthcare", "Artificial Intelligence"].filter(
+          (n) => !names.includes(n.toLowerCase())
+        );
+        for (const n of toSeed) await createProject(uid, n);
       }
       await refreshProjects();
     })();
