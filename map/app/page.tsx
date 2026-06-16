@@ -33,8 +33,8 @@ const VIEWS: { key: View; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
   { key: "company", label: "Company" },
   { key: "sector", label: "Sector" },
-  { key: "partnerships", label: "UNC" },
-  { key: "accounts", label: "Database" },
+  { key: "partnerships", label: "Partnerships" },
+  { key: "accounts", label: "Companies" },
   { key: "projects", label: "Projects" },
 ];
 
@@ -139,7 +139,7 @@ function GlobalHeader({
               userSelect: "none",
             }}
           >
-            Map 3
+            Map
           </span>
         </button>
       </div>
@@ -323,6 +323,7 @@ export default function MapHome() {
               setView("sector");
             }}
             onOpenCompanyView={() => setView("company")}
+            onOpenSectorView={() => setView("sector")}
             onPrefillSector={(name) => {
               setSectorDraft(name);
               setView("sector");
