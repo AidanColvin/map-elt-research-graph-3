@@ -313,11 +313,7 @@ export default function MapHome() {
           style={{ display: view === "dashboard" ? "block" : "none" }}
         >
           <DashboardHome
-            onRunCompany={(name) => {
-              setProjectsQuery(name);
-              setView("projects");
-            }}
-            onRunSector={(name) => {
+            onRunProject={(name) => {
               setProjectsQuery(name);
               setView("projects");
             }}
