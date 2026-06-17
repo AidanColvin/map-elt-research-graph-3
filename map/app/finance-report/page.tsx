@@ -86,15 +86,16 @@ export default function FinanceReportPage() {
       {/* Hero */}
       <div style={{ background: "#1d1d1f", color: "#fff", padding: "60px 32px 48px" }}>
         <div style={{ maxWidth: 860, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20, flexWrap: "wrap" }}>
             <LogoMark size={18} />
             <span style={{ fontSize: 12, color: "#86868b", fontWeight: 500, letterSpacing: "0.5px", textTransform: "uppercase" }}>Map Research Intelligence</span>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.4px", textTransform: "uppercase", color: "#9a6a00", background: "rgba(176,106,18,0.14)", border: "1px solid rgba(176,106,18,0.32)", borderRadius: 999, padding: "3px 9px" }}>Sample · illustrative</span>
           </div>
           <h1 style={{ fontSize: 40, fontWeight: 700, letterSpacing: "-1.5px", margin: "0 0 12px", lineHeight: 1.1 }}>
             Finance Sector<br />Partnership Intelligence
           </h1>
           <p style={{ fontSize: 17, color: "#a1a1a6", margin: "0 0 32px", fontWeight: 400, lineHeight: 1.5 }}>
-            UNC Chapel Hill Business Development · June 2025 · 20 companies analyzed
+            Example layout with illustrative figures — not live data. Generate a live, source-traced report from the workspace. UNC Chapel Hill Business Development.
           </p>
           <div style={{ display: "flex", gap: 24 }}>
             {[
