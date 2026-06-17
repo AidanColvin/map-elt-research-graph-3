@@ -106,8 +106,12 @@ function GlobalHeader({
         paddingBottom: 0,
         paddingLeft: "max(22px, env(safe-area-inset-left))",
         paddingRight: "max(22px, env(safe-area-inset-right))",
-        background: "#ffffff",
-        borderBottom: "1px solid #e5e5ea",
+        // Frosted system chrome: the tinted page washes show faintly through the
+        // bar and blur as content scrolls beneath it, exactly like macOS/iOS.
+        background: "rgba(255,255,255,0.72)",
+        backdropFilter: "saturate(180%) blur(20px)",
+        WebkitBackdropFilter: "saturate(180%) blur(20px)",
+        borderBottom: "1px solid rgba(0,0,0,0.07)",
         fontFamily: FONT,
       }}
     >
