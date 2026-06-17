@@ -40,20 +40,22 @@ The hard constraint behind every design decision: **completely free to run.**
 
 The app has three surfaces.
 
-**The workspace at `/`** sits behind an auth gate and exposes five views from one top nav:
+**The workspace at `/`** sits behind an auth gate and shows six views from one top nav:
 
 | View | What it shows |
 |---|---|
-| Dashboard | Launchpad. Editorial hero, a search bar with a Company/Sector toggle, a rotating 3D orbit, and an "Open a Canvas" card. |
+| Dashboard | Launchpad. Editorial hero, one search box, a rotating 3D orbit. Type a name, press enter, and it opens a new Project that runs the full pipeline. |
 | Company | Company Profile embedded as a canvas card. Search any public company, the report streams in. |
 | Sector | Sector Scan embedded as a canvas card. Live progress ("N of M companies"), ticker grid, full report. Clicking a ticker cross-loads that company into the Company view. |
-| UNC | UNC Partnership Intelligence. Company or sector toggle. Verifiable UNC signals (papers, grants, trials, SEC mentions) plus a Talking Points card for BD outreach. |
-| Database | 154 companies as an interactive table: live search, type filters, sortable columns, CSV / Excel / PDF / Markdown export. |
+| Partnerships | UNC Partnership Intelligence. Company or sector toggle. Verifiable UNC signals (papers, grants, trials, SEC mentions) plus a Talking Points card for BD outreach. |
+| Data | 300 companies as an interactive table: live search, type filters, sortable columns, CSV / Excel / PDF / Markdown export. |
+| Projects | Bundles a full pipeline run into one saved project. See [Projects canvas](#projects-canvas). |
 
-**The Projects canvas** bundles a full pipeline run into one project. A **Company / Sector mode toggle** determines which pipelines run:
+**The Projects canvas** bundles a full pipeline run into one project. A **mode toggle** picks which pipelines run. **Auto** reads the typed text and decides; **Company** and **Sector** force the choice:
 
 | Mode | Pipelines | Panels active |
 |---|---|---|
+| Auto | reads the text, runs Company or Sector | set by what it detects |
 | Company | Company Profile + UNC Partnership | Company Profile, UNC Partnership Profile |
 | Sector | Sector Scan + Database | Sector Scan, Database |
 
