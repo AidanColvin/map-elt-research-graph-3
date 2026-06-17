@@ -12,12 +12,14 @@ export const FONT =
 // Rich glass module: translucent fill, backdrop blur, an incredibly light
 // white border for the floating edge, and a soft diffuse shadow for depth.
 export const cardStyle: React.CSSProperties = {
-  background: "rgba(255,255,255,0.62)",
-  backdropFilter: "saturate(180%) blur(14px)",
-  WebkitBackdropFilter: "saturate(180%) blur(14px)",
+  background: "rgba(255,255,255,0.66)",
+  backdropFilter: "saturate(180%) blur(20px)",
+  WebkitBackdropFilter: "saturate(180%) blur(20px)",
   borderRadius: 22,
-  border: "1px solid rgba(255,255,255,0.1)",
-  boxShadow: "0 1px 1px rgba(0,0,0,0.03), 0 16px 48px rgba(0,0,0,0.055)",
+  // A hairline plus a bright inner top edge gives the glass a lit, floating rim.
+  border: "1px solid rgba(0,0,0,0.05)",
+  boxShadow:
+    "inset 0 1px 0 rgba(255,255,255,0.6), 0 1px 1px rgba(0,0,0,0.03), 0 16px 48px rgba(0,0,0,0.07)",
   overflow: "hidden",
 };
 
