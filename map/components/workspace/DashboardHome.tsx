@@ -71,7 +71,12 @@ export default function DashboardHome({
       {/* Headline */}
       <h1 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, marginBottom: 20 }}>
         <span style={{ color: "#1d1d1f" }}>Board-ready intelligence, </span>
-        <span style={{ color: "#007aff" }}>assembled from primary sources.</span>
+        <span style={{
+          background: "linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)",
+          WebkitBackgroundClip: "text",
+          backgroundClip: "text",
+          color: "transparent",
+        }}>assembled from primary sources.</span>
       </h1>
 
       {/* Body */}
@@ -151,7 +156,7 @@ export default function DashboardHome({
       </div>
 
       {/* 3D orbit */}
-      <div style={{ marginBottom: 32, borderRadius: 20, overflow: "hidden", background: "#f9f9fb", border: "1px solid #e5e5ea" }}>
+      <div style={{ marginBottom: 32, borderRadius: 20, overflow: "hidden", background: "#f9f9fb", border: "1px solid #e5e5ea", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6), 0 2px 6px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.05)" }}>
         <OrbitNetwork
           points={ORBIT_POINTS}
           centerLabel="map"
@@ -167,6 +172,7 @@ export default function DashboardHome({
         overflow: "hidden",
         marginBottom: "auto",
         background: "#fff",
+        boxShadow: "0 2px 6px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.05)",
       }}>
         <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", color: "#8e8e93", textTransform: "uppercase", padding: "14px 20px 10px", borderBottom: "1px solid #f2f2f7" }}>
           Open a canvas
