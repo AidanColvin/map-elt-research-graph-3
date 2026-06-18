@@ -17,7 +17,7 @@ interface Quote { company?: string; text: string; filing_url?: string; }
 interface Mention { title: string; url: string; company?: string; }
 interface Unit { unit: string; count: number; }
 interface Grant { project_num: string; title: string; pi: string; department: string; fiscal_year: string | number; url: string; }
-interface PI { name: string; org: string; project_title: string; grant_url: string; }
+interface PI { name: string; org: string; project_title: string; grant_url: string; grant_num?: string; fiscal_year?: string | number; }
 // unc_signal is the matched facility/collaborator NAME (a string), or "" — not a
 // boolean. Truthiness, not `=== true`, is the correct UNC-site test.
 interface Trial { nct_id: string; title: string; phase: string; status: string; lead_sponsor: string; collaborators: string[]; unc_signal: string | boolean; url: string; }
@@ -109,9 +109,9 @@ const NC_ACCESS: { asset: string; description: string; url: string }[] = [
 // returns: the card element
 function Card({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+    <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 26, boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>{title}</p>
-      <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 14px" }}>{subtitle}</p>
+      <p style={{ fontSize: 13, color: "#6b6b73", margin: "5px 0 18px" }}>{subtitle}</p>
       {children}
     </div>
   );
@@ -650,7 +650,7 @@ export default function PartnershipsView({
         );
 
         return (
-          <div data-testid="results-canvas" style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 16 }}>
+          <div data-testid="results-canvas" style={{ marginTop: 28, display: "flex", flexDirection: "column", gap: 20 }}>
             {/* ── Downloadable report — same Company-Profile chrome (title +
                 export/save bar + rendered Markdown body, same font). The export
                 bar and save controls serialize the full report Markdown. ───── */}
@@ -747,21 +747,32 @@ export default function PartnershipsView({
               </div>
             )}
 
-            {/* ── Section B — Where they partner with UNC ─────────────────── */}
+            {/* ── Current relationships — who at UNC, what's active, which schools ─ */}
             {hasSignal && (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div>
+                  <Eyebrow>Current relationships</Eyebrow>
+                  <p style={{ fontSize: 13.5, color: "#6b6b73", margin: "6px 0 0", maxWidth: 640, lineHeight: 1.5 }}>
+                    The named UNC investigators, the programs active right now, and the schools driving them — every item links to its primary source.
+                  </p>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
                 {/* Sub-card 1 — UNC staff / PIs */}
                 <Card title="UNC Research Contacts" subtitle="Named investigators from NIH grants and co-authored papers">
                   {nihPis.length > 0 ? (
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 14 }}>
                       {nihPis.map((p, i) => (
-                        <li key={`${p.name}-${i}`}>
+                        <li key={`${p.name}-${i}`} style={{ borderLeft: "2px solid #e5e5ea", paddingLeft: 12 }}>
                           <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{p.name}</p>
-                          {p.org && <p style={{ fontSize: 12, color: "#9a9aa2", margin: "2px 0 0" }}>{p.org}</p>}
-                          {p.project_title && (
-                            <p style={{ fontSize: 13, color: "#3a3a40", margin: "4px 0 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.project_title}</p>
+                          {(p.grant_num || p.fiscal_year) && (
+                            <p style={{ fontSize: 11.5, color: "#9a9aa2", margin: "2px 0 0" }}>
+                              {p.grant_num ? `Grant ${p.grant_num}` : ""}{p.grant_num && p.fiscal_year ? " · " : ""}{p.fiscal_year ? `FY${p.fiscal_year}` : ""}
+                            </p>
                           )}
-                          <a href={p.grant_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "#5b6cff", textDecoration: "none" }}>NIH grant →</a>
+                          {p.project_title && (
+                            <p style={{ fontSize: 13, color: "#3a3a40", margin: "5px 0 0", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{p.project_title}</p>
+                          )}
+                          <a href={p.grant_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "#5b6cff", textDecoration: "none", display: "inline-block", marginTop: 6 }}>NIH grant →</a>
                         </li>
                       ))}
                     </ul>
@@ -829,6 +840,7 @@ export default function PartnershipsView({
                     <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC school attribution found in PubMed.</p>
                   )}
                 </Card>
+                </div>
               </div>
             )}
 
@@ -860,7 +872,7 @@ export default function PartnershipsView({
             </div>
 
             {/* Three source-linked panels */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
               <div data-testid="card-clinical">
                 <Card title="Clinical / Research" subtitle={`${data.clinical.count} co-authored paper(s) with UNC`}>
                   {data.clinical.top_authors.length > 0 && (
