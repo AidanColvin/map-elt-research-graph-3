@@ -369,6 +369,14 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
                 print(f"{k} timed out for {name}: {e}")
                 results[k] = defaults[k]
 
+    # COI disclosures run sequentially — NOT inside the pool above — so the
+    # process-wide NCBI throttle can enforce the 0.35s gap after the main
+    # PubMed query, keeping the keyless E-utilities endpoint under its limit.
+    pubmed_coi = safe(
+        lambda: pubmed.search_coi_disclosures(name, max_results=4),
+        "PubMed-COI", [],
+    )
+
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
 
@@ -416,7 +424,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "trials": company_trials[:12],
         "unc_trials": unc_trials,
         "pubmed": results["pubmed"],
-        "pubmed_coi": [],
+        "pubmed_coi": pubmed_coi,
         "nih_grants": results["nih_grants"],
         "unc_alumni": unc_alumni,
         "patents": results["patents"] or dict(EMPTY_PATENTS),
