@@ -88,6 +88,26 @@ def resolve_sec_verbatim(company_name: str, sec: SECEdgarClient) -> dict:
 # does: finds UNC ↔ company co-authored papers and tallies the most frequent
 #       author names across them
 # returns: a dict { count: int, top_authors: [str], papers: [paper dicts] }
+_ORG_WORDS = {
+    "association", "society", "institute", "foundation", "group", "committee",
+    "network", "consortium", "european", "american", "national", "international",
+    "academy", "organization", "organisation", "programme", "program", "federation",
+    "center", "centre", "university", "college", "hospital", "clinic", "working",
+    "collaborative", "task", "force", "board", "council", "panel", "team",
+}
+
+
+def _is_person_name(name: str) -> bool:
+    """Return True if name looks like a person (Last FI or First Last), not an org."""
+    words = name.split()
+    if len(words) > 5:
+        return False
+    lower_words = {w.lower().rstrip(".,") for w in words}
+    if lower_words & _ORG_WORDS:
+        return False
+    return True
+
+
 def resolve_pubmed(company_name: str, pubmed: PubMedClient) -> dict:
     try:
         papers = pubmed.search_unc_with_company(company_name, max_results=8) or []
@@ -95,7 +115,10 @@ def resolve_pubmed(company_name: str, pubmed: PubMedClient) -> dict:
         for p in papers:
             for a in p.get("authors") or []:
                 tally[a] = tally.get(a, 0) + 1
-        top_authors = [a for a, _ in sorted(tally.items(), key=lambda kv: -kv[1])[:5]]
+        top_authors = [
+            a for a, _ in sorted(tally.items(), key=lambda kv: -kv[1])
+            if _is_person_name(a)
+        ][:5]
         return {"count": len(papers), "top_authors": top_authors, "papers": papers}
     except Exception as e:
         logger.error("partnership_resolver: PubMed resolve failed for %s: %s", company_name, e)
