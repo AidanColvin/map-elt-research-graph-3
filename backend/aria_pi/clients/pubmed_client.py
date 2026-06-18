@@ -41,14 +41,20 @@ class PubMedClient:
         self.timeout = 8
 
     def search_unc_with_company(self, company_name: str, max_results: int = 5) -> List[dict]:
-        """Find publications co-authored by UNC affiliation that also mention the company.
+        """Find papers genuinely CO-AUTHORED by a UNC author and a company author.
 
-        Query strategy: search PubMed for `(<company>[Title/Abstract]) AND
-        (UNC Chapel Hill[Affiliation])`. This is the most reliable way to
-        surface real co-authored work — which universities must disclose as
-        a relationship under research-integrity policies.
+        Query strategy: require BOTH the company and UNC to appear as author
+        AFFILIATIONS — i.e. an employee of the company and a UNC researcher are
+        co-authors on the same paper. This is true co-authorship.
+
+        The company is intentionally NOT matched in the title/abstract: that
+        looser match counted papers that merely *mention* a company (e.g. a UNC
+        paper that "used NVIDIA GPUs" or "studied Pfizer's drug"), which
+        overstated partnership ties — especially for non-health firms whose
+        products are referenced in methods sections. Affiliation-only keeps the
+        signal to verifiable co-authorship.
         """
-        term = (f'("{company_name}"[Title/Abstract] OR {company_name}[Affiliation])'
+        term = (f'"{company_name}"[Affiliation]'
                 f' AND ("University of North Carolina"[Affiliation]'
                 f' OR "UNC Chapel Hill"[Affiliation])')
         return self._run(term, max_results)
@@ -80,7 +86,10 @@ class PubMedClient:
         """
         results: List[dict] = []
         for school_name, aff_clause in self.UNC_SCHOOLS:
-            term = (f'("{company_name}"[Title/Abstract]) AND {aff_clause}')
+            # Strict co-authorship: the company must be an author affiliation,
+            # not merely mentioned in the title/abstract (consistent with
+            # search_unc_with_company).
+            term = (f'"{company_name}"[Affiliation] AND {aff_clause}')
             hits = self._run(term, max_per_school)
             for h in hits:
                 h["unc_school"] = school_name
