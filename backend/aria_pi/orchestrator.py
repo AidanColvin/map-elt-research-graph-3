@@ -233,18 +233,24 @@ async def run_pipeline_stream(req: PipelineRequest):
             # Fetch every company concurrently, emitting a progress frame as
             # each one finishes — this is the genuine, granular signal that
             # drives the frontend progress bar.
-            out_by_name = {n: _empty_company(n) for n in seeds}
+            t_start = time.monotonic()
+            # Prefetch SEC facts for all companies so financials survive a later
+            # enrichment-deadline cutoff; the prefetch eats into the budget.
+            facts_by_name = _prefetch_facts(seeds, sec,
+                                            deadline=t_start + FACTS_PREFETCH_BUDGET)
+            out_by_name = {n: _empty_company(n, facts_by_name.get(n)) for n in seeds}
             done = 0
-            deadline = time.monotonic() + FETCH_BUDGET_SECONDS
+            stream_timeout = max(1.0, t_start + FETCH_BUDGET_SECONDS - time.monotonic())
             with ThreadPoolExecutor(max_workers=len(seeds)) as pool:
                 fut_to_name = {
                     pool.submit(_fetch_one_company, n, sec=sec, trials=trials,
-                                pubmed=pubmed, nih=nih): n
+                                pubmed=pubmed, nih=nih,
+                                prefetched_facts=facts_by_name.get(n)): n
                     for n in seeds
                 }
                 try:
                     for fut in as_completed(fut_to_name,
-                                            timeout=FETCH_BUDGET_SECONDS + 2):
+                                            timeout=stream_timeout + 2):
                         name = fut_to_name[fut]
                         try:
                             out_by_name[name] = fut.result(timeout=0.1)
@@ -298,6 +304,11 @@ async def run_pipeline_stream(req: PipelineRequest):
 # data (SEC EDGAR is the fast, reliable backbone; PubMed/NIH/Trials enrich it).
 FETCH_BUDGET_SECONDS = 44
 
+# The SEC-facts prefetch runs first and eats into (not on top of) the overall
+# FETCH_BUDGET_SECONDS data-phase budget, so the total stays within the 60s
+# Vercel function limit with margin for report assembly.
+FACTS_PREFETCH_BUDGET = 15
+
 
 def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
     """Decide which companies a report covers, in priority order:
@@ -330,20 +341,64 @@ def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
     return DEFAULT_SEEDS, "default"
 
 
-def _empty_company(name: str) -> dict:
-    return {"name": name, "facts": {"legal_name": name, "source": "https://www.sec.gov"},
+def _empty_company(name: str, facts: dict | None = None) -> dict:
+    """A partial-data company record. When `facts` is supplied (from the SEC
+    facts prefetch) the stub carries real financials/CIK, so a company whose
+    slow enrichment misses the deadline still renders its SEC numbers instead of
+    being shown as private with blank financials. `_sec_only_stub` stays True so
+    the UI shows its "Partial data — only SEC EDGAR facts" banner."""
+    return {"name": name,
+            "facts": facts or {"legal_name": name, "source": "https://www.sec.gov"},
             "trials": [], "unc_trials": [], "pubmed": [], "pubmed_coi": [],
             "nih_grants": [], "unc_alumni": [],
             "patents": dict(EMPTY_PATENTS), "collab_8ks": {}, "tenk_text": "",
             "_sec_only_stub": True}
 
 
-def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
+def _safe_facts(sec, name: str) -> dict:
+    """get_company_facts for one company, never raising."""
+    try:
+        return sec.get_company_facts(name)
+    except Exception as e:
+        _log.warning("facts prefetch failed for %s: %s", name, e)
+        return {"legal_name": name, "source": "https://www.sec.gov"}
+
+
+def _prefetch_facts(names: List[str], sec, deadline: float) -> dict:
+    """Fetch SEC facts (CIK + financials) for every company up front, concurrently.
+
+    This is the cheap, high-value part of each company's data (2-3 SEC GETs,
+    now rate-limited process-wide). Fetching it separately and seeding it into
+    every company's stub guarantees financials survive even when the slower
+    enrichment (10-K text, website scrape, 8-Ks) blows the deadline. Bounded by
+    `deadline`; any company not back in time simply has no prefetched facts and
+    falls through to the per-company fetch.
+    """
+    out: dict = {}
+    if not names:
+        return out
+    with ThreadPoolExecutor(max_workers=min(len(names), 8)) as pool:
+        fut_to_name = {pool.submit(_safe_facts, sec, n): n for n in names}
+        for fut, name in fut_to_name.items():
+            remaining = deadline - time.monotonic()
+            try:
+                out[name] = fut.result(timeout=max(0.1, remaining))
+            except Exception as e:
+                _log.warning("facts prefetch deadline for %s: %s", name, e)
+    return out
+
+
+def _fetch_one_company(name: str, sec, trials, pubmed, nih,
+                       prefetched_facts: dict | None = None) -> dict:
     """Run the data-source lookups for one company in parallel.
 
     PubMed is deliberately limited to ONE combined query (was 7+ per company)
     because the unauthenticated E-utilities endpoint rate-limits to ~3 req/s
     and the school-by-school + COI fan-out was the dominant cause of timeouts.
+
+    When `prefetched_facts` is supplied, the SEC facts call is skipped (the
+    caller already fetched them up front), so this spends its whole budget on
+    the slower enrichment sources.
     """
     def safe(fn, label, default):
         try:
@@ -359,8 +414,6 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
     }
     with ThreadPoolExecutor(max_workers=5) as pool:
         futures = {
-            "facts": pool.submit(safe,
-                lambda: sec.get_company_facts(name), "SEC", defaults["facts"]),
             "trials": pool.submit(safe,
                 lambda: trials.search_by_sponsor(name), "Trials", []),
             "pubmed": pool.submit(safe,
@@ -372,6 +425,10 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             "patents": pool.submit(safe,
                 lambda: fetch_patents(name), "Patents", defaults["patents"]),
         }
+        # Only fetch SEC facts here if they weren't prefetched by the caller.
+        if prefetched_facts is None:
+            futures["facts"] = pool.submit(safe,
+                lambda: sec.get_company_facts(name), "SEC", defaults["facts"])
         results = {}
         for k, f in futures.items():
             try:
@@ -379,6 +436,8 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             except Exception as e:
                 _log.warning("%s timed out for %s: %s", k, name, e)
                 results[k] = defaults[k]
+    if prefetched_facts is not None:
+        results["facts"] = prefetched_facts
 
     # COI disclosures run sequentially — NOT inside the pool above — so the
     # process-wide NCBI throttle can enforce the 0.35s gap after the main
@@ -455,11 +514,21 @@ def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
     """
     if not names:
         return []
-    out_by_name: dict[str, dict] = {n: _empty_company(n) for n in names}
-    deadline = time.monotonic() + FETCH_BUDGET_SECONDS
+    t_start = time.monotonic()
+    # Prefetch SEC facts (financials + CIK) for all companies first, so they
+    # survive even if a company's enrichment later misses the deadline. The
+    # prefetch eats into the shared budget — enrichment uses the remainder.
+    facts_by_name = _prefetch_facts(names, clients["sec"],
+                                    deadline=t_start + FACTS_PREFETCH_BUDGET)
+    out_by_name: dict[str, dict] = {
+        n: _empty_company(n, facts_by_name.get(n)) for n in names
+    }
+    deadline = t_start + FETCH_BUDGET_SECONDS
     with ThreadPoolExecutor(max_workers=min(len(names), 7)) as pool:
         future_to_name = {
-            pool.submit(_fetch_one_company, n, **clients): n for n in names
+            pool.submit(_fetch_one_company, n,
+                        prefetched_facts=facts_by_name.get(n), **clients): n
+            for n in names
         }
         for fut, name in future_to_name.items():
             remaining = deadline - time.monotonic()
@@ -467,7 +536,7 @@ def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
                 out_by_name[name] = fut.result(timeout=max(0.1, remaining))
             except Exception as e:
                 _log.warning("Company fetch deadline/err for %s: %s", name, e)
-                # keep the SEC-only stub already in out_by_name
+                # keep the facts-bearing SEC stub already in out_by_name
     return [out_by_name[n] for n in names]
 
 
