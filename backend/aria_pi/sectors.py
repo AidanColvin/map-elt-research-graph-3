@@ -90,7 +90,7 @@ SECTOR_SEEDS = {
                      "Array Technologies", "Sunrun", "Sunnova Energy", "Stem", "Fluence Energy",
                      "Shoals Technologies", "Altus Power", "TPI Composites", "Clearway Energy", "Pattern Energy"],
     "energy": ["NextEra Energy", "First Solar", "Enphase Energy", "Bloom Energy", "Plug Power",
-               "ExxonMobil", "Chevron", "ConocoPhillips", "Schlumberger", "Halliburton",
+               "Exxon Mobil", "Chevron", "ConocoPhillips", "SLB", "Halliburton",
                "Duke Energy", "Southern Company", "Dominion Energy", "Entergy", "Consolidated Edison"],
     "automotive": ["Tesla", "General Motors", "Ford Motor", "Rivian Automotive", "Lucid Group",
                    "Toyota", "Volkswagen", "Stellantis", "NIO", "Li Auto",
@@ -196,7 +196,7 @@ SECTOR_NC_SEEDS = {
     "telecom": ["Bandwidth", "Limelight Networks"],
     # GICS sectors — NC-specific public companies where they exist
     "communication services": ["Bandwidth"],
-    "materials": ["Nucor Corporation", "Albemarle", "Sonoco Products", "Sealed Air Corporation"],
+    "materials": ["Albemarle", "Sonoco Products", "Sealed Air Corporation"],
     "real estate": ["Highwoods Properties", "Cousins Properties"],
 }
 

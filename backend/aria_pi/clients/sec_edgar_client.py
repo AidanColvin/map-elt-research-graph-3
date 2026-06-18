@@ -55,6 +55,35 @@ _GENERIC_NAME_TOKENS = {
     "llc", "ltd", "plc", "the", "and",
 }
 
+# Trailing corporate suffixes — a title that is the query plus exactly one of
+# these is a near-exact match (e.g. "Coca-Cola" → "COCA-COLA CO", not the longer
+# "COCA-COLA EUROPACIFIC PARTNERS PLC" bottler).
+_CORP_SUFFIXES = {
+    "co", "corp", "corporation", "inc", "incorporated", "company", "plc",
+    "ltd", "limited", "lp", "llc", "holdings", "holding", "group", "sa",
+    "ag", "nv", "se", "trust", "companies",
+}
+
+# Pure corporate-suffix / connector tokens dropped when requiring that ALL
+# discriminating query tokens appear in a title. Unlike _GENERIC_NAME_TOKENS this
+# does NOT include descriptive words (health, energy, games, networks…): those
+# ARE discriminating, so "Atrium Health" must not match "Atrium Therapeutics" and
+# "Epic Games" must not match "Motorsport Games" on a single shared token.
+_CORP_SUFFIX_TOKENS = {
+    "co", "corp", "corporation", "inc", "incorporated", "company", "companies",
+    "plc", "ltd", "limited", "llc", "lp", "holdings", "holding", "group",
+    "the", "and",
+}
+
+
+def _norm_name(s: str) -> str:
+    """Normalize a company name for matching: drop apostrophes/periods, turn all
+    other punctuation into spaces, lowercase, collapse whitespace. So "McDonald's",
+    "U.S. Bancorp", "Take-Two", "Yum! Brands" all compare cleanly to SEC titles."""
+    s = (s or "").lower().replace("'", "").replace("’", "").replace(".", "")
+    s = re.sub(r"[^a-z0-9]+", " ", s)
+    return " ".join(s.split())
+
 
 def _active_cik_titles() -> dict:
     """Map {int(cik): official_title} for every currently-traded SEC filer.
@@ -359,16 +388,25 @@ class SECEdgarClient:
 
         REV_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
                         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
-                        "SalesRevenueGoodsNet", "SalesRevenueServicesNet")
+                        "SalesRevenueGoodsNet", "SalesRevenueServicesNet",
+                        # Broker-dealers / investment banks (Goldman Sachs, Morgan
+                        # Stanley) report top-line revenue under this concept, not
+                        # "Revenues" — without it their revenue came back blank.
+                        "RevenuesNetOfInterestExpense")
+        # Multi-concept selection (max end-date) for net income and total assets
+        # too, so a company that switched XBRL concept names doesn't freeze these
+        # at an old fiscal year next to a current-year revenue.
+        NET_INCOME_CONCEPTS = ("NetIncomeLoss", "ProfitLoss",
+                               "NetIncomeLossAvailableToCommonStockholdersBasic")
         revenue = most_recent(*REV_CONCEPTS)
         return {
             "revenue": revenue,
             "rd_expense": latest_annual("ResearchAndDevelopmentExpense", "USD"),
-            "net_income": latest_annual("NetIncomeLoss", "USD"),
+            "net_income": most_recent(*NET_INCOME_CONCEPTS),
             "cash": latest_annual("CashAndCashEquivalentsAtCarryingValue", "USD"),
             "operating_cash_flow": latest_annual(
                 "NetCashProvidedByUsedInOperatingActivities", "USD"),
-            "total_assets": latest_annual("Assets", "USD"),
+            "total_assets": most_recent("Assets"),
             "stockholders_equity": latest_annual("StockholdersEquity", "USD"),
             "employees": latest_annual("EntityNumberOfEmployees", "pure", source=dei),
             "shares_outstanding": latest_annual("EntityCommonStockSharesOutstanding", "shares", source=dei),
@@ -661,33 +699,52 @@ class SECEdgarClient:
         """Resolve a company name → CIK using SEC's official ticker map first,
         then fall back to full-text search."""
         q = (company_name or "").lower().strip()
+        nq = _norm_name(company_name)
+        nq_tokens = nq.split()
+        nq_set = set(nq_tokens)
+        nq_sig = [w for w in nq_tokens if w not in _CORP_SUFFIX_TOKENS]
         tickers = load_tickers()
-        # Exact-ish match on title or ticker. Score by overlap and short prefix.
+        # Score each ticker. On ties, prefer the title with the FEWEST extra
+        # descriptive tokens (tokens that are neither in the query nor a corporate
+        # suffix), then the shorter title. So "Goldman Sachs" → "Goldman Sachs
+        # Group Inc" (extras: none) over "Goldman Sachs BDC Inc" (extra: "bdc"),
+        # and "Coca-Cola" → "Coca-Cola Co" over the longer Europacific bottler.
         best = None
-        best_score = 0
+        best_key = (0, 1, 0)  # (score, -extra, -len): higher is better
         for t in tickers:
-            title = (t.get("title") or "").lower()
             sym = (t.get("ticker") or "").lower()
-            if not title:
+            nt = _norm_name(t.get("title") or "")
+            if not nt:
                 continue
+            nt_tokens = nt.split()
+            nt_set = set(nt_tokens)
             score = 0
-            if q == sym:
+            if nq == sym or q == sym:
                 score = 100
-            elif q == title:
+            elif nq == nt:
                 score = 95
-            elif title.startswith(q + " ") or title.startswith(q + ","):
+            # title == query + exactly one trailing corporate suffix
+            elif (len(nt_tokens) == len(nq_tokens) + 1
+                  and nt_tokens[:len(nq_tokens)] == nq_tokens
+                  and nt_tokens[-1] in _CORP_SUFFIXES):
+                score = 90
+            elif nt.startswith(nq + " "):
                 score = 80
-            elif q in title.split():
+            # every discriminating query token is a whole word in the title
+            elif nq_sig and all(w in nt_set for w in nq_sig):
                 score = 60
-            if score > best_score:
-                best_score = score
-                best = t
-        # Require a whole-word or exact match (>= 60). The old bare-substring
-        # rule (len(q) >= 5 and q in title, score 50) mis-resolved short private
-        # names embedded in unrelated public titles — e.g. "Pendo" → "oPENDOor
-        # Technologies" — attributing the wrong company's financials. A substring
-        # is no longer sufficient; the name must match a whole title word, a
-        # title prefix, or the ticker/title exactly.
+            if score > 0:
+                extra = sum(1 for w in nt_tokens
+                            if w not in nq_set and w not in _CORP_SUFFIX_TOKENS)
+                key = (score, -extra, -len(nt))
+                if key > best_key:
+                    best_key = key
+                    best = t
+        best_score = best_key[0]
+        # Require a whole-word or exact match (>= 60). A bare substring is not
+        # sufficient (it mis-resolved "Pendo" → "oPENDOor"); and a single shared
+        # token is not sufficient (it mis-resolved "Atrium Health" → "Atrium
+        # Therapeutics") — ALL discriminating tokens must be present.
         if best and best_score >= 60:
             return str(best["cik_str"])
 
@@ -703,8 +760,7 @@ class SECEdgarClient:
             # contains ALL of the query's discriminating tokens (or matches it
             # exactly / by prefix) — otherwise the hit is just a filer that
             # *mentions* the name and would attribute the wrong company's data.
-            q_tokens = {w for w in q.split() if len(w) >= 3}
-            sig_tokens = q_tokens - _GENERIC_NAME_TOKENS
+            sig_tokens = {w for w in nq_tokens if w not in _CORP_SUFFIX_TOKENS}
             r = self._get(self.search_url,
                                   params={"q": company_name}, timeout=6)
             r.raise_for_status()
@@ -716,11 +772,11 @@ class SECEdgarClient:
                         ci = int(c)
                     except (ValueError, TypeError):
                         continue
-                    title = (active.get(ci) or "").lower()
-                    if not title:
+                    nt = _norm_name(active.get(ci) or "")
+                    if not nt:
                         continue
-                    title_tokens = set(title.split())
-                    if (q == title or title.startswith(q + " ")
+                    title_tokens = set(nt.split())
+                    if (nq == nt or nt.startswith(nq + " ")
                             or (sig_tokens and sig_tokens.issubset(title_tokens))):
                         return str(ci)
             return None

@@ -74,7 +74,7 @@ class ReportBuilder:
             canonical_sector(sector) or sector.lower(), [])}
         s4 = [self._profile(c, ctx, nc_names) for c in companies[:22]]
         s5 = self._section5(sector, companies)
-        s6 = self._section6(companies)
+        s6 = self._section6(companies, sector)
         report = {
             "report_meta": {
                 "sector": sector,
@@ -226,7 +226,7 @@ class ReportBuilder:
             out.append("")
 
         # ── PAGES 15–18: UNC PARTNERSHIP SECTION ──
-        out.extend(self._condensed_unc_section(top10, s5))
+        out.extend(self._condensed_unc_section(top10, s5, domain_for(sector) == "health"))
         out.append("---")
         out.append("")
 
@@ -325,13 +325,29 @@ class ReportBuilder:
             rows.append("")
         return rows
 
-    def _condensed_unc_section(self, top10: List[dict], s5: dict) -> List[str]:
+    def _condensed_unc_section(self, top10: List[dict], s5: dict,
+                               is_health: bool = True) -> List[str]:
         out: List[str] = []
         out.append("## UNC Research Capacity")
         out.append("")
+        if not is_health:
+            # UNC's publicly sourceable research assets (NIH grants, clinical
+            # trials, health data warehouses) are health/life-sciences. For a
+            # non-health sector, presenting them as "sector relevance" is
+            # misleading, so state the limitation plainly. Any grants listed
+            # below merely *name* a company in this set and may be incidental.
+            out.append("UNC's strongest publicly verifiable research assets are in "
+                       "health and the life sciences. Direct research overlap with "
+                       "this sector is limited — the company financials above (from "
+                       "SEC filings) are the primary verifiable signal; any NIH "
+                       "grants shown below merely name a company in this set and may "
+                       "be incidental.")
+            out.append("")
 
         # Faculty contacts (from NIH grants), sorted by fiscal year desc, max 15.
-        out.append("### Faculty Contacts with Verified Sector Relevance")
+        out.append("### Faculty Contacts with Verified Sector Relevance"
+                   if is_health else
+                   "### UNC NIH Grants Naming Companies in This Set (may be incidental)")
         out.append("")
         out.append("| PI Name | Department | Grant # | Title | FY | Award |")
         out.append("|---|---|---|---|---|---|")
@@ -381,20 +397,19 @@ class ReportBuilder:
         out.append("No UNC patents found in this sector's IPC classes.")
         out.append("")
 
-        # Fixed data-assets table.
-        out.append("### UNC Data Assets Available to Partners")
-        out.append("")
-        out.append("| Asset | Held By |")
-        out.append("|---|---|")
-        for asset, holder in [
-            ("Carolina Data Warehouse for Health (CDWH)", "NC TraCS / UNC Health"),
-            ("NC AHEC Network Data", "NC AHEC Program"),
-            ("UNC Lineberger Cancer Registry", "UNC Lineberger"),
-            ("UNC Biospecimen Processing Facility", "UNC School of Medicine"),
-            ("UNC Sheps Center Rural Health Data", "Cecil G. Sheps Center"),
-        ]:
-            out.append(f"| {asset} | {holder} |")
-        out.append("")
+        # Data-assets table — driven by the domain-gated section5 list (all
+        # curated UNC datasets are health, so this is empty for non-health
+        # sectors). Omit the section entirely rather than show off-topic health
+        # warehouses for a tech/finance/energy report.
+        data_assets = [d for d in (s5.get("data_assets") or []) if d.get("name")]
+        if data_assets:
+            out.append("### UNC Data Assets Available to Partners")
+            out.append("")
+            out.append("| Asset | Held By |")
+            out.append("|---|---|")
+            for d in data_assets:
+                out.append(f"| {_md(d.get('name',''))} | {_md(d.get('held_by','UNC'))} |")
+            out.append("")
 
         # Fixed partnership-models table.
         out.append("### Partnership Models")
@@ -1012,34 +1027,56 @@ class ReportBuilder:
             if len(capacity) >= 12:
                 break
 
+        # UNC's talent pipeline (PharmD, MPH, MD-PhD…) and NC clinical-access
+        # programs (UNC Health, NC AHEC, NC TraCS) are all health/life-sciences,
+        # so only surface them for health-domain sectors. Partnership models
+        # (SRA, license, data-access) are domain-neutral and always shown.
+        is_health = domain_for(sector) == "health"
         return {
             "data_assets": [
                 {"name": d["name"], "description": d["description"],
+                 "held_by": d.get("held_by", "UNC"),
                  "relevance": d["description"][:140],
                  "sources": d.get("sources", [])}
                 for d in self._sector_datasets
             ],
             "research_capacity": capacity,
-            "talent_pipeline": self.programs_blob.get("talent_programs", []),
-            "nc_access": self.programs_blob.get("nc_access", []),
+            "talent_pipeline": self.programs_blob.get("talent_programs", []) if is_health else [],
+            "nc_access": self.programs_blob.get("nc_access", []) if is_health else [],
             "future_signals": [],
             "partnership_models": self.programs_blob.get("partnership_models", []),
         }
 
-    def _section6(self, companies: List[dict]) -> dict:
+    def _section6(self, companies: List[dict], sector: str = "") -> dict:
         # Sector-level opening: aggregate counts across companies — concrete, sourced.
         total_trials = sum(len(c.get("trials") or []) for c in companies)
         total_papers = sum(len(c.get("pubmed") or []) for c in companies)
         total_grants = sum(len(c.get("nih_grants") or []) for c in companies)
-        opening = {
-            "text": (f"Across {len(companies)} candidate companies in this sector, "
-                     f"UNC has {total_grants} active NIH grants mentioning these "
-                     f"firms, {total_papers} co-authored PubMed publications, and "
-                     f"the firms collectively sponsor {total_trials} active "
-                     f"ClinicalTrials.gov studies."),
-            "sources": ["https://reporter.nih.gov",
-                        "https://pubmed.ncbi.nlm.nih.gov"],
-        }
+        # The NIH-grants / ClinicalTrials framing only makes sense for health
+        # sectors. For non-health sectors those matches are coincidental keyword
+        # hits, so lead with the verifiable SEC + co-authorship signal instead of
+        # implying clinical partnerships that don't exist.
+        if domain_for(sector) == "health":
+            opening = {
+                "text": (f"Across {len(companies)} candidate companies in this sector, "
+                         f"UNC has {total_grants} active NIH grants mentioning these "
+                         f"firms, {total_papers} co-authored PubMed publications, and "
+                         f"the firms collectively sponsor {total_trials} active "
+                         f"ClinicalTrials.gov studies."),
+                "sources": ["https://reporter.nih.gov",
+                            "https://pubmed.ncbi.nlm.nih.gov"],
+            }
+        else:
+            opening = {
+                "text": (f"This brief profiles {len(companies)} companies in the sector "
+                         f"from their SEC filings. UNC's verifiable research assets are "
+                         f"concentrated in health and the life sciences, so direct "
+                         f"research overlap with this sector is limited; any UNC grant "
+                         f"or publication links shown are name matches that should be "
+                         f"verified before being treated as partnerships."),
+                "sources": ["https://www.sec.gov",
+                            "https://pubmed.ncbi.nlm.nih.gov"],
+            }
 
         cos = []
         for c in companies[:5]:
