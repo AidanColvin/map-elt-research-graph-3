@@ -61,31 +61,49 @@ export async function resolveCik(
     if (tickerHit) return format(tickerHit);
   }
 
-  // otherwise score every candidate and take the best. titles are
-  // normalized (lowercase, no leading "the", punctuation -> spaces) so
-  // "Coca-Cola" matches the SEC title "COCA COLA CO". shorter titles break
-  // ties, so it lands on "The Coca-Cola Company", not a bottler subsidiary.
+  // otherwise score every candidate and take the best. Titles are normalized
+  // (lowercase, no leading "the", apostrophes/periods dropped, other punctuation
+  // -> spaces) so "Coca-Cola" matches "COCA COLA CO". Ties are broken by FEWEST
+  // extra descriptive tokens (tokens that are neither in the query nor a
+  // corporate suffix), then by shorter title — so "Goldman Sachs" lands on
+  // "The Goldman Sachs Group" (extras: none) not "Goldman Sachs BDC" (extra:
+  // "bdc"), and "Coca-Cola" on "Coca-Cola Co" not the Europacific bottler.
   const nq = normalizeName(q);
+  const qSet = new Set(nq.split(" ").filter(Boolean));
   const word = new RegExp(`\\b${escapeRegExp(nq)}\\b`);
 
   let best: TickerRow | null = null;
-  let bestScore = -1;
+  let bestScore = -Infinity;
   for (const r of rows) {
     const nt = normalizeName(r.title);
-    let score = -1;
-    if (nt === nq) score = 1000 - nt.length;
-    else if (nt.startsWith(nq)) score = 600 - nt.length;
-    else if (word.test(nt)) score = 300 - nt.length;
-    else if (nt.includes(nq)) score = 100 - nt.length;
+    let tier = -1;
+    if (nt === nq) tier = 4;
+    else if (nt.startsWith(nq + " ")) tier = 3;
+    else if (word.test(nt)) tier = 2;
+    else if (nt.includes(nq)) tier = 1;
+    if (tier < 0) continue;
+    const extra = nt
+      .split(" ")
+      .filter((w) => w && !qSet.has(w) && !CORP_SUFFIX.has(w)).length;
+    // tier dominates, then fewer extra descriptive tokens, then shorter title.
+    const score = tier * 1_000_000 - extra * 1000 - nt.length;
     if (score > bestScore) {
       bestScore = score;
       best = r;
     }
   }
 
-  if (!best || bestScore < 0) return null;
+  if (!best) return null;
   return format(best);
 }
+
+// Corporate-suffix / connector tokens that don't distinguish one company from
+// another — ignored when counting a title's "extra" tokens during tie-breaking.
+const CORP_SUFFIX = new Set([
+  "co", "corp", "corporation", "inc", "incorporated", "company", "companies",
+  "plc", "ltd", "limited", "llc", "lp", "holdings", "holding", "group",
+  "the", "and", "sa", "ag", "nv", "se", "trust", "class",
+]);
 
 function format(row: TickerRow): { cik: string; ticker: string; title: string } {
   return {
@@ -107,6 +125,7 @@ function escapeRegExp(s: string): string {
 function normalizeName(s: string): string {
   return s
     .toLowerCase()
+    .replace(/['’.]/g, "")        // drop apostrophes/periods: "McDonald's"->mcdonalds, "U.S."->us
     .replace(/^the\s+/, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
