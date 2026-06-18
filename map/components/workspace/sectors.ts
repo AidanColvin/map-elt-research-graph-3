@@ -33,6 +33,13 @@ export const SECTORS = [
   "Consumer Electronics",
   "Gaming",
   "Streaming",
+  // S&P 500 GICS sectors
+  "Consumer Discretionary",
+  "Consumer Staples",
+  "Communication Services",
+  "Utilities",
+  "Materials",
+  "Real Estate",
 ];
 
 // Sector signal words. If a typed subject contains any of these (as a whole
@@ -71,6 +78,11 @@ const SECTOR_KEYWORDS = [
   "electric vehicle", "electric vehicles", "ev", "evs", "car", "cars", "truck", "trucks",
   // Food & beverage
   "coffee", "restaurant", "restaurants", "fast food", "grocery",
+  // S&P GICS sector names + variants
+  "consumer discretionary", "discretionary", "consumer staples", "staples",
+  "communication services", "communications", "utilities", "utility",
+  "materials", "chemicals", "chemical", "mining", "metals",
+  "real estate", "reit", "reits",
 ];
 
 // takes: a free-text subject typed into the unified Projects search
