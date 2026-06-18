@@ -121,19 +121,89 @@ function Card({ title, subtitle, children }: { title: string; subtitle: string; 
 // does: renders one at-a-glance metric tile — a large number, an uppercase
 //       label, and a short accent rule that greys out when the value is zero
 // returns: the metric-tile element
-function StatTile({ value, label, accent }: { value: number; label: string; accent: string }) {
+function StatTile({ value, label, accent, note }: { value: number; label: string; accent: string; note?: string }) {
   const has = value > 0;
   return (
     <div style={{
       background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 16,
       padding: "15px 17px", boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
-      display: "flex", flexDirection: "column", gap: 7,
+      display: "flex", flexDirection: "column", gap: 6,
     }}>
       <span style={{ fontSize: "clamp(26px,3vw,32px)", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em", color: has ? "#1d1d1f" : "#c4c4cc" }}>{value}</span>
       <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#8a8a92" }}>{label}</span>
       <span style={{ height: 3, width: 26, borderRadius: 999, background: has ? accent : "#e8e8ec", marginTop: 1 }} />
+      {note ? <span style={{ fontSize: 10.5, color: "#9a9aa2", marginTop: 1 }}>{note}</span> : null}
     </div>
   );
+}
+
+// takes: the resolver payload and the resolved company/term name
+// does: derives an evidence-weighted, recency-aware assessment so the report
+//       ADAPTS to what was actually found — a current funded partnership reads
+//       differently from incidental keyword co-authorship or stale history.
+//       This is what keeps a junk query ("streaming") from being presented as a
+//       confident "Active partner" off the back of unrelated keyword matches.
+// returns: { tier, label, badge, color, summary, caveats, latestPaper,
+//            latestGrant, hasSignal }
+function assessPartnership(data: PartnerData, resolvedName: string) {
+  const RECENT = 5;
+  const nowY = new Date().getFullYear();
+  const yearsOf = (arr: unknown[] | undefined, key: string) =>
+    (arr ?? [])
+      .map((x) => parseInt(String((x as Record<string, unknown>)?.[key] ?? "").slice(0, 4), 10))
+      .filter((n) => n > 0);
+
+  const paperCount = data.clinical?.count ?? 0;
+  const secMentions = data.financial?.quotes?.length ?? 0;
+  const nihGrants = data.nih_grants?.length ?? 0;
+  const uncTrials = (data.trials ?? []).length;
+  const coiCount = data.coi?.count ?? 0;
+  const topUnit = (data.unc_units ?? [])[0]?.unit;
+
+  const grantYears = yearsOf(data.nih_grants, "fiscal_year");
+  const paperYears = yearsOf(data.clinical?.papers, "year");
+  const latestGrant = grantYears.length ? Math.max(...grantYears) : 0;
+  const latestPaper = paperYears.length ? Math.max(...paperYears) : 0;
+  const recentGrants = grantYears.filter((y) => y >= nowY - RECENT).length;
+
+  // "Strong" = institution-level commitment (grant/trial/filing/disclosure).
+  // strongNow weights recency so decades-old grants don't read as current.
+  const strongNow = recentGrants + uncTrials + secMentions + coiCount;
+  const strongEver = nihGrants + uncTrials + secMentions + coiCount;
+
+  const plural = (n: number, s: string) => `${n} ${s}${n !== 1 ? "s" : ""}`;
+  const caveats: string[] = [];
+  let tier: "active" | "emerging" | "historical" | "none";
+  let label: string, badge: string, color: string, summary: string;
+
+  if (strongNow > 0) {
+    tier = "active"; label = "Active"; badge = "UNC PARTNER"; color = "#16a34a";
+    const bits: string[] = [];
+    if (recentGrants > 0) bits.push(plural(nihGrants, "NIH-funded program"));
+    if (uncTrials > 0) bits.push(plural(uncTrials, "joint clinical trial"));
+    if (coiCount > 0) bits.push(plural(coiCount, "disclosed financial tie"));
+    if (secMentions > 0) bits.push(plural(secMentions, "SEC filing mention"));
+    const list = bits.length > 1 ? `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}` : bits[0];
+    summary = `${resolvedName}'s UNC relationship is anchored by ${list}`
+      + `${paperCount > 0 ? `, alongside ${plural(paperCount, "co-authored paper")}` : ""}`
+      + `${topUnit ? ` — concentrated in the ${topUnit}` : ""}.`;
+  } else if (paperCount > 0) {
+    tier = "emerging"; label = "Co-authorship signal"; badge = "EARLY SIGNAL"; color = "#b45309";
+    summary = `${resolvedName} shows ${plural(paperCount, "UNC co-authored paper")}`
+      + `${topUnit ? ` (${topUnit})` : ""}, but no recent NIH grants, clinical trials, COI disclosures, or SEC filings confirm a formal partnership.`;
+    caveats.push(`Co-authored papers can be incidental keyword overlap — confirm they involve ${resolvedName} the company before treating it as a partner.`);
+    if (latestGrant > 0 && recentGrants === 0) caveats.push(`The only NIH grants on record are historical (most recent FY${latestGrant}).`);
+  } else if (strongEver > 0) {
+    tier = "historical"; label = "Historical ties"; badge = "PAST ACTIVITY"; color = "#b45309";
+    summary = `UNC ties to ${resolvedName} appear historical`
+      + `${latestGrant ? ` — the most recent NIH grant is FY${latestGrant}` : ""}, with no current papers, trials, or filings.`;
+    caveats.push(`No activity in the last ${RECENT} years — verify the relationship is still current.`);
+  } else {
+    tier = "none"; label = "No confirmed relationship"; badge = "NOT A PARTNER"; color = "#6b7280";
+    summary = `No public UNC research relationship found for ${resolvedName} in PubMed, NIH RePORTER, ClinicalTrials.gov, or SEC filings.`;
+  }
+
+  return { tier, label, badge, color, summary, caveats, latestPaper, latestGrant, hasSignal: paperCount > 0 || strongEver > 0 };
 }
 
 // takes: an external href and a button label
@@ -547,12 +617,13 @@ export default function PartnershipsView({
         const coiCount = data.coi?.count ?? 0;
         const units = data.unc_units ?? [];
 
-        const isPartner = paperCount > 0 || secMentions > 0 || nihGrants > 0 || uncTrialCount > 0;
-        const depth =
-          (paperCount > 3 || secMentions > 0 || nihGrants > 0 || uncTrialCount > 0) ? "Active"
-          : (paperCount >= 1 || coiCount > 0) ? "Exploratory"
-          : "None confirmed";
-        const depthColor = depth === "Active" ? "#16a34a" : depth === "Exploratory" ? "#d97706" : "#9ca3af";
+        // Evidence-weighted, recency-aware assessment — the report adapts its
+        // framing, colour, and narrative to what was actually found.
+        const assessment = assessPartnership(data, resolvedName);
+        const isPartner = assessment.tier === "active";   // confident, current partner
+        const hasSignal = assessment.hasSignal;            // any evidence at all → show detail cards
+        const depth = assessment.label;
+        const depthColor = assessment.color;
 
         const inventoryMatch = ACCOUNTS.find((a) =>
           a.account.toLowerCase().includes(resolvedName.toLowerCase()) ||
@@ -590,8 +661,8 @@ export default function PartnershipsView({
                 counts. The full prose report is available from the export bar
                 above (PDF / DOCX / Markdown). */}
             <div data-testid="partnership-metrics" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(138px, 1fr))", gap: 12 }}>
-              <StatTile value={paperCount} label="Co-authored papers" accent="#2563eb" />
-              <StatTile value={nihGrants} label="NIH grants" accent="#7c3aed" />
+              <StatTile value={paperCount} label="Co-authored papers" accent="#2563eb" note={assessment.latestPaper ? `latest ${assessment.latestPaper}` : undefined} />
+              <StatTile value={nihGrants} label="NIH grants" accent="#7c3aed" note={assessment.latestGrant ? `latest FY${assessment.latestGrant}` : undefined} />
               <StatTile value={uncTrialCount} label="UNC trials" accent="#0891b2" />
               <StatTile value={coiCount} label="COI disclosures" accent="#d97706" />
               <StatTile value={secMentions} label="SEC mentions" accent="#475569" />
@@ -609,35 +680,27 @@ export default function PartnershipsView({
             <div
               data-testid="partner-status-banner"
               style={{
-                background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderLeft: `4px solid ${isPartner ? "#16a34a" : "#9ca3af"}`,
+                background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderLeft: `4px solid ${depthColor}`,
                 borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)",
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 20, flexWrap: "wrap",
+                display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 20, flexWrap: "wrap",
               }}
             >
               <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 150 }}>
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 13, fontWeight: 600, color: depthColor }}>
-                  <span>{isPartner ? "●" : "○"}</span> {depth}
+                  <span>{assessment.tier === "none" ? "○" : "●"}</span> {assessment.label}
                 </span>
-                <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.12em", color: isPartner ? "#16a34a" : "#6b7280" }}>
-                  {isPartner ? "UNC PARTNER" : "NOT YET A PARTNER"}
+                <span style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: "0.12em", color: depthColor }}>
+                  {assessment.badge}
                 </span>
               </div>
 
               <div style={{ flex: 1, minWidth: 240 }}>
-                {isPartner ? (
-                  <p style={{ fontSize: 14.5, color: "#1d1d1f", margin: 0, lineHeight: 1.45 }}>
-                    {resolvedName} has a verifiable research relationship with UNC Chapel Hill.
-                  </p>
-                ) : (
-                  <>
-                    <p style={{ fontSize: 14.5, color: "#1d1d1f", margin: 0, lineHeight: 1.45 }}>
-                      No public research relationship found in PubMed, NIH RePORTER, or SEC filings.
-                    </p>
-                    <p style={{ fontSize: 12.5, color: "#9a9aa2", margin: "6px 0 0", lineHeight: 1.45 }}>
-                      This reflects publicly indexed academic and financial data only — operational relationships (IT deployments, hiring, clinical pilots) are not captured here.
-                    </p>
-                  </>
-                )}
+                <p style={{ fontSize: 14.5, color: "#1d1d1f", margin: 0, lineHeight: 1.45 }}>
+                  {assessment.summary}
+                </p>
+                {assessment.caveats.map((c, i) => (
+                  <p key={i} style={{ fontSize: 12.5, color: "#9a6b4a", margin: "7px 0 0", lineHeight: 1.4 }}>⚠ {c}</p>
+                ))}
               </div>
 
               <div style={{ textAlign: "right", minWidth: 150 }}>
@@ -666,7 +729,7 @@ export default function PartnershipsView({
             )}
 
             {/* ── Section B — Where they partner with UNC ─────────────────── */}
-            {isPartner && (
+            {hasSignal && (
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 16 }}>
                 {/* Sub-card 1 — UNC staff / PIs */}
                 <Card title="UNC Research Contacts" subtitle="Named investigators from NIH grants and co-authored papers">
