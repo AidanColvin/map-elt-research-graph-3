@@ -445,7 +445,7 @@ def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
         return []
     out_by_name: dict[str, dict] = {n: _empty_company(n) for n in names}
     deadline = time.monotonic() + FETCH_BUDGET_SECONDS
-    with ThreadPoolExecutor(max_workers=len(names)) as pool:
+    with ThreadPoolExecutor(max_workers=min(len(names), 7)) as pool:
         future_to_name = {
             pool.submit(_fetch_one_company, n, **clients): n for n in names
         }
