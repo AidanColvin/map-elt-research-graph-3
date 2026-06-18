@@ -847,7 +847,8 @@ export default function PartnershipsView({
             {/* ── Section C — Verifiable evidence ─────────────────────────── */}
             <Eyebrow style={{ marginTop: 8 }}>Verifiable evidence · every item below links to its primary source</Eyebrow>
 
-            {/* Conflict of Interest */}
+            {/* Conflict of Interest — only rendered when disclosures actually exist */}
+            {data.coi && data.coi.papers.length > 0 && (
             <div data-testid="card-coi" style={{ background: "#fff7ed", border: "1px solid #fed7aa", borderRadius: 18, padding: 22 }}>
               <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a3412", margin: 0 }}>
                 Conflict of Interest · last {data.coi?.window_years ?? 5} years
@@ -855,21 +856,18 @@ export default function PartnershipsView({
               <p style={{ fontSize: 13, color: "#9a6b4a", margin: "4px 0 14px" }}>
                 UNC-authored papers that disclosed a financial relationship with {data.query} (consulting, equity, or funding).
               </p>
-              {!data.coi || data.coi.papers.length === 0 ? (
-                <p style={{ fontSize: 13, color: "#b08968", margin: 0 }}>No disclosed conflicts of interest found in the last 5 years.</p>
-              ) : (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                  {data.coi.papers.map((p) => (
-                    <li key={p.pmid} style={{ borderLeft: "2px solid #fdba74", paddingLeft: 12 }}>
-                      <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: "#7c2d12", fontWeight: 500, textDecoration: "none" }}>{p.title}</a>
-                      <p style={{ fontSize: 11.5, color: "#b08968", margin: "3px 0 0" }}>
-                        PMID {p.pmid}{p.company ? ` · ${p.company}` : ""}{p.year ? ` · ${p.year}` : ""}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                {data.coi.papers.map((p) => (
+                  <li key={p.pmid} style={{ borderLeft: "2px solid #fdba74", paddingLeft: 12 }}>
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: "#7c2d12", fontWeight: 500, textDecoration: "none" }}>{p.title}</a>
+                    <p style={{ fontSize: 11.5, color: "#b08968", margin: "3px 0 0" }}>
+                      PMID {p.pmid}{p.company ? ` · ${p.company}` : ""}{p.year ? ` · ${p.year}` : ""}
+                    </p>
+                  </li>
+                ))}
+              </ul>
             </div>
+            )}
 
             {/* Three source-linked panels */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 18 }}>
@@ -946,48 +944,47 @@ export default function PartnershipsView({
               </div>
             </div>
 
-            {/* ── Section D — Why UNC is a fit (always shown) ─────────────── */}
-            <div ref={whyRef} style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)", marginTop: 8 }}>
-              <Eyebrow>{isPartner ? "Deepen the relationship" : "Why UNC"}</Eyebrow>
-              <p style={{ fontSize: 14, color: "#6b6b73", margin: "6px 0 18px" }}>
-                {isPartner ? `UNC assets most relevant to ${resolvedName}'s strategy:` : `What UNC brings to ${resolvedName}:`}
-              </p>
-
-              {/* Item 1 — Partnership Profile (only if on file) */}
-              {inventoryMatch?.linkToReport ? (
-                <div style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderLeft: "4px solid #5b6cff", borderRadius: 12, padding: 16, marginBottom: 16 }}>
-                  <p style={{ fontSize: 13.5, fontWeight: 600, margin: 0 }}>📄 Partnership Profile on file</p>
-                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 8px", lineHeight: 1.45 }}>
-                    A full background profile for {inventoryMatch.account} is available in the UNC partnership inventory.
-                  </p>
-                  <a href={inventoryMatch.linkToReport} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: "#5b6cff", textDecoration: "none" }}>Open Partnership Profile →</a>
-                </div>
-              ) : null}
-
-              {/* Item 2 — UNC partnership models (static, from unc_programs.json) */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 16 }}>
-                {PARTNERSHIP_MODELS.map((m) => (
-                  <div key={m.model} style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                    <span style={{ fontSize: 13.5, fontWeight: 700 }}>{m.model}</span>
-                    <span style={{ fontSize: 12, color: "#9a9aa2" }}>→ {m.unit}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Item 3 — UNC research assets (static, from nc_access) */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                {NC_ACCESS.map((a) => (
-                  <div key={a.asset} style={{ fontSize: 13.5, lineHeight: 1.45 }}>
-                    <strong>{a.asset}</strong>
-                    <span style={{ color: "#6b6b73" }}> — {a.description} </span>
-                    <a href={a.url} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>{a.url}</a>
-                  </div>
-                ))}
-              </div>
-              <p style={{ fontSize: 11, color: "#9a9aa2", margin: "8px 0 0" }}>Source: unc.edu / tracs.unc.edu</p>
-
-              <p style={{ fontSize: 12, color: "#9a9aa2", fontStyle: "italic", margin: "18px 0 0", lineHeight: 1.5 }}>
-                Signals from PubMed co-authorship, NIH RePORTER grants, ClinicalTrials.gov, and SEC filings. Operational relationships (IT contracts, hiring, clinical pilots) are not indexed in public research databases and may not appear above — check the Partnership Profile for the full picture.
+            {/* ── Section D — Deepen / where to start, tailored to this search ─ */}
+            <div ref={whyRef} style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 26, boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+              <Eyebrow>{isPartner ? "Deepen the relationship" : "Where to start with UNC"}</Eyebrow>
+              {(() => {
+                const topUnit = units[0]?.unit;
+                const strongest =
+                  nihGrants > 0 ? `${nihGrants} NIH-funded program${nihGrants !== 1 ? "s" : ""}`
+                  : uncTrialCount > 0 ? `${uncTrialCount} joint clinical trial${uncTrialCount !== 1 ? "s" : ""}`
+                  : paperCount > 0 ? `${paperCount} co-authored paper${paperCount !== 1 ? "s" : ""}`
+                  : null;
+                const steps: { title: string; unit: string; detail: string }[] = [];
+                if (nihGrants > 0) steps.push({ title: "Sponsored Research Agreement", unit: "UNC Office of Sponsored Programs", detail: `Extend the ${nihGrants} active NIH-funded program${nihGrants !== 1 ? "s" : ""} into company-sponsored work${topUnit ? ` with the ${topUnit}` : ""}.` });
+                if (uncTrialCount > 0 || (data.trials_total ?? 0) > 0) steps.push({ title: "Clinical Research Collaboration", unit: "UNC Health / NC TraCS", detail: uncTrialCount > 0 ? `Build on UNC's role in ${uncTrialCount} joint trial${uncTrialCount !== 1 ? "s" : ""}.` : `Bring ${resolvedName}'s ${data.trials_total} sponsored trial${(data.trials_total ?? 0) !== 1 ? "s" : ""} to UNC sites.` });
+                if (coiCount > 0 || paperCount > 0) steps.push({ title: "Co-development & IP licensing", unit: "UNC Office of Technology Commercialization", detail: `Formalize ${paperCount} co-authored paper${paperCount !== 1 ? "s" : ""}${coiCount > 0 ? ` and ${coiCount} disclosed financial tie${coiCount !== 1 ? "s" : ""}` : ""} into a structured agreement.` });
+                if (steps.length === 0) steps.push({ title: "Sponsored Research Agreement", unit: "UNC Office of Sponsored Programs", detail: `Open a first UNC research engagement aligned to ${resolvedName}'s focus.` });
+                return (
+                  <>
+                    <p style={{ fontSize: 14, color: "#6b6b73", margin: "6px 0 18px", lineHeight: 1.5, maxWidth: 640 }}>
+                      {strongest
+                        ? `Given ${resolvedName}'s ${strongest}${topUnit ? ` with the ${topUnit}` : ""}, the most direct next steps:`
+                        : `${resolvedName} has no confirmed UNC research ties yet — the fastest ways in:`}
+                    </p>
+                    {inventoryMatch?.linkToReport && (
+                      <div style={{ border: "1px solid rgba(0,0,0,0.06)", borderLeft: "4px solid #5b6cff", borderRadius: 12, padding: 16, marginBottom: 18 }}>
+                        <p style={{ fontSize: 13.5, fontWeight: 600, margin: "0 0 4px" }}>📄 Partnership Profile on file</p>
+                        <a href={inventoryMatch.linkToReport} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: "#5b6cff", textDecoration: "none" }}>Open the {inventoryMatch.account} profile →</a>
+                      </div>
+                    )}
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 16 }}>
+                      {steps.map((s) => (
+                        <li key={s.title} style={{ borderLeft: "2px solid #e5e5ea", paddingLeft: 12 }}>
+                          <p style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>{s.title} <span style={{ fontSize: 12, fontWeight: 500, color: "#9a9aa2" }}>→ {s.unit}</span></p>
+                          <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 0", lineHeight: 1.45 }}>{s.detail}</p>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                );
+              })()}
+              <p style={{ fontSize: 11.5, color: "#9a9aa2", fontStyle: "italic", margin: "20px 0 0", lineHeight: 1.5 }}>
+                Derived from PubMed, NIH RePORTER, ClinicalTrials.gov &amp; SEC filings — operational ties (IT, hiring, clinical pilots) aren&apos;t indexed in these public sources.
               </p>
             </div>
 
