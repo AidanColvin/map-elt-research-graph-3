@@ -327,7 +327,7 @@ class SECEdgarClient:
             # Prefer annual filings: 10-K (domestic) or 20-F (foreign private
             # issuers like Spotify). Fall back to most recent of any form.
             annual = [e for e in entries
-                      if e.get("form") in ("10-K", "20-F") and e.get("fp") == "FY"]
+                      if e.get("form") in ("10-K", "20-F", "40-F") and e.get("fp") == "FY"]
             pool = annual or entries
             if not pool:
                 return None
@@ -373,7 +373,7 @@ class SECEdgarClient:
             for name in concept_names:
                 concept = src.get(name) or {}
                 for e in ((concept.get("units") or {}).get(unit) or []):
-                    if e.get("form") not in ("10-K", "20-F") or e.get("fp") != "FY":
+                    if e.get("form") not in ("10-K", "20-F", "40-F") or e.get("fp") != "FY":
                         continue
                     fy = e.get("fy")
                     val = e.get("val")
