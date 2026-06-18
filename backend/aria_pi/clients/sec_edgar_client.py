@@ -12,50 +12,25 @@ from datetime import date, timedelta
 from typing import Optional, List
 
 from aria_pi.utils.net_guard import assert_public_url
+from aria_pi.lib.tickers import load_tickers
 
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-
-_TICKERS_CACHE: list | None = None
-_CIK_TITLE_CACHE: dict | None = None
 
 
 def _active_cik_titles() -> dict:
     """Map {int(cik): official_title} for every currently-traded SEC filer.
 
     Used to filter full-text search hits down to live, public companies so
-    discovery never surfaces defunct shells (e.g. THQ, Midway)."""
-    global _CIK_TITLE_CACHE
-    if _CIK_TITLE_CACHE is not None:
-        return _CIK_TITLE_CACHE
+    discovery never surfaces defunct shells (e.g. THQ, Midway). Reads the
+    shared, cached ticker list from aria_pi.lib.tickers."""
     out: dict = {}
-    for t in _load_tickers():
+    for t in load_tickers():
         try:
             out[int(t["cik_str"])] = t.get("title") or ""
         except (KeyError, ValueError, TypeError):
             continue
-    _CIK_TITLE_CACHE = out
     return out
-
-
-def _load_tickers() -> list:
-    """Load SEC's official company-tickers map once per cold start.
-
-    Returns a list of dicts: [{cik_str, ticker, title}, ...]
-    """
-    global _TICKERS_CACHE
-    if _TICKERS_CACHE is not None:
-        return _TICKERS_CACHE
-    try:
-        r = requests.get("https://www.sec.gov/files/company_tickers.json",
-                         headers=HEADERS, timeout=8)
-        r.raise_for_status()
-        raw = r.json()
-        _TICKERS_CACHE = list(raw.values()) if isinstance(raw, dict) else []
-    except Exception as e:
-        print(f"SEC tickers load error: {e}")
-        _TICKERS_CACHE = []
-    return _TICKERS_CACHE
 
 
 class SECEdgarClient:
@@ -631,7 +606,7 @@ class SECEdgarClient:
         """Resolve a company name → CIK using SEC's official ticker map first,
         then fall back to full-text search."""
         q = (company_name or "").lower().strip()
-        tickers = _load_tickers()
+        tickers = load_tickers()
         # Exact-ish match on title or ticker. Score by overlap and short prefix.
         best = None
         best_score = 0

@@ -7,57 +7,11 @@ against the official SEC company-title list and returns the canonical title
 when confident, so the strict clients receive a name they can actually find.
 """
 
-import json
-import os
-import tempfile
-import time
-
-import requests
 from rapidfuzz import process, fuzz, utils
 
-_SEC_TICKERS_URL = "https://www.sec.gov/files/company_tickers.json"
-# SEC requires a descriptive User-Agent on automated requests.
-_HEADERS = {"User-Agent": "aria-pi research.intelligence@unc.edu"}
+from aria_pi.lib.tickers import load_tickers
+
 _MATCH_THRESHOLD = 80          # rapidfuzz score (0-100) required to accept a match
-_CACHE_TTL_SECONDS = 86_400    # refresh the on-disk ticker cache daily
-_TITLES_CACHE = {"titles": None}  # process-wide memo
-
-
-# takes: nothing
-# does: fetches the SEC company_tickers.json (memoized in-process and cached on
-#       disk for a day) and returns the list of official company titles
-# returns: a list of official SEC company title strings (empty on failure)
-def _load_sec_titles() -> list:
-    if _TITLES_CACHE["titles"] is not None:
-        return _TITLES_CACHE["titles"]
-
-    path = os.path.join(tempfile.gettempdir(), "sec_company_tickers.json")
-    data = None
-    try:
-        if os.path.exists(path) and (time.time() - os.path.getmtime(path) < _CACHE_TTL_SECONDS):
-            with open(path) as f:
-                data = json.load(f)
-    except Exception:
-        data = None
-
-    if data is None:
-        try:
-            r = requests.get(_SEC_TICKERS_URL, headers=_HEADERS, timeout=10)
-            r.raise_for_status()
-            data = r.json()
-            try:
-                with open(path, "w") as f:
-                    json.dump(data, f)
-            except Exception:
-                pass  # disk cache is best-effort
-        except Exception as e:
-            print(f"SEC ticker fetch error: {e}")
-            _TITLES_CACHE["titles"] = []
-            return []
-
-    titles = [v.get("title", "") for v in data.values() if v.get("title")]
-    _TITLES_CACHE["titles"] = titles
-    return titles
 
 
 # takes: two strings
@@ -83,7 +37,7 @@ def normalize_company_name(query: str) -> str:
     q = (query or "").strip()
     if not q:
         return q
-    titles = _load_sec_titles()
+    titles = [v.get("title", "") for v in load_tickers() if v.get("title")]
     if not titles:
         return q
     match = process.extractOne(
