@@ -344,7 +344,7 @@ export function buildPartnershipMarkdown(data: PartnerData): string {
       L.push(`- **${p.name}** — ${p.org || "UNC Chapel Hill"}. ${p.project_title}${p.grant_url ? ` ([NIH grant](${p.grant_url}))` : ""}`);
     });
   } else if (data.clinical.top_authors.length > 0) {
-    data.clinical.top_authors.forEach((a) => L.push(`- ${a} · UNC Chapel Hill`));
+    data.clinical.top_authors.forEach((a) => L.push(`- ${a} · co-author on a UNC paper`));
   } else {
     L.push("_No named UNC investigators found in public grant or publication records._");
   }
@@ -847,7 +847,7 @@ export default function PartnershipsView({
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
                       {data.clinical.top_authors.map((a) => (
                         <li key={a} style={{ fontSize: 13.5, color: "#1d1d1f" }}>
-                          {a} · <span style={{ color: "#9a9aa2" }}>UNC Chapel Hill</span>
+                          {a} · <span style={{ color: "#9a9aa2" }}>co-author on a UNC paper</span>
                           {data.links?.pubmed && (
                             <>{" "}<a href={data.links.pubmed} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "#5b6cff", textDecoration: "none" }}>Search PubMed →</a></>
                           )}
