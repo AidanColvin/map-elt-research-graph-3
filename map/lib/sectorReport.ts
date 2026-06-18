@@ -66,7 +66,7 @@ const ASSET_GROUPS: { match: RegExp; assets: DataAsset[] }[] = [
     { name: "High-Throughput Sequencing Facility", url: "https://www.med.unc.edu/", description: "Genomic & transcriptomic sequencing at scale", heldBy: "UNC School of Medicine" },
     { name: "Carolina Data Warehouse for Health", url: "https://tracs.unc.edu/", description: "EHR, labs & imaging metadata · 1M+ patients", heldBy: "NC TraCS / UNC Health" },
   ] },
-  { match: /\bai\b|artificial intelligence|machine learning|\bml\b|data scien|software|cloud|comput|cyber|semiconductor|informatics|analytics|quantum|robot/i, assets: [
+  { match: /\bai\b|artificial intelligence|machine learning|\bml\b|data scien|software|cloud|comput|cyber|semiconductor|\bchip|informatics|analytics|quantum|robot|\btech\b|technolog|information technology|\bit\b|internet|hardware|electronic|telecom|\bnetwork|\b5g\b|streaming|\bmedia\b|gaming|video game|\bsaas\b|platform|digital/i, assets: [
     { name: "RENCI — Renaissance Computing Institute", url: "https://renci.org/", description: "Applied AI, cyberinfrastructure & large-scale data science", heldBy: "UNC-Chapel Hill" },
     { name: "School of Data Science and Society", url: "https://datascience.unc.edu/", description: "Cross-disciplinary data-science research & talent", heldBy: "UNC-Chapel Hill" },
     { name: "Carolina Health Informatics Program", url: "https://tracs.unc.edu/", description: "Health-data analytics, EHR & biomedical informatics", heldBy: "UNC-Chapel Hill" },
@@ -86,14 +86,29 @@ const ASSET_GROUPS: { match: RegExp; assets: DataAsset[] }[] = [
     { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey research, data archiving & quantitative methods", heldBy: "UNC-Chapel Hill" },
     { name: "Cecil G. Sheps Center", url: "https://www.shepscenter.unc.edu/", description: "Health services, workforce & rural-health data", heldBy: "UNC-Chapel Hill" },
   ] },
+  // Broad health/life-sciences catch-all — covers health sectors that don't hit
+  // the oncology group (diabetes, immunology, cardiology, neuro, gene therapy,
+  // medical devices, etc.) so they still surface UNC's clinical data assets.
+  { match: /health|medical|medicine|clinical|disease|therap|drug|pharma|\bbio|genom|\bgene\b|immun|diabet|cardio|neuro|vaccine|patient|device|diagnostic|surg|hospital|life scien/i, assets: DATA_ASSETS.slice(0, 3) },
+];
+
+// Cross-cutting research infrastructure for sectors that match no specific
+// domain — relevant to almost any industry, and never health-specific (so a
+// tech/industrial/consumer sector never shows a cancer registry as its asset).
+const GENERIC_ASSETS: DataAsset[] = [
+  { name: "RENCI — Renaissance Computing Institute", url: "https://renci.org/", description: "Applied AI, cyberinfrastructure & large-scale data science", heldBy: "UNC-Chapel Hill" },
+  { name: "School of Data Science and Society", url: "https://datascience.unc.edu/", description: "Cross-disciplinary data-science research & talent", heldBy: "UNC-Chapel Hill" },
+  { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic & administrative-data archive", heldBy: "UNC-Chapel Hill" },
 ];
 
 // takes: the report's sector name
-// does: picks the UNC data assets relevant to that topic (health/biomedical default)
+// does: picks the UNC data assets relevant to that topic; sectors that match no
+//       specific domain get cross-cutting research infrastructure, NOT health
+//       datasets (showing a cancer registry to a tech firm reads as nonsensical)
 // returns: up to 3 tailored DataAssets
 function pickDataAssets(sector: string): DataAsset[] {
   const hit = ASSET_GROUPS.find((g) => g.match.test(sector || ""));
-  return hit ? hit.assets : DATA_ASSETS.slice(0, 3);
+  return hit ? hit.assets : GENERIC_ASSETS;
 }
 
 function firstSource(sources: any): string | undefined {
