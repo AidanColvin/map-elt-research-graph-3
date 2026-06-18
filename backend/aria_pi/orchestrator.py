@@ -131,18 +131,26 @@ async def run_pipeline(req: PipelineRequest):
 
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds, resolution = _resolve_seeds(req.sector, override, sec)
+        _log.info("pipeline: sector=%r seeds=%d resolution=%s",
+                  req.sector, len(seeds), resolution)
 
         # 1. Real data collection per company — runs all sources in parallel
         # for up to 10 candidate companies within the Vercel 60s budget.
+        _t0 = time.monotonic()
         company_data = _fetch_all_concurrent(
             seeds[:22], sec=sec, trials=trials, pubmed=pubmed, nih=nih
         )
+        _log.info("pipeline: fetch done in %.1fs companies=%d",
+                  time.monotonic() - _t0, len(company_data))
 
         # 2. Deterministic synthesis
         report = builder.build(req.sector, {"sector": req.sector, "companies": company_data})
 
         # 3. Source-blocklist validation
         report["_validation"] = _validate_report_sources(report, tagger)
+        _val = report["_validation"]
+        _log.info("pipeline: validation total=%d verified=%d unverified=%d",
+                  _val["total_claims"], _val["verified"], _val["unverified"])
 
         # 3b. Condensed 18–22 page brief (Markdown) alongside the full report.
         report["condensed_report_markdown"] = builder.build_condensed_report(report, company_data)
@@ -215,6 +223,8 @@ async def run_pipeline_stream(req: PipelineRequest):
 
             override = req.companies or ([req.company_override] if req.company_override else None)
             seeds, resolution = _resolve_seeds(req.sector, override, sec)
+            _log.info("pipeline-stream: sector=%r seeds=%d resolution=%s",
+                      req.sector, len(seeds), resolution)
             seeds = seeds[:22]
             total = len(seeds)
             yield _sse({"type": "stage", "key": "resolved",
