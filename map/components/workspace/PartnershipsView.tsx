@@ -885,8 +885,8 @@ export default function PartnershipsView({
                       {data.clinical.papers.slice(0, 5).map((p) => (
                         <li key={p.pmid} style={{ borderLeft: "2px solid #e5e5ea", paddingLeft: 12 }}>
                           <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: "#1d1d1f", fontWeight: 500, textDecoration: "none" }}>{p.title || "Untitled record"}</a>
-                          <p style={{ fontSize: 11.5, color: "#9a9aa2", margin: "3px 0 0" }}>
-                            PMID {p.pmid}{p.company ? ` · ${p.company}` : ""}{p.year ? ` · ${p.year}` : ""}
+                          <p style={{ fontSize: 11.5, color: "#9a9aa2", margin: "4px 0 0" }}>
+                            {p.journal ? <span style={{ fontWeight: 600, color: "#6b6b73" }}>{p.journal}</span> : null}{p.journal && p.year ? " · " : ""}{p.year || ""}{(p.journal || p.year) ? " · " : ""}PMID {p.pmid}
                           </p>
                         </li>
                       ))}
