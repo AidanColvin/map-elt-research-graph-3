@@ -12,12 +12,42 @@ Endpoint:
 Docs:
   https://api.reporter.nih.gov/
 """
+import logging
 import requests
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 ENDPOINT = "https://api.reporter.nih.gov/v2/projects/search"
 
 _UNC_ORG_KEYWORDS = ("north carolina", "unc", "chapel hill")
+
+
+def _coerce_award(value) -> int:
+    """Cast an NIH award figure to int, or None when absent/unparseable."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _pi_name_from(record) -> str:
+    """Display name from one PI object, tolerant of field-spelling variants.
+
+    The live API returns `full_name` (e.g. "Owen S Fenton"); we fall back to
+    assembling first + last name, and finally to bare last_name. Returns ""
+    for anything that is not a usable PI object.
+    """
+    if not isinstance(record, dict):
+        return ""
+    name = record.get("full_name") or record.get("FullName")
+    if name:
+        return name.strip()
+    parts = [record.get("first_name") or record.get("FirstName") or "",
+             record.get("last_name") or record.get("LastName") or ""]
+    return " ".join(p for p in parts if p).strip()
 
 
 def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
@@ -51,7 +81,7 @@ def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
             if len(pis) >= limit:
                 break
     except Exception as e:
-        print(f"UNC PI extraction error: {e}")
+        logger.error("nih_reporter: UNC PI extraction failed: %s", e)
         return []
     return pis
 
@@ -93,21 +123,42 @@ class NIHReporterClient:
             r.raise_for_status()
             results = (r.json() or {}).get("results", []) or []
         except Exception as e:
-            print(f"NIH Reporter error for {company_name}: {e}")
+            logger.error("nih_reporter: unc_grants_mentioning request failed for %s: %s", company_name, e)
             return []
+
+        if not results:
+            logger.warning("nih_reporter: unc_grants_mentioning returned 0 results for %s", company_name)
 
         grants = []
         for g in results:
             proj_num = g.get("project_num") or g.get("ProjectNum") or ""
+            # PrincipalInvestigators may be a list of PI objects, a single PI
+            # object, or absent. Handle all three without raising.
             pi_name = ""
-            pis = g.get("principal_investigators") or g.get("PrincipalInvestigators") or []
-            if pis and isinstance(pis, list):
-                pi_name = pis[0].get("full_name") or pis[0].get("FullName") or ""
+            pis = g.get("principal_investigators") or g.get("PrincipalInvestigators")
+            if isinstance(pis, list) and pis:
+                pi_name = _pi_name_from(pis[0])
+            elif isinstance(pis, dict):
+                pi_name = _pi_name_from(pis)
             if not pi_name:
                 pi_name = g.get("contact_pi_name") or g.get("ContactPiName") or ""
+            if not pi_name:
+                logger.debug("nih_reporter: no PI found for grant %s", proj_num)
             org = g.get("organization") or g.get("Organization") or {}
-            dept = (org.get("org_dept") if isinstance(org, dict) else "") or ""
+            # org_dept comes back null for UNC records; fall back to a top-level
+            # department field if a future record carries one.
+            dept = ((org.get("org_dept") if isinstance(org, dict) else "")
+                    or g.get("department") or "")
             org_name = (org.get("org_name") if isinstance(org, dict) else "") or g.get("OrgName", "")
+            # Award dollars: the live API populates `award_amount` (total award);
+            # `award_notice_amount` comes back null for UNC records, so it is only a
+            # fallback. `direct_cost_amt` is the last resort. (Confirmed via live
+            # smoke test against api.reporter.nih.gov.)
+            award_amount = _coerce_award(
+                g.get("award_amount") or g.get("AwardAmount")
+                or g.get("award_notice_amount") or g.get("AwardNoticeAmount")
+                or g.get("direct_cost_amt") or g.get("DirectCostAmt")
+            )
             grants.append({
                 "project_num": proj_num,
                 "title": g.get("project_title") or g.get("ProjectTitle") or "",
@@ -115,6 +166,7 @@ class NIHReporterClient:
                 "department": dept,
                 "organization": org_name,
                 "fiscal_year": g.get("fiscal_year") or g.get("FiscalYear") or "",
+                "award_amount": award_amount,
                 "agency": g.get("agency_ic_admin", {}).get("name", "") if isinstance(g.get("agency_ic_admin"), dict) else "",
                 "url": f"https://reporter.nih.gov/project-details/{proj_num}" if proj_num else "https://reporter.nih.gov",
             })
@@ -125,8 +177,9 @@ def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dic
     """UNCFacultyLead list from NIH grants mentioning the company at UNC.
 
     Maps the existing grant records to the UNCFacultyLead shape expected by
-    the talking-points assembler: pi_name, pi_email, department, grant_number,
-    project_title, fiscal_year, award_amount.
+    the talking-points assembler: pi_name, department, grant_number,
+    project_title, fiscal_year, award_amount. (NIH Reporter does not expose
+    PI email publicly, so no pi_email key is emitted.)
     """
     client = NIHReporterClient()
     grants = client.unc_grants_mentioning(company_name, max_results=max_results)
@@ -134,11 +187,10 @@ def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dic
     for g in grants:
         leads.append({
             "pi_name": g.get("pi") or "",
-            "pi_email": "",  # NIH Reporter does not expose PI email publicly
             "department": g.get("department") or "",
             "grant_number": g.get("project_num") or "",
             "project_title": g.get("title") or "",
             "fiscal_year": g.get("fiscal_year") or "",
-            "award_amount": None,  # not returned by this search endpoint
+            "award_amount": g.get("award_amount"),  # int or None, set in unc_grants_mentioning
         })
     return leads
