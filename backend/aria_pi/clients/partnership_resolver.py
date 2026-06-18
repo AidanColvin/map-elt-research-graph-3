@@ -338,6 +338,9 @@ def resolve_sector(sector: str) -> dict:
     top = records[:_SECTOR_TOP]
 
     clinical_papers, top_authors, financial_quotes, ecosystem, coi_papers = [], [], [], [], []
+    nih_grants, nih_pis, sector_trials = [], [], []
+    trials_total = 0
+    pi_seen = set()
     unit_tally = {}
     for r in top:
         for p in (r["clinical"]["papers"] or [])[:2]:
@@ -351,6 +354,20 @@ def resolve_sector(sector: str) -> dict:
             financial_quotes.append({"company": r["query"], "text": q, "filing_url": r["financial"]["filing_url"]})
         for m in (r["ecosystem"] or [])[:2]:
             ecosystem.append({**m, "company": r["query"]})
+        # Aggregate the institution-level signals the company view shows but the
+        # sector view previously dropped — NIH grants, the UNC PIs behind them,
+        # and clinical trials where UNC is a site. Without these the sector
+        # report always read "0 NIH grants / 0 UNC trials" regardless of reality.
+        for g in (r.get("nih_grants") or [])[:3]:
+            nih_grants.append({**g, "company": r["query"]})
+        for pi in (r.get("nih_pis") or []):
+            key = (pi.get("name") or "").lower()
+            if key and key not in pi_seen:
+                pi_seen.add(key)
+                nih_pis.append(pi)
+        for t in (r.get("trials") or [])[:3]:
+            sector_trials.append({**t, "company": r["query"]})
+        trials_total += r.get("trials_total") or 0
 
     return {
         "query": sector,
@@ -371,6 +388,10 @@ def resolve_sector(sector: str) -> dict:
         "unc_units": [{"unit": u, "count": c} for u, c in sorted(unit_tally.items(), key=lambda kv: -kv[1])],
         "financial": {"quotes": financial_quotes[:10], "filing_url": ""},
         "ecosystem": ecosystem[:10],
+        "nih_grants": nih_grants[:12],
+        "nih_pis": nih_pis[:8],
+        "trials": sector_trials[:12],
+        "trials_total": trials_total,
     }
 
 
