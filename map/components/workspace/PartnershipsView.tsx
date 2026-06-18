@@ -145,7 +145,7 @@ function StatTile({ value, label, accent, note }: { value: number; label: string
 //       confident "Active partner" off the back of unrelated keyword matches.
 // returns: { tier, label, badge, color, summary, caveats, latestPaper,
 //            latestGrant, hasSignal }
-function assessPartnership(data: PartnerData, resolvedName: string) {
+function assessPartnership(data: PartnerData, resolvedName: string, partnerType: PartnerType = "company") {
   const RECENT = 5;
   const nowY = new Date().getFullYear();
   const yearsOf = (arr: unknown[] | undefined, key: string) =>
@@ -176,6 +176,7 @@ function assessPartnership(data: PartnerData, resolvedName: string) {
   let tier: "active" | "emerging" | "historical" | "none";
   let label: string, badge: string, color: string, summary: string;
 
+  const isSector = partnerType === "sector";
   if (strongNow > 0) {
     tier = "active"; label = "Active"; badge = "UNC PARTNER"; color = "#16a34a";
     const bits: string[] = [];
@@ -184,23 +185,43 @@ function assessPartnership(data: PartnerData, resolvedName: string) {
     if (coiCount > 0) bits.push(plural(coiCount, "disclosed financial tie"));
     if (secMentions > 0) bits.push(plural(secMentions, "SEC filing mention"));
     const list = bits.length > 1 ? `${bits.slice(0, -1).join(", ")} and ${bits[bits.length - 1]}` : bits[0];
-    summary = `${resolvedName}'s UNC relationship is anchored by ${list}`
-      + `${paperCount > 0 ? `, alongside ${plural(paperCount, "co-authored paper")}` : ""}`
-      + `${topUnit ? ` — concentrated in the ${topUnit}` : ""}.`;
+    if (isSector) {
+      summary = `UNC's ${resolvedName} sector partnerships are anchored by ${list}`
+        + `${paperCount > 0 ? `, alongside ${plural(paperCount, "co-authored paper")}` : ""}`
+        + `${topUnit ? ` — concentrated in the ${topUnit}` : ""}.`;
+    } else {
+      summary = `${resolvedName}'s UNC relationship is anchored by ${list}`
+        + `${paperCount > 0 ? `, alongside ${plural(paperCount, "co-authored paper")}` : ""}`
+        + `${topUnit ? ` — concentrated in the ${topUnit}` : ""}.`;
+    }
   } else if (paperCount > 0) {
     tier = "emerging"; label = "Co-authorship signal"; badge = "EARLY SIGNAL"; color = "#b45309";
-    summary = `${resolvedName} shows ${plural(paperCount, "UNC co-authored paper")}`
-      + `${topUnit ? ` (${topUnit})` : ""}, but no recent NIH grants, clinical trials, COI disclosures, or SEC filings confirm a formal partnership.`;
-    caveats.push(`Co-authored papers can be incidental keyword overlap — confirm they involve ${resolvedName} the company before treating it as a partner.`);
+    if (isSector) {
+      summary = `The ${resolvedName} sector shows ${plural(paperCount, "UNC co-authored paper")}`
+        + `${topUnit ? ` (${topUnit})` : ""}, but no recent NIH grants, clinical trials, COI disclosures, or SEC filings confirm formal partnerships.`;
+    } else {
+      summary = `${resolvedName} shows ${plural(paperCount, "UNC co-authored paper")}`
+        + `${topUnit ? ` (${topUnit})` : ""}, but no recent NIH grants, clinical trials, COI disclosures, or SEC filings confirm a formal partnership.`;
+      caveats.push(`Co-authored papers can be incidental keyword overlap — confirm they involve ${resolvedName} the company before treating it as a partner.`);
+    }
     if (latestGrant > 0 && recentGrants === 0) caveats.push(`The only NIH grants on record are historical (most recent FY${latestGrant}).`);
   } else if (strongEver > 0) {
     tier = "historical"; label = "Historical ties"; badge = "PAST ACTIVITY"; color = "#b45309";
-    summary = `UNC ties to ${resolvedName} appear historical`
-      + `${latestGrant ? ` — the most recent NIH grant is FY${latestGrant}` : ""}, with no current papers, trials, or filings.`;
+    if (isSector) {
+      summary = `UNC's ties to the ${resolvedName} sector appear historical`
+        + `${latestGrant ? ` — the most recent NIH grant is FY${latestGrant}` : ""}, with no current papers, trials, or filings.`;
+    } else {
+      summary = `UNC ties to ${resolvedName} appear historical`
+        + `${latestGrant ? ` — the most recent NIH grant is FY${latestGrant}` : ""}, with no current papers, trials, or filings.`;
+    }
     caveats.push(`No activity in the last ${RECENT} years — verify the relationship is still current.`);
   } else {
     tier = "none"; label = "No confirmed relationship"; badge = "NOT A PARTNER"; color = "#6b7280";
-    summary = `No public UNC research relationship found for ${resolvedName} in PubMed, NIH RePORTER, ClinicalTrials.gov, or SEC filings.`;
+    if (isSector) {
+      summary = `No public UNC research relationships found for the ${resolvedName} sector in PubMed, NIH RePORTER, ClinicalTrials.gov, or SEC filings.`;
+    } else {
+      summary = `No public UNC research relationship found for ${resolvedName} in PubMed, NIH RePORTER, ClinicalTrials.gov, or SEC filings.`;
+    }
   }
 
   return { tier, label, badge, color, summary, caveats, latestPaper, latestGrant, hasSignal: paperCount > 0 || strongEver > 0 };
@@ -638,7 +659,7 @@ export default function PartnershipsView({
 
         // Evidence-weighted, recency-aware assessment — the report adapts its
         // framing, colour, and narrative to what was actually found.
-        const assessment = assessPartnership(data, resolvedName);
+        const assessment = assessPartnership(data, resolvedName, type);
         const isPartner = assessment.tier === "active";   // confident, current partner
         const hasSignal = assessment.hasSignal;            // any evidence at all → show detail cards
         const depth = assessment.label;
