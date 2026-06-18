@@ -853,17 +853,9 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
     { n: String(m.ncHeadquartered), l: 'NC-headquartered' },
   ] });
 
-  // Engagement routing — OSP first, then company readiness (no named contacts).
+  // Engagement routing — route through OSP first; no named contacts.
   if (m.ospCompanies.length) {
     b.push({ t: 'p', text: `Route initial outreach through UNC OSP (research.unc.edu/osp): ${m.ospCompanies.length} compan${m.ospCompanies.length === 1 ? 'y has' : 'ies have'} active NIH grants — verify before contacting any investigator.` });
-  }
-  b.push({ t: 'h3', text: 'Company readiness — UNC tie on record' });
-  b.push(m.warm.length
-    ? { t: 'list', items: m.warm.map((c) => `${c.name} · ${c.detail}${c.nc ? ' · NC' : ''}`) }
-    : { t: 'p', text: 'None.' });
-  if (m.cold.length) {
-    b.push({ t: 'h3', text: 'No documented tie' });
-    b.push({ t: 'p', text: m.cold.join(' · ') });
   }
 
   // Sector snapshot — colored revenue + R&D bars (valueB is in $B; scale to
@@ -880,30 +872,11 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
     money: true, barColor: RD_BAR,
   });
 
-  // Priority matrix.
-  b.push({ t: 'h2', text: 'Priority matrix' });
-  b.push(m.matrix.length
-    ? { t: 'table', headers: ['Company', 'Tier', 'Signal', 'Grant / paper', 'First move'],
-        rows: m.matrix.map((r) => [
-          r.company,
-          r.signal === 'None' ? 'Various' : r.tier,
-          r.signal,
-          r.grantOrPmid || '—',
-          r.firstMove,
-        ]) }
-    : { t: 'p', text: 'No prioritized companies.' });
-
   if (m.alignmentChart.length) b.push({
     t: 'chart', chartKind: 'bars', title: 'UNC alignment signals by company',
     subtitle: 'Matched grants, trials, and publications',
     series: m.alignmentChart.map((a) => ({ label: a.name, value: a.count })),
   });
-
-  if (m.faculty.length) {
-    b.push({ t: 'h2', text: 'UNC investigators with sector-overlapping NIH grants (NIH RePORTER · last 5 FY)' });
-    b.push({ t: 'table', headers: ['PI', 'Unit', 'Grant', 'Topic', 'FY', 'Company overlap'],
-      rows: m.faculty.map((f) => [f.name, f.unit, f.grant || '—', f.topic || '—', f.fy || '—', f.overlap || '—']) });
-  }
 
   if (m.dataAssets.length) {
     b.push({ t: 'h2', text: 'UNC data assets available to partners' });
