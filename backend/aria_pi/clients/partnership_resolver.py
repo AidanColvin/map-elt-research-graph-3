@@ -11,6 +11,7 @@ ranked by total verifiable mention count and only the Top 10 are returned, so
 the frontend payload can never balloon.
 """
 
+import logging
 import re
 from datetime import datetime
 from urllib.parse import quote_plus
@@ -25,6 +26,8 @@ from aria_pi.clients.patents import fetch_unc_patents
 from aria_pi.clients.relationship_detector import fetch_relationship_signals
 from aria_pi.sectors import seeds_for
 from aria_pi.utils.name_resolver import normalize_company_name
+
+logger = logging.getLogger(__name__)
 
 _COI_WINDOW_YEARS = 5  # COI disclosures must be within the last N years
 
@@ -76,7 +79,7 @@ def resolve_sec_verbatim(company_name: str, sec: SECEdgarClient) -> dict:
         filing_url = sec._latest_tenk_url(cik) if quotes else ""
         return {"quotes": quotes, "filing_url": filing_url, "cik": cik}
     except Exception as e:
-        print(f"SEC verbatim error for {company_name}: {e}")
+        logger.error("partnership_resolver: SEC verbatim failed for %s: %s", company_name, e)
         return {"quotes": [], "filing_url": "", "cik": ""}
 
 
@@ -94,7 +97,7 @@ def resolve_pubmed(company_name: str, pubmed: PubMedClient) -> dict:
         top_authors = [a for a, _ in sorted(tally.items(), key=lambda kv: -kv[1])[:5]]
         return {"count": len(papers), "top_authors": top_authors, "papers": papers}
     except Exception as e:
-        print(f"PubMed resolve error for {company_name}: {e}")
+        logger.error("partnership_resolver: PubMed resolve failed for %s: %s", company_name, e)
         return {"count": 0, "top_authors": [], "papers": []}
 
 
@@ -118,7 +121,7 @@ def resolve_coi(company_name: str, pubmed: PubMedClient) -> dict:
                 recent.append(p)
         return {"count": len(recent), "papers": recent, "window_years": _COI_WINDOW_YEARS}
     except Exception as e:
-        print(f"COI resolve error for {company_name}: {e}")
+        logger.error("partnership_resolver: COI resolve failed for %s: %s", company_name, e)
         return {"count": 0, "papers": [], "window_years": _COI_WINDOW_YEARS}
 
 
@@ -136,7 +139,7 @@ def resolve_unc_units(company_name: str, pubmed: PubMedClient) -> list:
                 tally[unit] = tally.get(unit, 0) + 1
         return [{"unit": u, "count": c} for u, c in sorted(tally.items(), key=lambda kv: -kv[1])]
     except Exception as e:
-        print(f"UNC units resolve error for {company_name}: {e}")
+        logger.error("partnership_resolver: UNC units resolve failed for %s: %s", company_name, e)
         return []
 
 
@@ -161,7 +164,7 @@ def resolve_ecosystem(company_name: str, web: WebSearchClient) -> list:
     try:
         return web.search_unc_site_mentions(company_name)
     except Exception as e:
-        print(f"Ecosystem resolve error for {company_name}: {e}")
+        logger.error("partnership_resolver: ecosystem resolve failed for %s: %s", company_name, e)
         return []
 
 
@@ -192,7 +195,7 @@ def safe_nih(company_name: str, client: NIHReporterClient) -> dict:
         pis = unc_pis_from_grants(grants, limit=3)
         return {"grants": grants, "pis": pis}
     except Exception as e:
-        print(f"NIH safe error for {company_name}: {e}")
+        logger.error("partnership_resolver: NIH safe_nih failed for %s: %s", company_name, e)
         return {"grants": [], "pis": []}
 
 
@@ -207,7 +210,7 @@ def safe_trials(company_name: str, client: ClinicalTrialsClient) -> dict:
         unc_trials = [t for t in all_trials if t.get("unc_signal")]
         return {"all_count": len(all_trials), "unc_trials": unc_trials[:4]}
     except Exception as e:
-        print(f"Trials safe error for {company_name}: {e}")
+        logger.error("partnership_resolver: trials safe_trials failed for %s: %s", company_name, e)
         return {"all_count": 0, "unc_trials": []}
 
 
@@ -245,6 +248,8 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     nih = results.get("nih_grants") or {"grants": [], "pis": []}
     trials = results.get("trials") or {"all_count": 0, "unc_trials": []}
     unc_faculty_leads = fetch_unc_faculty_leads(company_name)
+    if not unc_faculty_leads:
+        logger.warning("partnership_resolver: unc_faculty_leads empty for %s", company_name)
     unc_patents = fetch_unc_patents(company_name)
     unc_joint_trials = fetch_unc_sponsored_trials(target)
     relationship_signals = fetch_relationship_signals(
@@ -291,7 +296,7 @@ def resolve_sector(sector: str) -> dict:
             try:
                 records.append(fut.result())
             except Exception as e:
-                print(f"Sector company error: {e}")
+                logger.error("partnership_resolver: sector company resolve failed: %s", e)
     records.sort(key=lambda r: r["mention_count"], reverse=True)
     top = records[:_SECTOR_TOP]
 
