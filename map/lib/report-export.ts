@@ -178,7 +178,7 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
         rows: s2.known_partnerships.map((p) => [p.company, p.unc_unit, p.relationship_type, p.active, mark(p.sources, cites).trim()]) }
     : { t: 'p', text: 'None identified.' });
   if (alignSeries.length) b.push({ t: 'chart', chartKind: 'bars', title: 'UNC alignment signals by company', subtitle: 'Matched grants, trials, and publications', series: alignSeries });
-  b.push({ t: 'h3', text: '2.2 UNC Faculty with Verified Sector Expertise' });
+  b.push({ t: 'h3', text: '2.2 UNC Investigators on Company-Overlapping NIH Grants' });
   b.push(s2.unc_faculty.length
     ? { t: 'table', headers: ['Faculty', 'School', 'Research Focus', 'Ref.'],
         rows: s2.unc_faculty.map((f) => [f.name, f.school, f.research_focus, mark(f.sources, cites).trim()]) }
@@ -853,21 +853,17 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
     { n: String(m.ncHeadquartered), l: 'NC-headquartered' },
   ] });
 
-  // Quick-reference tiers.
-  b.push({ t: 'h3', text: 'Contact now — verify OSP first' });
-  b.push(m.contactNow.length
-    ? { t: 'list', items: m.contactNow.map((c) => `${c.name} · ${c.detail}`) }
-    : { t: 'p', text: 'None with active NIH grants.' });
-  b.push({ t: 'h3', text: 'Warm — paper on record' });
+  // Engagement routing — OSP first, then company readiness (no named contacts).
+  if (m.ospCompanies.length) {
+    b.push({ t: 'p', text: `Route initial outreach through UNC OSP (research.unc.edu/osp): ${m.ospCompanies.length} compan${m.ospCompanies.length === 1 ? 'y has' : 'ies have'} active NIH grants — verify before contacting any investigator.` });
+  }
+  b.push({ t: 'h3', text: 'Company readiness — UNC tie on record' });
   b.push(m.warm.length
     ? { t: 'list', items: m.warm.map((c) => `${c.name} · ${c.detail}${c.nc ? ' · NC' : ''}`) }
     : { t: 'p', text: 'None.' });
   if (m.cold.length) {
     b.push({ t: 'h3', text: 'No documented tie' });
     b.push({ t: 'p', text: m.cold.join(' · ') });
-  }
-  if (m.ospCompanies.length) {
-    b.push({ t: 'p', text: `Note: ${m.ospCompanies.length} companies have active NIH grants — contact UNC OSP (research.unc.edu/osp) before any outreach.` });
   }
 
   // Sector snapshot — colored revenue + R&D bars (valueB is in $B; scale to
@@ -887,12 +883,11 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
   // Priority matrix.
   b.push({ t: 'h2', text: 'Priority matrix' });
   b.push(m.matrix.length
-    ? { t: 'table', headers: ['Company', 'Tier', 'Signal', 'UNC contact', 'Grant / paper', 'First move'],
+    ? { t: 'table', headers: ['Company', 'Tier', 'Signal', 'Grant / paper', 'First move'],
         rows: m.matrix.map((r) => [
           r.company,
           r.signal === 'None' ? 'Various' : r.tier,
           r.signal,
-          r.contact || '—',
           r.grantOrPmid || '—',
           r.firstMove,
         ]) }
@@ -905,7 +900,7 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
   });
 
   if (m.faculty.length) {
-    b.push({ t: 'h2', text: 'UNC faculty with verified sector expertise' });
+    b.push({ t: 'h2', text: 'UNC investigators with sector-overlapping NIH grants (NIH RePORTER · last 5 FY)' });
     b.push({ t: 'table', headers: ['PI', 'Unit', 'Grant', 'Topic', 'FY', 'Company overlap'],
       rows: m.faculty.map((f) => [f.name, f.unit, f.grant || '—', f.topic || '—', f.fy || '—', f.overlap || '—']) });
   }
