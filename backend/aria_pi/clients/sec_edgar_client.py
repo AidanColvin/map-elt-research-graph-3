@@ -5,6 +5,7 @@ Uses two SEC endpoints:
   2. data.sec.gov/submissions/CIK{cik}.json  — rich company submissions
 """
 import html as _html
+import logging
 import re
 import time
 import requests
@@ -12,50 +13,27 @@ from datetime import date, timedelta
 from typing import Optional, List
 
 from aria_pi.utils.net_guard import assert_public_url
+from aria_pi.lib.tickers import load_tickers
+
+logger = logging.getLogger(__name__)
 
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
-
-_TICKERS_CACHE: list | None = None
-_CIK_TITLE_CACHE: dict | None = None
 
 
 def _active_cik_titles() -> dict:
     """Map {int(cik): official_title} for every currently-traded SEC filer.
 
     Used to filter full-text search hits down to live, public companies so
-    discovery never surfaces defunct shells (e.g. THQ, Midway)."""
-    global _CIK_TITLE_CACHE
-    if _CIK_TITLE_CACHE is not None:
-        return _CIK_TITLE_CACHE
+    discovery never surfaces defunct shells (e.g. THQ, Midway). Reads the
+    shared, cached ticker list from aria_pi.lib.tickers."""
     out: dict = {}
-    for t in _load_tickers():
+    for t in load_tickers():
         try:
             out[int(t["cik_str"])] = t.get("title") or ""
         except (KeyError, ValueError, TypeError):
             continue
-    _CIK_TITLE_CACHE = out
     return out
-
-
-def _load_tickers() -> list:
-    """Load SEC's official company-tickers map once per cold start.
-
-    Returns a list of dicts: [{cik_str, ticker, title}, ...]
-    """
-    global _TICKERS_CACHE
-    if _TICKERS_CACHE is not None:
-        return _TICKERS_CACHE
-    try:
-        r = requests.get("https://www.sec.gov/files/company_tickers.json",
-                         headers=HEADERS, timeout=8)
-        r.raise_for_status()
-        raw = r.json()
-        _TICKERS_CACHE = list(raw.values()) if isinstance(raw, dict) else []
-    except Exception as e:
-        print(f"SEC tickers load error: {e}")
-        _TICKERS_CACHE = []
-    return _TICKERS_CACHE
 
 
 class SECEdgarClient:
@@ -63,6 +41,10 @@ class SECEdgarClient:
         self.search_url = "https://efts.sec.gov/LATEST/search-index"
         self.submissions_url = "https://data.sec.gov/submissions/CIK{cik}.json"
         self.companyfacts_url = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+        # One pooled connection per client instead of a fresh TCP/TLS handshake
+        # on every requests.get; the session carries the standard SEC headers.
+        self._session = requests.Session()
+        self._session.headers.update(HEADERS)
 
     def discover_companies(self, term: str, limit: int = 10) -> List[str]:
         """Find real, currently-traded public companies for ANY free-text term.
@@ -151,12 +133,12 @@ class SECEdgarClient:
                 params["from"] = page * 10
                 time.sleep(0.35)  # be gentle: efts throttles rapid requests
             try:
-                r = requests.get(self.search_url, headers=HEADERS,
-                                 timeout=8, params=params)
+                r = self._session.get(self.search_url,
+                                      timeout=8, params=params)
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
-                print(f"SEC discovery error for {q!r} (page {page}): {e}")
+                logger.warning("SEC discovery error for %r (page %s): %s", q, page, e)
                 if page == 0:
                     return []  # genuine failure — nothing to rank
                 break          # keep whatever earlier pages returned
@@ -185,11 +167,11 @@ class SECEdgarClient:
 
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=6)
+            r = self._session.get(url, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
-            print(f"SEC submissions error: {e}")
+            logger.warning("SEC submissions error: %s", e)
             return {"legal_name": company_name, "cik": cik, "source": "https://www.sec.gov"}
 
         recent = data.get("filings", {}).get("recent", {})
@@ -254,11 +236,11 @@ class SECEdgarClient:
         """
         try:
             url = self.companyfacts_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=6)
+            r = self._session.get(url, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
-            print(f"XBRL fetch error for CIK {cik}: {e}")
+            logger.warning("XBRL fetch error for CIK %s: %s", cik, e)
             return {}
 
         us_gaap = ((data.get("facts") or {}).get("us-gaap") or {})
@@ -374,12 +356,12 @@ class SECEdgarClient:
             params = {"q": q, "forms": "8-K", "startdt": start,
                       "enddt": end, "ciks": cik10}
             try:
-                r = requests.get(self.search_url, headers=HEADERS,
-                                 timeout=8, params=params)
+                r = self._session.get(self.search_url,
+                                      timeout=8, params=params)
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
-                print(f"8-K collaboration search error ({q}, CIK {cik}): {e}")
+                logger.warning("8-K collaboration search error (%s, CIK %s): %s", q, cik, e)
                 continue
             for h in hits:
                 src = h.get("_source") or {}
@@ -435,14 +417,14 @@ class SECEdgarClient:
             raw = self._fetch_proxy_bytes(doc_url, max_bytes=max_bytes)
             return _strip_proxy_html(raw) if raw else ""
         except Exception as e:
-            print(f"10-K text fetch error for CIK {cik}: {e}")
+            logger.warning("10-K text fetch error for CIK %s: %s", cik, e)
             return ""
 
     def _latest_tenk_url(self, cik: str) -> str:
         """Most recent 10-K document URL from the full submissions index."""
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=6)
+            r = self._session.get(url, timeout=6)
             r.raise_for_status()
             recent = (r.json().get("filings") or {}).get("recent") or {}
             forms = recent.get("form", []) or []
@@ -453,7 +435,7 @@ class SECEdgarClient:
                     return _filing_url(cik, accessions[i],
                                        docs[i] if i < len(docs) else "")
         except Exception as e:
-            print(f"10-K lookup error for CIK {cik}: {e}")
+            logger.warning("10-K lookup error for CIK %s: %s", cik, e)
         return ""
 
     def get_unc_alumni_from_proxy(self, cik: str, proxy_filings: list) -> list:
@@ -505,7 +487,7 @@ class SECEdgarClient:
                 'startdt': '2018-01-01',
                 'enddt': date.today().isoformat(),
             }
-            r = requests.get(self.search_url, headers=HEADERS, timeout=8, params=params)
+            r = self._session.get(self.search_url, timeout=8, params=params)
             r.raise_for_status()
             hits = r.json().get('hits', {}).get('hits', []) or []
             for hit in hits:
@@ -517,7 +499,7 @@ class SECEdgarClient:
                         continue
             return False
         except Exception as e:
-            print(f'UNC proxy pre-filter error: {e}')
+            logger.warning("UNC proxy pre-filter error: %s", e)
             return None  # None = unknown; caller treats as "proceed"
 
     def _resolve_proxy_doc_url(self, url: str) -> str:
@@ -528,7 +510,7 @@ class SECEdgarClient:
             return url  # already a direct document link
         try:
             assert_public_url(url)  # SSRF guard: only public http(s) hosts
-            r = requests.get(url, headers={'User-Agent': USER_AGENT}, timeout=8)
+            r = self._session.get(url, timeout=8)
             r.raise_for_status()
             assert_public_url(r.url)  # re-check after any redirect
             # Find .htm links; prefer ones with "proxy" or "def14a" in the name
@@ -540,15 +522,15 @@ class SECEdgarClient:
             if links:
                 return url.rstrip('/') + '/' + links[0].lstrip('/')
         except Exception as e:
-            print(f'Proxy index resolve error ({url}): {e}')
+            logger.warning("Proxy index resolve error (%s): %s", url, e)
         return ''
 
     def _fetch_proxy_bytes(self, url: str, max_bytes: int = 800_000) -> str:
         """Fetch a proxy document, capped at max_bytes, returned as str."""
         try:
             assert_public_url(url)  # SSRF guard: only public http(s) hosts
-            r = requests.get(
-                url, headers={'User-Agent': USER_AGENT}, timeout=14, stream=True,
+            r = self._session.get(
+                url, timeout=14, stream=True,
             )
             r.raise_for_status()
             assert_public_url(r.url)  # re-check after any redirect
@@ -560,7 +542,7 @@ class SECEdgarClient:
                     break
             return b''.join(chunks).decode('utf-8', errors='ignore')
         except Exception as e:
-            print(f'DEF 14A fetch error ({url}): {e}')
+            logger.warning("DEF 14A fetch error (%s): %s", url, e)
             return ''
 
     def get_unc_alumni_from_website(self, company_name: str,
@@ -591,7 +573,7 @@ class SECEdgarClient:
                 # SSRF guard: the company website is external/SEC-provided, and
                 # requests follows redirects — block any private/metadata host.
                 assert_public_url(url)
-                r = requests.get(
+                r = self._session.get(
                     url,
                     headers={'User-Agent': USER_AGENT,
                              'Accept': 'text/html,application/xhtml+xml'},
@@ -623,7 +605,7 @@ class SECEdgarClient:
                 if alumni:
                     break  # found people — no need to try other URLs
             except Exception as e:
-                print(f'Website alumni fetch error ({url}): {e}')
+                logger.warning("Website alumni fetch error (%s): %s", url, e)
                 continue
         return alumni[:8]
 
@@ -631,7 +613,7 @@ class SECEdgarClient:
         """Resolve a company name → CIK using SEC's official ticker map first,
         then fall back to full-text search."""
         q = (company_name or "").lower().strip()
-        tickers = _load_tickers()
+        tickers = load_tickers()
         # Exact-ish match on title or ticker. Score by overlap and short prefix.
         best = None
         best_score = 0
@@ -668,8 +650,8 @@ class SECEdgarClient:
         try:
             active = _active_cik_titles()
             q_tokens = {w for w in q.split() if len(w) >= 4}
-            r = requests.get(self.search_url, headers=HEADERS,
-                             params={"q": company_name}, timeout=6)
+            r = self._session.get(self.search_url,
+                                  params={"q": company_name}, timeout=6)
             r.raise_for_status()
             hits = r.json().get("hits", {}).get("hits", []) or []
             for hit in hits:
@@ -687,7 +669,7 @@ class SECEdgarClient:
                         return str(ci)
             return None
         except Exception as e:
-            print(f"SEC search error: {e}")
+            logger.warning("SEC search error: %s", e)
             return None
 
 
