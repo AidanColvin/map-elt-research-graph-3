@@ -13,6 +13,7 @@ so a human can complete them. This honors the template's rule:
 """
 from __future__ import annotations
 import json
+import logging
 import os
 import urllib.parse
 from datetime import datetime
@@ -21,6 +22,8 @@ from typing import Dict, List, Any
 from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS
 from aria_pi.clients.clinicaltrials_client import summarize_phases, unc_site_stats
 from aria_pi.clients.nih_reporter_client import unc_pis_from_grants
+
+logger = logging.getLogger(__name__)
 
 # 10-K partnership-language scoring (Signal 4) — counted in memory over the
 # narrative text the orchestrator already fetched; no calls from the builder.
@@ -39,7 +42,7 @@ def _load_json(name: str) -> Any:
         with open(path, "r") as f:
             return json.load(f)
     except Exception as e:
-        print(f"Failed to load {name}: {e}")
+        logger.error("Failed to load %s: %s", name, e, exc_info=False)
         return None
 
 
@@ -106,7 +109,7 @@ class ReportBuilder:
         try:
             return self._build_condensed(sector_data or {}, unc_data or [])
         except Exception as e:  # pragma: no cover - defensive: never crash the pipeline
-            print(f"build_condensed_report failed: {e}")
+            logger.warning("build_condensed_report failed: %s", e)
             meta = (sector_data or {}).get("report_meta", {}) or {}
             sector = meta.get("sector", "Sector")
             return (f"# {sector} Partnership Intelligence\n\n"

@@ -5,6 +5,7 @@ Uses two SEC endpoints:
   2. data.sec.gov/submissions/CIK{cik}.json  — rich company submissions
 """
 import html as _html
+import logging
 import re
 import time
 import requests
@@ -13,6 +14,8 @@ from typing import Optional, List
 
 from aria_pi.utils.net_guard import assert_public_url
 from aria_pi.lib.tickers import load_tickers
+
+logger = logging.getLogger(__name__)
 
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
@@ -131,7 +134,7 @@ class SECEdgarClient:
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
-                print(f"SEC discovery error for {q!r} (page {page}): {e}")
+                logger.warning("SEC discovery error for %r (page %s): %s", q, page, e)
                 if page == 0:
                     return []  # genuine failure — nothing to rank
                 break          # keep whatever earlier pages returned
@@ -164,7 +167,7 @@ class SECEdgarClient:
             r.raise_for_status()
             data = r.json()
         except Exception as e:
-            print(f"SEC submissions error: {e}")
+            logger.warning("SEC submissions error: %s", e)
             return {"legal_name": company_name, "cik": cik, "source": "https://www.sec.gov"}
 
         recent = data.get("filings", {}).get("recent", {})
@@ -233,7 +236,7 @@ class SECEdgarClient:
             r.raise_for_status()
             data = r.json()
         except Exception as e:
-            print(f"XBRL fetch error for CIK {cik}: {e}")
+            logger.warning("XBRL fetch error for CIK %s: %s", cik, e)
             return {}
 
         us_gaap = ((data.get("facts") or {}).get("us-gaap") or {})
@@ -354,7 +357,7 @@ class SECEdgarClient:
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
-                print(f"8-K collaboration search error ({q}, CIK {cik}): {e}")
+                logger.warning("8-K collaboration search error (%s, CIK %s): %s", q, cik, e)
                 continue
             for h in hits:
                 src = h.get("_source") or {}
@@ -410,7 +413,7 @@ class SECEdgarClient:
             raw = self._fetch_proxy_bytes(doc_url, max_bytes=max_bytes)
             return _strip_proxy_html(raw) if raw else ""
         except Exception as e:
-            print(f"10-K text fetch error for CIK {cik}: {e}")
+            logger.warning("10-K text fetch error for CIK %s: %s", cik, e)
             return ""
 
     def _latest_tenk_url(self, cik: str) -> str:
@@ -428,7 +431,7 @@ class SECEdgarClient:
                     return _filing_url(cik, accessions[i],
                                        docs[i] if i < len(docs) else "")
         except Exception as e:
-            print(f"10-K lookup error for CIK {cik}: {e}")
+            logger.warning("10-K lookup error for CIK %s: %s", cik, e)
         return ""
 
     def get_unc_alumni_from_proxy(self, cik: str, proxy_filings: list) -> list:
@@ -492,7 +495,7 @@ class SECEdgarClient:
                         continue
             return False
         except Exception as e:
-            print(f'UNC proxy pre-filter error: {e}')
+            logger.warning("UNC proxy pre-filter error: %s", e)
             return None  # None = unknown; caller treats as "proceed"
 
     def _resolve_proxy_doc_url(self, url: str) -> str:
@@ -515,7 +518,7 @@ class SECEdgarClient:
             if links:
                 return url.rstrip('/') + '/' + links[0].lstrip('/')
         except Exception as e:
-            print(f'Proxy index resolve error ({url}): {e}')
+            logger.warning("Proxy index resolve error (%s): %s", url, e)
         return ''
 
     def _fetch_proxy_bytes(self, url: str, max_bytes: int = 800_000) -> str:
@@ -535,7 +538,7 @@ class SECEdgarClient:
                     break
             return b''.join(chunks).decode('utf-8', errors='ignore')
         except Exception as e:
-            print(f'DEF 14A fetch error ({url}): {e}')
+            logger.warning("DEF 14A fetch error (%s): %s", url, e)
             return ''
 
     def get_unc_alumni_from_website(self, company_name: str,
@@ -598,7 +601,7 @@ class SECEdgarClient:
                 if alumni:
                     break  # found people — no need to try other URLs
             except Exception as e:
-                print(f'Website alumni fetch error ({url}): {e}')
+                logger.warning("Website alumni fetch error (%s): %s", url, e)
                 continue
         return alumni[:8]
 
@@ -662,7 +665,7 @@ class SECEdgarClient:
                         return str(ci)
             return None
         except Exception as e:
-            print(f"SEC search error: {e}")
+            logger.warning("SEC search error: %s", e)
             return None
 
 
