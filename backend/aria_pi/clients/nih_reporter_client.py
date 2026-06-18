@@ -20,6 +20,16 @@ ENDPOINT = "https://api.reporter.nih.gov/v2/projects/search"
 _UNC_ORG_KEYWORDS = ("north carolina", "unc", "chapel hill")
 
 
+def _coerce_award(value) -> int:
+    """Cast an NIH award figure to int, or None when absent/unparseable."""
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
 def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
     """Named UNC contacts from grants already fetched — no new query.
 
@@ -108,6 +118,15 @@ class NIHReporterClient:
             org = g.get("organization") or g.get("Organization") or {}
             dept = (org.get("org_dept") if isinstance(org, dict) else "") or ""
             org_name = (org.get("org_name") if isinstance(org, dict) else "") or g.get("OrgName", "")
+            # Award dollars: the live API populates `award_amount` (total award);
+            # `award_notice_amount` comes back null for UNC records, so it is only a
+            # fallback. `direct_cost_amt` is the last resort. (Confirmed via live
+            # smoke test against api.reporter.nih.gov.)
+            award_amount = _coerce_award(
+                g.get("award_amount") or g.get("AwardAmount")
+                or g.get("award_notice_amount") or g.get("AwardNoticeAmount")
+                or g.get("direct_cost_amt") or g.get("DirectCostAmt")
+            )
             grants.append({
                 "project_num": proj_num,
                 "title": g.get("project_title") or g.get("ProjectTitle") or "",
@@ -115,6 +134,7 @@ class NIHReporterClient:
                 "department": dept,
                 "organization": org_name,
                 "fiscal_year": g.get("fiscal_year") or g.get("FiscalYear") or "",
+                "award_amount": award_amount,
                 "agency": g.get("agency_ic_admin", {}).get("name", "") if isinstance(g.get("agency_ic_admin"), dict) else "",
                 "url": f"https://reporter.nih.gov/project-details/{proj_num}" if proj_num else "https://reporter.nih.gov",
             })
@@ -139,6 +159,6 @@ def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dic
             "grant_number": g.get("project_num") or "",
             "project_title": g.get("title") or "",
             "fiscal_year": g.get("fiscal_year") or "",
-            "award_amount": None,  # not returned by this search endpoint
+            "award_amount": g.get("award_amount"),  # int or None, set in unc_grants_mentioning
         })
     return leads
