@@ -261,6 +261,25 @@ const CHIP_CLASS = "rounded-full bg-white/80 border border-black/[0.06] hover:sh
 //       project snapshots all serialize. Mirrors the on-screen sections so the
 //       file matches what the user sees. Every line traces to a primary source.
 // returns: the report Markdown string
+// UNC's research-active schools/centers (the set the PubMed school-attribution
+// returns) with a one-line focus so the units section says WHAT each unit does
+// and WHY it's relevant — not just a bare name + paper count.
+const UNC_UNIT_INFO: Array<{ match: RegExp; focus: string; url?: string }> = [
+  { match: /gillings|global public health/i, focus: "Epidemiology, biostatistics, environmental health, health policy & nutrition", url: "https://sph.unc.edu" },
+  { match: /lineberger|cancer center/i, focus: "Cancer therapeutics, immunotherapy & cell therapy, cancer data science, prevention", url: "https://unclineberger.org" },
+  { match: /eshelman|pharmacy/i, focus: "Drug discovery & delivery, pharmacoengineering, pharmacometrics, outcomes & policy", url: "https://pharmacy.unc.edu" },
+  { match: /school of medicine|\bmedicine\b/i, focus: "Biomedical research & clinical trials across 30+ clinical and basic-science departments", url: "https://www.med.unc.edu" },
+  { match: /sheps/i, focus: "Health services research, rural health, workforce & primary-care policy", url: "https://www.shepscenter.unc.edu" },
+  { match: /health informatics|informatics/i, focus: "EHR & health-data analytics, virtual care, biomedical informatics, patient safety" },
+  { match: /nursing/i, focus: "Health disparities, aging, maternal-child & behavioral health, patient safety", url: "https://nursing.unc.edu" },
+  { match: /dentistry/i, focus: "Oral-health discovery, rural & geriatric care, AI in dentistry", url: "https://dentistry.unc.edu" },
+];
+
+// takes: a UNC unit name; returns: its focus/url info, or undefined if unknown
+function unitInfo(name: string) {
+  return UNC_UNIT_INFO.find((u) => u.match.test(name));
+}
+
 export function buildPartnershipMarkdown(data: PartnerData): string {
   const resolvedName = data.resolved_name ?? data.query;
   const paperCount = data.clinical.count;
@@ -788,23 +807,26 @@ export default function PartnershipsView({
                   )}
                 </Card>
 
-                {/* Sub-card 3 — UNC units */}
-                <Card title="UNC Units" subtitle="Schools and centers with documented ties">
+                {/* Sub-card 3 — UNC units, enriched with each unit's focus */}
+                <Card title="UNC Units" subtitle="Schools and centers tied to this company — and what they work on">
                   {units.length > 0 ? (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                      {units.map((u) => (
-                        <span key={u.unit} style={{ fontSize: 11.5, background: "#eef0ff", color: "#4451c8", borderRadius: 999, padding: "3px 10px" }}>
-                          {u.unit} · {u.count} paper{u.count !== 1 ? "s" : ""}
-                        </span>
-                      ))}
-                    </div>
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 13 }}>
+                      {units.map((u) => {
+                        const info = unitInfo(u.unit);
+                        return (
+                          <li key={u.unit}>
+                            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                              <span style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f" }}>{u.unit}</span>
+                              <span style={{ fontSize: 11.5, color: "#9a9aa2", whiteSpace: "nowrap" }}>{u.count} paper{u.count !== 1 ? "s" : ""}</span>
+                            </div>
+                            {info?.focus && <p style={{ fontSize: 12, color: "#6b6b73", margin: "3px 0 0", lineHeight: 1.4 }}>{info.focus}</p>}
+                            {info?.url && <a href={info.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#5b6cff", textDecoration: "none" }}>Visit unit →</a>}
+                          </li>
+                        );
+                      })}
+                    </ul>
                   ) : (
                     <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No UNC school attribution found in PubMed.</p>
-                  )}
-                  {coiCount > 0 && (
-                    <p style={{ fontSize: 12.5, color: "#92400e", background: "#fffbeb", borderRadius: 10, padding: "8px 12px", margin: "14px 0 0", lineHeight: 1.45 }}>
-                      {coiCount} conflict-of-interest disclosure(s) in the last {data.coi?.window_years ?? 5} years — indicates disclosed financial ties.
-                    </p>
                   )}
                 </Card>
               </div>
@@ -841,15 +863,6 @@ export default function PartnershipsView({
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
               <div data-testid="card-clinical">
                 <Card title="Clinical / Research" subtitle={`${data.clinical.count} co-authored paper(s) with UNC`}>
-                  {units.length > 0 && (
-                    <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 12 }}>
-                      {units.map((u) => (
-                        <span key={u.unit} style={{ fontSize: 11.5, background: "#eef0ff", color: "#4451c8", borderRadius: 999, padding: "3px 10px" }}>
-                          {u.unit} · {u.count}
-                        </span>
-                      ))}
-                    </div>
-                  )}
                   {data.clinical.top_authors.length > 0 && (
                     <p style={{ fontSize: 12.5, color: "#6b6b73", margin: "0 0 12px" }}>Top authors: {data.clinical.top_authors.join(", ")}</p>
                   )}
@@ -857,14 +870,21 @@ export default function PartnershipsView({
                     <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No co-authored papers found.</p>
                   ) : (
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                      {data.clinical.papers.map((p) => (
+                      {data.clinical.papers.slice(0, 5).map((p) => (
                         <li key={p.pmid} style={{ borderLeft: "2px solid #e5e5ea", paddingLeft: 12 }}>
-                          <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: "#1d1d1f", fontWeight: 500, textDecoration: "none" }}>{p.title}</a>
+                          <a href={p.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13.5, color: "#1d1d1f", fontWeight: 500, textDecoration: "none" }}>{p.title || "Untitled record"}</a>
                           <p style={{ fontSize: 11.5, color: "#9a9aa2", margin: "3px 0 0" }}>
                             PMID {p.pmid}{p.company ? ` · ${p.company}` : ""}{p.year ? ` · ${p.year}` : ""}
                           </p>
                         </li>
                       ))}
+                      {data.clinical.papers.length > 5 && data.links?.pubmed && (
+                        <li style={{ paddingLeft: 12 }}>
+                          <a href={data.links.pubmed} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12.5, color: "#5b6cff", textDecoration: "none" }}>
+                            +{data.clinical.papers.length - 5} more in PubMed →
+                          </a>
+                        </li>
+                      )}
                     </ul>
                   )}
                 </Card>
