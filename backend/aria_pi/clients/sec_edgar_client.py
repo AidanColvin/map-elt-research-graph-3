@@ -41,6 +41,10 @@ class SECEdgarClient:
         self.search_url = "https://efts.sec.gov/LATEST/search-index"
         self.submissions_url = "https://data.sec.gov/submissions/CIK{cik}.json"
         self.companyfacts_url = "https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
+        # One pooled connection per client instead of a fresh TCP/TLS handshake
+        # on every requests.get; the session carries the standard SEC headers.
+        self._session = requests.Session()
+        self._session.headers.update(HEADERS)
 
     def discover_companies(self, term: str, limit: int = 10) -> List[str]:
         """Find real, currently-traded public companies for ANY free-text term.
@@ -129,8 +133,8 @@ class SECEdgarClient:
                 params["from"] = page * 10
                 time.sleep(0.35)  # be gentle: efts throttles rapid requests
             try:
-                r = requests.get(self.search_url, headers=HEADERS,
-                                 timeout=8, params=params)
+                r = self._session.get(self.search_url,
+                                      timeout=8, params=params)
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
@@ -163,7 +167,7 @@ class SECEdgarClient:
 
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=6)
+            r = self._session.get(url, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
@@ -232,7 +236,7 @@ class SECEdgarClient:
         """
         try:
             url = self.companyfacts_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=6)
+            r = self._session.get(url, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
@@ -352,8 +356,8 @@ class SECEdgarClient:
             params = {"q": q, "forms": "8-K", "startdt": start,
                       "enddt": end, "ciks": cik10}
             try:
-                r = requests.get(self.search_url, headers=HEADERS,
-                                 timeout=8, params=params)
+                r = self._session.get(self.search_url,
+                                      timeout=8, params=params)
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
             except Exception as e:
@@ -420,7 +424,7 @@ class SECEdgarClient:
         """Most recent 10-K document URL from the full submissions index."""
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = requests.get(url, headers=HEADERS, timeout=6)
+            r = self._session.get(url, timeout=6)
             r.raise_for_status()
             recent = (r.json().get("filings") or {}).get("recent") or {}
             forms = recent.get("form", []) or []
@@ -483,7 +487,7 @@ class SECEdgarClient:
                 'startdt': '2018-01-01',
                 'enddt': date.today().isoformat(),
             }
-            r = requests.get(self.search_url, headers=HEADERS, timeout=8, params=params)
+            r = self._session.get(self.search_url, timeout=8, params=params)
             r.raise_for_status()
             hits = r.json().get('hits', {}).get('hits', []) or []
             for hit in hits:
@@ -506,7 +510,7 @@ class SECEdgarClient:
             return url  # already a direct document link
         try:
             assert_public_url(url)  # SSRF guard: only public http(s) hosts
-            r = requests.get(url, headers={'User-Agent': USER_AGENT}, timeout=8)
+            r = self._session.get(url, timeout=8)
             r.raise_for_status()
             assert_public_url(r.url)  # re-check after any redirect
             # Find .htm links; prefer ones with "proxy" or "def14a" in the name
@@ -525,8 +529,8 @@ class SECEdgarClient:
         """Fetch a proxy document, capped at max_bytes, returned as str."""
         try:
             assert_public_url(url)  # SSRF guard: only public http(s) hosts
-            r = requests.get(
-                url, headers={'User-Agent': USER_AGENT}, timeout=14, stream=True,
+            r = self._session.get(
+                url, timeout=14, stream=True,
             )
             r.raise_for_status()
             assert_public_url(r.url)  # re-check after any redirect
@@ -569,7 +573,7 @@ class SECEdgarClient:
                 # SSRF guard: the company website is external/SEC-provided, and
                 # requests follows redirects — block any private/metadata host.
                 assert_public_url(url)
-                r = requests.get(
+                r = self._session.get(
                     url,
                     headers={'User-Agent': USER_AGENT,
                              'Accept': 'text/html,application/xhtml+xml'},
@@ -646,8 +650,8 @@ class SECEdgarClient:
         try:
             active = _active_cik_titles()
             q_tokens = {w for w in q.split() if len(w) >= 4}
-            r = requests.get(self.search_url, headers=HEADERS,
-                             params={"q": company_name}, timeout=6)
+            r = self._session.get(self.search_url,
+                                  params={"q": company_name}, timeout=6)
             r.raise_for_status()
             hits = r.json().get("hits", {}).get("hits", []) or []
             for hit in hits:
