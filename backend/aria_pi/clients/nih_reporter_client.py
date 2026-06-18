@@ -89,6 +89,10 @@ def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
 class NIHReporterClient:
     def __init__(self):
         self.timeout = 8
+        # Pool the connection across grant lookups instead of a fresh handshake
+        # per request; the session carries the standard descriptive User-Agent.
+        self._session = requests.Session()
+        self._session.headers.update({"User-Agent": "InnovateCarolina research.intelligence@unc.edu"})
 
     def unc_grants_mentioning(self, company_name: str, max_results: int = 5) -> List[dict]:
         """Search UNC-awarded NIH grants whose text mentions the company.
@@ -119,7 +123,7 @@ class NIHReporterClient:
         }
 
         try:
-            r = requests.post(ENDPOINT, json=payload, timeout=self.timeout)
+            r = self._session.post(ENDPOINT, json=payload, timeout=self.timeout)
             r.raise_for_status()
             results = (r.json() or {}).get("results", []) or []
         except Exception as e:

@@ -13,6 +13,7 @@ so a human can complete them. This honors the template's rule:
 """
 from __future__ import annotations
 import json
+import logging
 import os
 import urllib.parse
 from datetime import datetime
@@ -21,6 +22,8 @@ from typing import Dict, List, Any
 from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS
 from aria_pi.clients.clinicaltrials_client import summarize_phases, unc_site_stats
 from aria_pi.clients.nih_reporter_client import unc_pis_from_grants
+
+logger = logging.getLogger(__name__)
 
 # 10-K partnership-language scoring (Signal 4) — counted in memory over the
 # narrative text the orchestrator already fetched; no calls from the builder.
@@ -39,7 +42,7 @@ def _load_json(name: str) -> Any:
         with open(path, "r") as f:
             return json.load(f)
     except Exception as e:
-        print(f"Failed to load {name}: {e}")
+        logger.error("Failed to load %s: %s", name, e, exc_info=False)
         return None
 
 
@@ -106,7 +109,7 @@ class ReportBuilder:
         try:
             return self._build_condensed(sector_data or {}, unc_data or [])
         except Exception as e:  # pragma: no cover - defensive: never crash the pipeline
-            print(f"build_condensed_report failed: {e}")
+            logger.warning("build_condensed_report failed: %s", e)
             meta = (sector_data or {}).get("report_meta", {}) or {}
             sector = meta.get("sector", "Sector")
             return (f"# {sector} Partnership Intelligence\n\n"
@@ -558,8 +561,7 @@ class ReportBuilder:
                                           f"{t.get('nct_id', '')} ({t.get('status', '').lower()})"),
                     "active": "Yes" if "recruit" in (t.get("status") or "").lower()
                               or "active" in (t.get("status") or "").lower() else "Unknown",
-                    "sources": [t.get("url", "https://clinicaltrials.gov"),
-                                "https://research.unc.edu/coi"],
+                    "sources": [t.get("url", "https://clinicaltrials.gov")],
                 })
             for g in (c.get("nih_grants") or [])[:3]:
                 dept = g.get("department") or g.get("organization") or "UNC Chapel Hill"
@@ -569,8 +571,7 @@ class ReportBuilder:
                     "relationship_type": f"NIH-funded research — grant {g.get('project_num', '')} "
                                          f"(PI: {g.get('pi', 'n/a')})",
                     "active": "Yes" if g.get("fiscal_year") else "Unknown",
-                    "sources": [g.get("url", "https://reporter.nih.gov"),
-                                "https://research.unc.edu/coi"],
+                    "sources": [g.get("url", "https://reporter.nih.gov")],
                 })
             for p in (c.get("pubmed") or [])[:5]:
                 school = p.get("unc_school") or "UNC Chapel Hill (per PubMed affiliation)"
@@ -580,8 +581,7 @@ class ReportBuilder:
                     "relationship_type": f"Co-authored publication ({p.get('year', 'n.d.')}) — "
                                          f"{p.get('journal', '')}",
                     "active": "Unknown",
-                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
-                                "https://research.unc.edu/coi"],
+                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov")],
                 })
             for p in (c.get("pubmed_coi") or [])[:2]:
                 known.append({
@@ -590,8 +590,7 @@ class ReportBuilder:
                     "relationship_type": (f"COI / funding disclosure ({p.get('year', 'n.d.')}) — "
                                           f"{p.get('journal', '')}"),
                     "active": "Unknown — review disclosure",
-                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
-                                "https://research.unc.edu/coi"],
+                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov")],
                 })
 
         # ── UNC faculty: PIs from NIH grants (named + departmental) plus
@@ -683,7 +682,7 @@ class ReportBuilder:
         selected = []
         for c in companies[:22]:
             facts = c.get("facts", {}) or {}
-            tie = "Yes" if c.get("pubmed") else "Unknown"
+            tie = "Yes" if _has_unc_tie(c) else "Unknown"
             selected.append({
                 "company": c["name"],
                 "unc_alignment": _alignment_hint(c),

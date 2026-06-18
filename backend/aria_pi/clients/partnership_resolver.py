@@ -192,6 +192,8 @@ def safe_nih(company_name: str, client: NIHReporterClient) -> dict:
     """Fetch NIH grants mentioning company at UNC. Returns safe empty on failure."""
     try:
         grants = client.unc_grants_mentioning(company_name, max_results=5) or []
+        if not grants:
+            logger.warning("partnership_resolver: safe_nih returned 0 grants for %s", company_name)
         pis = unc_pis_from_grants(grants, limit=3)
         return {"grants": grants, "pis": pis}
     except Exception as e:

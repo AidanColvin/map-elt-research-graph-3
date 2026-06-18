@@ -131,18 +131,26 @@ async def run_pipeline(req: PipelineRequest):
 
         override = req.companies or ([req.company_override] if req.company_override else None)
         seeds, resolution = _resolve_seeds(req.sector, override, sec)
+        _log.info("pipeline: sector=%r seeds=%d resolution=%s",
+                  req.sector, len(seeds), resolution)
 
         # 1. Real data collection per company — runs all sources in parallel
         # for up to 10 candidate companies within the Vercel 60s budget.
+        _t0 = time.monotonic()
         company_data = _fetch_all_concurrent(
             seeds[:22], sec=sec, trials=trials, pubmed=pubmed, nih=nih
         )
+        _log.info("pipeline: fetch done in %.1fs companies=%d",
+                  time.monotonic() - _t0, len(company_data))
 
         # 2. Deterministic synthesis
         report = builder.build(req.sector, {"sector": req.sector, "companies": company_data})
 
         # 3. Source-blocklist validation
         report["_validation"] = _validate_report_sources(report, tagger)
+        _val = report["_validation"]
+        _log.info("pipeline: validation total=%d verified=%d unverified=%d",
+                  _val["total_claims"], _val["verified"], _val["unverified"])
 
         # 3b. Condensed 18–22 page brief (Markdown) alongside the full report.
         report["condensed_report_markdown"] = builder.build_condensed_report(report, company_data)
@@ -215,6 +223,8 @@ async def run_pipeline_stream(req: PipelineRequest):
 
             override = req.companies or ([req.company_override] if req.company_override else None)
             seeds, resolution = _resolve_seeds(req.sector, override, sec)
+            _log.info("pipeline-stream: sector=%r seeds=%d resolution=%s",
+                      req.sector, len(seeds), resolution)
             seeds = seeds[:22]
             total = len(seeds)
             yield _sse({"type": "stage", "key": "resolved",
@@ -239,13 +249,13 @@ async def run_pipeline_stream(req: PipelineRequest):
                         try:
                             out_by_name[name] = fut.result(timeout=0.1)
                         except Exception as e:
-                            print(f"stream company err {name}: {e}")
+                            _log.warning("stream company err %s: %s", name, e)
                         done += 1
                         yield _sse({"type": "progress", "done": done,
                                     "total": total, "company": name})
                 except FuturesTimeout:
                     # Deadline hit — remaining companies keep their SEC-only stubs.
-                    print("stream fetch deadline reached")
+                    _log.warning("stream fetch deadline reached")
 
             company_data = [out_by_name[n] for n in seeds]
 
@@ -313,7 +323,7 @@ def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
     try:
         discovered = sec.discover_companies(sector, limit=15)
     except Exception as e:
-        print(f"discovery failed for '{sector}': {e}")
+        _log.warning("discovery failed for %s: %s", sector, e)
         discovered = []
     if discovered:
         return discovered, "discovered"
@@ -338,7 +348,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         try:
             return fn()
         except Exception as e:
-            print(f"{label} failed for {name}: {e}")
+            _log.warning("%s failed for %s: %s", label, name, e)
             return default
 
     defaults = {
@@ -366,8 +376,16 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             try:
                 results[k] = f.result(timeout=FETCH_BUDGET_SECONDS)
             except Exception as e:
-                print(f"{k} timed out for {name}: {e}")
+                _log.warning("%s timed out for %s: %s", k, name, e)
                 results[k] = defaults[k]
+
+    # COI disclosures run sequentially — NOT inside the pool above — so the
+    # process-wide NCBI throttle can enforce the 0.35s gap after the main
+    # PubMed query, keeping the keyless E-utilities endpoint under its limit.
+    pubmed_coi = safe(
+        lambda: pubmed.search_coi_disclosures(name, max_results=4),
+        "PubMed-COI", [],
+    )
 
     company_trials = results["trials"] or []
     unc_trials = [t for t in company_trials if t.get("unc_signal")]
@@ -416,7 +434,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "trials": company_trials[:12],
         "unc_trials": unc_trials,
         "pubmed": results["pubmed"],
-        "pubmed_coi": [],
+        "pubmed_coi": pubmed_coi,
         "nih_grants": results["nih_grants"],
         "unc_alumni": unc_alumni,
         "patents": results["patents"] or dict(EMPTY_PATENTS),
@@ -437,7 +455,7 @@ def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
         return []
     out_by_name: dict[str, dict] = {n: _empty_company(n) for n in names}
     deadline = time.monotonic() + FETCH_BUDGET_SECONDS
-    with ThreadPoolExecutor(max_workers=len(names)) as pool:
+    with ThreadPoolExecutor(max_workers=min(len(names), 7)) as pool:
         future_to_name = {
             pool.submit(_fetch_one_company, n, **clients): n for n in names
         }
@@ -446,7 +464,7 @@ def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
             try:
                 out_by_name[name] = fut.result(timeout=max(0.1, remaining))
             except Exception as e:
-                print(f"Company fetch deadline/err for {name}: {e}")
+                _log.warning("Company fetch deadline/err for %s: %s", name, e)
                 # keep the SEC-only stub already in out_by_name
     return [out_by_name[n] for n in names]
 
