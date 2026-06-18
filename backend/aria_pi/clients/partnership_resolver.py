@@ -25,7 +25,9 @@ from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient, fetch_un
 from aria_pi.clients.patents import fetch_unc_patents
 from aria_pi.clients.relationship_detector import fetch_relationship_signals
 from aria_pi.clients.openalex_client import search_unc_coauthorship
-from aria_pi.sectors import seeds_for
+from aria_pi.sectors import (
+    canonical_sector, SECTOR_SEEDS, SECTOR_NC_SEEDS, DEFAULT_SEEDS,
+)
 from aria_pi.utils.name_resolver import normalize_company_name
 
 logger = logging.getLogger(__name__)
@@ -321,8 +323,32 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
 #       (CRITICAL LIMIT) so the payload stays small; aggregates their evidence
 #       into the same three buckets the company view uses
 # returns: the sector partnership record (ranked companies + aggregated buckets)
+def _sector_seeds(sector: str) -> list:
+    """Seed companies for a sector query, in priority order:
+      1. curated   — the term maps to one of our canonical sectors (hand-picked
+                     global list + NC-specific companies).
+      2. discovered — any other free-text term ("diabetes", "clean energy"):
+                     pull real, on-topic public companies live from SEC EDGAR.
+      3. default   — only if discovery returns nothing.
+    Without step 2, every unmapped term fell back to the same generic megacaps
+    (Apple/Microsoft/Amazon/Alphabet/JPMorgan), so "diabetes" and "neuroscience"
+    produced identical, off-topic reports.
+    """
+    canon = canonical_sector(sector)
+    if canon and canon in SECTOR_SEEDS:
+        global_seeds = SECTOR_SEEDS[canon]
+        nc_extras = [c for c in SECTOR_NC_SEEDS.get(canon, []) if c not in global_seeds]
+        return global_seeds + nc_extras
+    try:
+        discovered = SECEdgarClient().discover_companies(sector, limit=_SECTOR_FANOUT)
+    except Exception as e:
+        logger.warning("partnership_resolver: sector discovery failed for %s: %s", sector, e)
+        discovered = []
+    return discovered or DEFAULT_SEEDS
+
+
 def resolve_sector(sector: str) -> dict:
-    seeds = (seeds_for(sector) or [])[:_SECTOR_FANOUT]
+    seeds = (_sector_seeds(sector) or [])[:_SECTOR_FANOUT]
     records = []
     # Keep concurrency low: each company already runs its PubMed lookups
     # sequentially, so too many parallel companies would still trip NCBI's rate

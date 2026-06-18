@@ -199,6 +199,7 @@ function assessPartnership(data: PartnerData, resolvedName: string, partnerType:
     if (isSector) {
       summary = `The ${resolvedName} sector shows ${plural(paperCount, "UNC co-authored paper")}`
         + `${topUnit ? ` (${topUnit})` : ""}, but no recent NIH grants, clinical trials, COI disclosures, or SEC filings confirm formal partnerships.`;
+      caveats.push(`Co-authored papers can be incidental keyword overlap — confirm they involve ${resolvedName} companies before treating the sector as a partner.`);
     } else {
       summary = `${resolvedName} shows ${plural(paperCount, "UNC co-authored paper")}`
         + `${topUnit ? ` (${topUnit})` : ""}, but no recent NIH grants, clinical trials, COI disclosures, or SEC filings confirm a formal partnership.`;
