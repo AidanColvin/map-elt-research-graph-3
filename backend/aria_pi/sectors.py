@@ -134,6 +134,28 @@ SECTOR_SEEDS = {
     "industrial": ["Caterpillar", "Honeywell International", "General Electric", "3M", "Emerson Electric",
                    "Parker Hannifin", "Eaton", "Illinois Tool Works", "Deere & Company", "Cummins",
                    "Rockwell Automation", "Dover Corporation", "Xylem", "IDEX Corporation", "Watts Water Technologies"],
+    # ── S&P 500 GICS sectors (the 11-sector taxonomy) ─────────────────────
+    # Curated so every standard S&P sector resolves to on-topic, SEC-filing
+    # public companies instead of falling to live discovery (which mismatches
+    # category phrases like "Consumer Discretionary") or generic megacaps.
+    "consumer discretionary": ["Amazon", "Tesla", "Home Depot", "McDonald's", "Booking Holdings",
+                               "Lowe's", "TJX Companies", "Nike", "Starbucks", "Chipotle Mexican Grill",
+                               "Marriott International", "Ford Motor", "General Motors", "Yum! Brands", "Ross Stores"],
+    "communication services": ["Alphabet", "Meta Platforms", "Netflix", "Walt Disney", "Comcast",
+                               "Verizon", "AT&T", "T-Mobile US", "Charter Communications", "Warner Bros Discovery",
+                               "Electronic Arts", "Take-Two Interactive", "Paramount Global", "Fox Corporation", "Omnicom Group"],
+    "consumer staples": ["Procter & Gamble", "Coca-Cola", "PepsiCo", "Costco Wholesale", "Walmart",
+                         "Philip Morris International", "Mondelez International", "Altria Group", "Colgate-Palmolive", "Kimberly-Clark",
+                         "General Mills", "Kraft Heinz", "Kroger", "Archer-Daniels-Midland", "Sysco"],
+    "utilities": ["NextEra Energy", "Southern Company", "Duke Energy", "Dominion Energy", "American Electric Power",
+                  "Exelon", "Sempra", "Xcel Energy", "Constellation Energy", "Public Service Enterprise Group",
+                  "Consolidated Edison", "WEC Energy Group", "Entergy", "American Water Works", "Edison International"],
+    "materials": ["Linde", "Sherwin-Williams", "Air Products and Chemicals", "Ecolab", "Freeport-McMoRan",
+                  "Nucor", "Dow", "DuPont de Nemours", "Corteva", "Newmont",
+                  "PPG Industries", "Vulcan Materials", "Nutrien", "International Paper", "Martin Marietta Materials"],
+    "real estate": ["Prologis", "American Tower", "Equinix", "Welltower", "Public Storage",
+                    "Simon Property Group", "Digital Realty Trust", "Realty Income", "CBRE Group", "Crown Castle",
+                    "Extra Space Storage", "AvalonBay Communities", "VICI Properties", "Iron Mountain", "CoStar Group"],
 }
 
 # NC-based companies added on top of the global seeds for each sector.
@@ -169,8 +191,13 @@ SECTOR_NC_SEEDS = {
     # NC energy / utilities
     "energy": ["Duke Energy", "Dominion Energy North Carolina"],
     "climate tech": ["Duke Energy", "Dominion Energy North Carolina"],
+    "utilities": ["Duke Energy", "Dominion Energy North Carolina"],
     # Telecom
     "telecom": ["Bandwidth", "Limelight Networks"],
+    # GICS sectors — NC-specific public companies where they exist
+    "communication services": ["Bandwidth"],
+    "materials": ["Nucor Corporation", "Albemarle", "Sonoco Products", "Sealed Air Corporation"],
+    "real estate": ["Highwoods Properties", "Cousins Properties"],
 }
 
 # Broad domain per sector — used to pick which UNC datasets / talent programs
@@ -189,6 +216,10 @@ SECTOR_DOMAIN = {
     "footwear": "business", "shoes": "business",
     "climate tech": "energy", "energy": "energy", "automotive": "energy",
     "aerospace": "energy",
+    # S&P GICS sectors
+    "consumer discretionary": "business", "consumer staples": "business",
+    "communication services": "tech", "real estate": "business",
+    "utilities": "energy", "materials": "energy",
 }
 
 # Keyword → canonical sector key. Lets free-text / misspelled searches route to
@@ -323,6 +354,25 @@ _EXACT_ALIASES = {
     "ar": "technology",
     "chips": "semiconductors",
     "semis": "semiconductors",
+    # S&P GICS sector names + common short variants. The full phrases are also
+    # SECTOR_SEEDS keys (matched first), so these mainly catch the abbreviations.
+    "consumer discretionary": "consumer discretionary",
+    "discretionary": "consumer discretionary",
+    "consumer staples": "consumer staples",
+    "staples": "consumer staples",
+    "communication services": "communication services",
+    "communications": "communication services",
+    "comms": "communication services",
+    "utilities": "utilities",
+    "utility": "utilities",
+    "materials": "materials",
+    "chemicals": "materials",
+    "chemical": "materials",
+    "mining": "materials",
+    "metals": "materials",
+    "real estate": "real estate",
+    "reit": "real estate",
+    "reits": "real estate",
 }
 
 

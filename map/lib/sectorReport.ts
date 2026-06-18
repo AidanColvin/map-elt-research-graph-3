@@ -66,17 +66,23 @@ const ASSET_GROUPS: { match: RegExp; assets: DataAsset[] }[] = [
     { name: "High-Throughput Sequencing Facility", url: "https://www.med.unc.edu/", description: "Genomic & transcriptomic sequencing at scale", heldBy: "UNC School of Medicine" },
     { name: "Carolina Data Warehouse for Health", url: "https://tracs.unc.edu/", description: "EHR, labs & imaging metadata · 1M+ patients", heldBy: "NC TraCS / UNC Health" },
   ] },
-  { match: /\bai\b|artificial intelligence|machine learning|\bml\b|data scien|software|cloud|comput|cyber|semiconductor|\bchip|informatics|analytics|quantum|robot|\btech\b|technolog|information technology|\bit\b|internet|hardware|electronic|telecom|\bnetwork|\b5g\b|streaming|\bmedia\b|gaming|video game|\bsaas\b|platform|digital/i, assets: [
+  { match: /\bai\b|artificial intelligence|machine learning|\bml\b|data scien|software|cloud|comput|cyber|semiconductor|\bchip|informatics|analytics|quantum|robot|\btech\b|technolog|information technology|\bit\b|internet|hardware|electronic|telecom|\bnetwork|\b5g\b|streaming|\bmedia\b|gaming|video game|\bsaas\b|platform|digital|communication|broadcast|publishing|advertis/i, assets: [
     { name: "RENCI — Renaissance Computing Institute", url: "https://renci.org/", description: "Applied AI, cyberinfrastructure & large-scale data science", heldBy: "UNC-Chapel Hill" },
     { name: "School of Data Science and Society", url: "https://datascience.unc.edu/", description: "Cross-disciplinary data-science research & talent", heldBy: "UNC-Chapel Hill" },
     { name: "Carolina Health Informatics Program", url: "https://tracs.unc.edu/", description: "Health-data analytics, EHR & biomedical informatics", heldBy: "UNC-Chapel Hill" },
   ] },
-  { match: /climate|energy|environment|sustainab|clean ?tech|carbon|coastal|marine|ocean|\bwater\b/i, assets: [
+  { match: /climate|energy|environment|sustainab|clean ?tech|carbon|coastal|marine|ocean|\bwater\b|utilit|\bpower\b|electric|\bgrid\b|nuclear|renewable|\bsolar\b|\bwind\b/i, assets: [
     { name: "UNC Institute for the Environment", url: "https://ie.unc.edu/", description: "Environmental modeling, energy transition & clean-tech research", heldBy: "UNC-Chapel Hill" },
     { name: "Institute of Marine Sciences", url: "https://ims.unc.edu/", description: "Coastal, estuarine & marine field data and labs", heldBy: "UNC-Chapel Hill" },
     { name: "The Water Institute", url: "https://waterinstitute.unc.edu/", description: "Water, sanitation & resource-management data", heldBy: "Gillings School of Global Public Health" },
   ] },
-  { match: /fintech|financ|bank|insur|capital|invest|business|econom|\bmarket/i, assets: [
+  // Materials / chemicals / mining — UNC's chemistry & applied physical sciences.
+  { match: /material|chemical|mining|\bmetals?\b|\bsteel\b|cement|\bpaper\b|packaging|polymer|coating|\bplastic/i, assets: [
+    { name: "UNC Department of Chemistry", url: "https://chem.unc.edu/", description: "Materials, polymer & synthetic chemistry research", heldBy: "UNC-Chapel Hill" },
+    { name: "Department of Applied Physical Sciences", url: "https://aps.unc.edu/", description: "Materials science, soft matter & advanced manufacturing", heldBy: "UNC-Chapel Hill" },
+    { name: "Frank Hawkins Kenan Institute", url: "https://kenaninstitute.unc.edu/", description: "Commercialization & industry partnerships", heldBy: "Kenan-Flagler Business School" },
+  ] },
+  { match: /fintech|financ|bank|insur|capital|invest|business|econom|\bmarket|retail|consumer|staple|discretionary|real estate|\breit|propert|apparel|restaurant|hotel|leisure|homebuild|industrial|manufactur/i, assets: [
     { name: "Frank Hawkins Kenan Institute of Private Enterprise", url: "https://kenaninstitute.unc.edu/", description: "Economic forecasting, market & private-capital research", heldBy: "Kenan-Flagler Business School" },
     { name: "Institute for Private Capital", url: "https://uncipc.org/", description: "Private equity, venture & fund-performance datasets", heldBy: "Kenan-Flagler Business School" },
     { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic & administrative-data archive", heldBy: "UNC-Chapel Hill" },
