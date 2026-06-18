@@ -35,8 +35,9 @@ class WebSearchClient:
         Returns: A list of result dictionaries with title and URL.
         """
         if not self.client:
-            return [{"title": f"Mock News: {company_name} announces new partnership", "url": "https://example.com"}]
-            
+            return []
+
+
         try:
             query = f"{company_name} research agreement OR license agreement"
             response = self.client.search(query=query, search_depth="basic", max_results=3)
