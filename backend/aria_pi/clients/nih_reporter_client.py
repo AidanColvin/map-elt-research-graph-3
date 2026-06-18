@@ -33,6 +33,23 @@ def _coerce_award(value) -> int:
         return None
 
 
+def _pi_name_from(record) -> str:
+    """Display name from one PI object, tolerant of field-spelling variants.
+
+    The live API returns `full_name` (e.g. "Owen S Fenton"); we fall back to
+    assembling first + last name, and finally to bare last_name. Returns ""
+    for anything that is not a usable PI object.
+    """
+    if not isinstance(record, dict):
+        return ""
+    name = record.get("full_name") or record.get("FullName")
+    if name:
+        return name.strip()
+    parts = [record.get("first_name") or record.get("FirstName") or "",
+             record.get("last_name") or record.get("LastName") or ""]
+    return " ".join(p for p in parts if p).strip()
+
+
 def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
     """Named UNC contacts from grants already fetched — no new query.
 
@@ -115,14 +132,23 @@ class NIHReporterClient:
         grants = []
         for g in results:
             proj_num = g.get("project_num") or g.get("ProjectNum") or ""
+            # PrincipalInvestigators may be a list of PI objects, a single PI
+            # object, or absent. Handle all three without raising.
             pi_name = ""
-            pis = g.get("principal_investigators") or g.get("PrincipalInvestigators") or []
-            if pis and isinstance(pis, list):
-                pi_name = pis[0].get("full_name") or pis[0].get("FullName") or ""
+            pis = g.get("principal_investigators") or g.get("PrincipalInvestigators")
+            if isinstance(pis, list) and pis:
+                pi_name = _pi_name_from(pis[0])
+            elif isinstance(pis, dict):
+                pi_name = _pi_name_from(pis)
             if not pi_name:
                 pi_name = g.get("contact_pi_name") or g.get("ContactPiName") or ""
+            if not pi_name:
+                logger.debug("nih_reporter: no PI found for grant %s", proj_num)
             org = g.get("organization") or g.get("Organization") or {}
-            dept = (org.get("org_dept") if isinstance(org, dict) else "") or ""
+            # org_dept comes back null for UNC records; fall back to a top-level
+            # department field if a future record carries one.
+            dept = ((org.get("org_dept") if isinstance(org, dict) else "")
+                    or g.get("department") or "")
             org_name = (org.get("org_name") if isinstance(org, dict) else "") or g.get("OrgName", "")
             # Award dollars: the live API populates `award_amount` (total award);
             # `award_notice_amount` comes back null for UNC records, so it is only a
