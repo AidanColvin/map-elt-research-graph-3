@@ -41,6 +41,9 @@ def _is_actual_sponsor(company_name: str, lead: str, collabs: List[str]) -> bool
 class ClinicalTrialsClient:
     def __init__(self):
         self.base_url = "https://clinicaltrials.gov/api/v2/studies"
+        # Reuse one pooled connection across trial lookups. The v2 API needs no
+        # special request headers, so the session carries requests' defaults.
+        self._session = requests.Session()
 
     def search_by_sponsor(self, sponsor_name: str) -> List[dict]:
         # query.spons searches specifically in sponsor and collaborator name
@@ -49,7 +52,7 @@ class ClinicalTrialsClient:
         # We fetch a larger page and post-filter to the genuine matches.
         params = {"query.spons": sponsor_name, "pageSize": 20}
         try:
-            response = requests.get(self.base_url, params=params, timeout=6)
+            response = self._session.get(self.base_url, params=params, timeout=6)
             response.raise_for_status()
             data = response.json()
         except Exception as e:
