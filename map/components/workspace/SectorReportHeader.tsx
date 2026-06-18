@@ -106,23 +106,19 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
         ))}
       </div>
 
-      {/* Quick reference */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginBottom: 20 }}>
-        <div>
-          <Eyebrow>Contact now — verify OSP first</Eyebrow>
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {m.contactNow.map((c, i) => (
-              <li key={i} style={{ fontSize: 13, color: MUTED, padding: "9px 0", borderBottom: i < m.contactNow.length - 1 ? `1px solid ${BORDER}` : "none" }}>
-                <span style={{ color: "#c7c7cc", marginRight: 7 }}>·</span>
-                <span style={{ fontWeight: 700, color: INK }}>{c.name}</span> · {c.detail}
-              </li>
-            ))}
-            {!m.contactNow.length && <li style={{ fontSize: 13, color: MUTED }}>None with active NIH grants.</li>}
-          </ul>
+      {/* OSP routing — the primary engagement step, shown first */}
+      {m.ospCompanies.length > 0 && (
+        <div style={{ background: "#fdf6e3", borderRadius: 10, padding: "11px 15px", marginBottom: 22, fontSize: 12.5, color: "#8a6d1a", display: "flex", gap: 8, alignItems: "flex-start" }}>
+          <span>⚠</span>
+          <span>{m.ospCompanies.length} compan{m.ospCompanies.length === 1 ? "y has" : "ies have"} active NIH grants — route initial outreach through <a href="https://research.unc.edu/osp" target="_blank" rel="noreferrer" style={{ color: BLUE, textDecoration: "none" }}>UNC OSP</a> before contacting any investigator.</span>
         </div>
-        <div>
-          <Eyebrow>Warm — paper on record</Eyebrow>
-          <ul style={{ listStyle: "none", margin: "0 0 16px", padding: 0 }}>
+      )}
+
+      {/* Company readiness — which companies already have a UNC tie (no named contacts) */}
+      {(m.warm.length > 0 || m.cold.length > 0) && (
+        <div style={{ marginBottom: 26 }}>
+          <Eyebrow>Company readiness — UNC tie on record</Eyebrow>
+          <ul style={{ listStyle: "none", margin: "0 0 12px", padding: 0 }}>
             {m.warm.map((c, i) => (
               <li key={i} style={{ fontSize: 13, color: MUTED, padding: "9px 0", borderBottom: i < m.warm.length - 1 ? `1px solid ${BORDER}` : "none" }}>
                 <span style={{ color: "#c7c7cc", marginRight: 7 }}>·</span>
@@ -130,20 +126,11 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
                 {c.nc && <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 600, color: "#085041", background: "#e1f5ee", borderRadius: 999, padding: "2px 8px" }}>◉ NC</span>}
               </li>
             ))}
-            {!m.warm.length && <li style={{ fontSize: 13, color: MUTED }}>None.</li>}
           </ul>
           {m.cold.length > 0 && <>
             <Eyebrow>No documented tie</Eyebrow>
             <p style={{ fontSize: 13, color: MUTED, margin: 0 }}><span style={{ color: "#c7c7cc", marginRight: 7 }}>·</span>{m.cold.join(" · ")}</p>
           </>}
-        </div>
-      </div>
-
-      {/* OSP warning */}
-      {m.ospCompanies.length > 0 && (
-        <div style={{ background: "#fdf6e3", borderRadius: 10, padding: "10px 14px", marginBottom: 28, fontSize: 12, color: "#8a6d1a", display: "flex", gap: 8, alignItems: "flex-start" }}>
-          <span>⚠</span>
-          <span>{m.ospCompanies.length} companies have active NIH grants — contact <a href="https://research.unc.edu/osp" target="_blank" rel="noreferrer" style={{ color: BLUE, textDecoration: "none" }}>UNC OSP</a> before any outreach</span>
         </div>
       )}
 
@@ -163,14 +150,13 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
       {/* Priority matrix */}
       <Eyebrow>Priority matrix</Eyebrow>
       <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 28 }}>
-        <thead><tr><th style={th}>Company</th><th style={th}>Tier</th><th style={th}>Signal</th><th style={th}>UNC contact</th><th style={th}>Grant / paper</th><th style={th}>First move</th></tr></thead>
+        <thead><tr><th style={th}>Company</th><th style={th}>Tier</th><th style={th}>Signal</th><th style={th}>Grant / paper</th><th style={th}>First move</th></tr></thead>
         <tbody>
           {m.matrix.map((r: MatrixRow, i) => (
             <tr key={i}>
               <td style={{ ...td, color: INK, fontWeight: 600 }}>{r.company}</td>
               <td style={td}><span style={{ fontSize: 11, fontWeight: 600, padding: "2px 9px", borderRadius: 999, background: r.tier === "Strategic" ? "#e8effb" : "#f2f2f2", color: r.tier === "Strategic" ? "#1f5d99" : MUTED }}>{r.signal === "None" ? "Various" : r.tier}</span></td>
               <td style={td}><span style={{ display: "inline-block", width: 7, height: 7, borderRadius: 999, background: SIGNAL_DOT[r.signal], marginRight: 6, verticalAlign: "middle" }} />{r.signal}</td>
-              <td style={td}>{r.contactUrl ? <A href={r.contactUrl}>{r.contact}</A> : r.contact}</td>
               <td style={td}>{r.grantOrPmid ? <a href={r.grantUrl} target="_blank" rel="noreferrer" style={{ textDecoration: "none" }}><code style={codePill}>{r.grantOrPmid}</code></a> : "—"}</td>
               <td style={td}>{r.firstMove}</td>
             </tr>
@@ -186,7 +172,10 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
 
       {/* Faculty */}
       {m.faculty.length > 0 && <>
-        <Eyebrow>UNC faculty with verified sector expertise</Eyebrow>
+        <Eyebrow>UNC investigators with sector-overlapping NIH grants</Eyebrow>
+        <p style={{ fontSize: 11.5, color: MUTED, margin: "6px 0 12px", lineHeight: 1.5, maxWidth: 680 }}>
+          Verified via NIH RePORTER, last 5 fiscal years. &ldquo;Overlap&rdquo; means the grant record references the company — not a vetting of the investigator&apos;s commercial focus.
+        </p>
         <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 28 }}>
           <thead><tr><th style={th}>PI</th><th style={th}>Unit</th><th style={th}>Grant</th><th style={th}>Topic</th><th style={th}>FY</th><th style={th}>Company overlap</th></tr></thead>
           <tbody>

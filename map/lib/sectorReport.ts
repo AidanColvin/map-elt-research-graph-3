@@ -136,7 +136,7 @@ export function buildSectorReport(report: any): SectorReportModel {
     const tier: "Strategic" | "Translational" = p.partnership_type === "Strategic" ? "Strategic" : "Translational";
     if (pis.length) {
       const pi = pis[0];
-      matrix.push({ company: p.company_name, tier, signal: "NIH grant", contact: pi.name, contactUrl: pi.grant_url, grantOrPmid: pi.grant_num || grantIdFromUrl(pi.grant_url || ""), grantUrl: pi.grant_url, firstMove: "Email PI · OSP first" });
+      matrix.push({ company: p.company_name, tier, signal: "NIH grant", contact: pi.name, contactUrl: pi.grant_url, grantOrPmid: pi.grant_num || grantIdFromUrl(pi.grant_url || ""), grantUrl: pi.grant_url, firstMove: "Route via UNC OSP" });
     } else if (p.existing_unc_tie) {
       const a = pubAlign(p)[0];
       const yr = a ? fy4(a.unc_fact || a.rationale || "") : "";
@@ -159,13 +159,18 @@ export function buildSectorReport(report: any): SectorReportModel {
     .filter((x) => x.count > 0)
     .sort((a, b) => b.count - a.count);
 
-  // Faculty table — flatten PIs across companies, dedupe, newest FY first.
+  // UNC investigators with RECENT (last 5 FY) NIH grants overlapping a sector
+  // company, deduped, newest FY first. We do NOT claim vetted "sector expertise"
+  // — only a verified, recent RePORTER overlap (older grants are filtered out).
+  const nowFY = new Date().getFullYear();
   const seen = new Set<string>();
   const faculty: FacultyRow[] = [];
   for (const p of profiles) {
     for (const pi of uncPisOf(p)) {
       const key = (pi.name || "").toLowerCase();
       if (!pi.name || seen.has(key)) continue;
+      const fyNum = parseInt(String(pi.fiscal_year || "").slice(0, 4), 10);
+      if (!fyNum || fyNum < nowFY - 5) continue;
       seen.add(key);
       faculty.push({
         name: pi.name, unit: pi.org || "UNC Chapel Hill",

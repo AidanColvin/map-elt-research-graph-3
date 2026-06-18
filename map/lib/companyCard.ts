@@ -366,6 +366,11 @@ export function cardToMarkdown(c: CompanyCardData): string {
   for (const s of c.stats) out.push(`| ${s.label} | ${s.value} |`);
   out.push("");
 
+  if (c.ospFlag) {
+    out.push(`**Engagement route:** route initial outreach through [UNC OSP](https://research.unc.edu/osp) — ${c.ospGrantCount} active NIH grant${c.ospGrantCount === 1 ? "" : "s"} to verify first.`);
+    out.push("");
+  }
+
   const section = (title: string, bullets: CardBullet[]) => {
     if (!bullets.length) return;
     out.push(`## ${title}`);
@@ -377,17 +382,6 @@ export function cardToMarkdown(c: CompanyCardData): string {
   section("Problem", c.problem);
   section("Goal", c.goal);
 
-  if (c.contacts.length) {
-    out.push("## UNC Contacts");
-    out.push("");
-    out.push("| PI | Unit | Grant | Topic |");
-    out.push("|---|---|---|---|");
-    for (const ct of c.contacts) {
-      const pi = ct.url ? `[${ct.pi}](${ct.url})` : ct.pi;
-      out.push(`| ${pi} | ${ct.unit} | ${ct.grant || "—"} | ${ct.topic || "—"} |`);
-    }
-    out.push("");
-  }
   if (c.assets.length) {
     out.push("## UNC Data Assets");
     out.push("");
@@ -408,10 +402,6 @@ export function cardToMarkdown(c: CompanyCardData): string {
       const bold = tp.boldUrl ? `[**${tp.bold}**](${tp.boldUrl})` : `**${tp.bold}**`;
       out.push(`- ${bold}${tp.rest ? ` ${tp.rest}` : ""}`);
     }
-    out.push("");
-  }
-  if (c.ospFlag) {
-    out.push(`> ⚠ ${c.ospGrantCount} active NIH grant${c.ospGrantCount === 1 ? "" : "s"} · verify with UNC OSP before contact — https://research.unc.edu/osp`);
     out.push("");
   }
   return out.join("\n");

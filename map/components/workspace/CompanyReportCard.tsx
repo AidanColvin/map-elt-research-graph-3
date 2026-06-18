@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type {
-  CompanyCardData, CardBullet, CardContact, CardAsset, CardPeer, CardTalkingPoint,
+  CompanyCardData, CardBullet, CardAsset, CardPeer, CardTalkingPoint,
 } from "@/lib/companyCard";
 import { FONT } from "./ui";
 
@@ -73,27 +73,6 @@ function Pill({ text, kind }: { text: string; kind: "tier" | "active" | "prior" 
   );
 }
 
-function ContactsTable({ rows }: { rows: CardContact[] }) {
-  if (!rows.length) return null;
-  const th = { fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: MUTED, borderBottom: `1px solid ${BORDER}`, padding: "6px 8px 6px 0", textAlign: "left" as const };
-  const td = { fontSize: 12, color: MUTED, padding: "7px 8px 7px 0", borderBottom: `1px solid ${BORDER}`, verticalAlign: "top" as const };
-  return (
-    <table style={{ width: "100%", borderCollapse: "collapse" }}>
-      <thead><tr><th style={th}>PI</th><th style={th}>Unit</th><th style={th}>Grant</th><th style={th}>FY</th><th style={th}>Topic</th></tr></thead>
-      <tbody>
-        {rows.map((r, i) => (
-          <tr key={i}>
-            <td style={{ ...td, color: INK, fontWeight: 500 }}><A href={r.url}>{r.pi}</A></td>
-            <td style={td}>{r.unit}</td>
-            <td style={{ ...td, fontFamily: "ui-monospace, monospace", fontSize: 11 }}>{r.grant || "—"}</td>
-            <td style={td}>{r.fy || "—"}</td>
-            <td style={td}>{r.topic || "—"}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
 
 function AssetsTable({ rows }: { rows: CardAsset[] }) {
   if (!rows.length) return null;
@@ -192,6 +171,18 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
         </div>
       )}
 
+      {/* OSP routing — the primary engagement step, shown first */}
+      {data.ospFlag && (
+        <div style={{ background: "#fdeceb", borderRadius: 10, padding: "9px 13px", marginBottom: 18, fontSize: 12, color: "#b3261e", display: "flex", gap: 7, alignItems: "flex-start" }}>
+          <span>⚠</span>
+          <span>
+            Route initial outreach through{" "}
+            <a href="https://research.unc.edu/osp" target="_blank" rel="noreferrer" style={{ color: "#b3261e", textDecoration: "underline" }}>UNC OSP</a>
+            {" "}— {data.ospGrantCount} active NIH grant{data.ospGrantCount === 1 ? "" : "s"} to verify first.
+          </span>
+        </div>
+      )}
+
       {/* Body grid */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
         <div>
@@ -201,8 +192,7 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
           {data.rdPeers.length > 0 && <div style={{ marginTop: 16 }}><SectionLabel>R&D vs sector peers</SectionLabel><RdChart peers={data.rdPeers} /></div>}
         </div>
         <div>
-          {data.contacts.length > 0 && <><SectionLabel>UNC Contacts &amp; Resources</SectionLabel><ContactsTable rows={data.contacts} /></>}
-          {data.assets.length > 0 && <div style={{ marginTop: 16 }}><SectionLabel>UNC Data Assets</SectionLabel><AssetsTable rows={data.assets} /></div>}
+          {data.assets.length > 0 && <><SectionLabel>UNC Data Assets</SectionLabel><AssetsTable rows={data.assets} /></>}
           {data.solution.length > 0 && <div style={{ marginTop: 16 }}><SectionLabel>Solution</SectionLabel><Bullets items={data.solution} /></div>}
         </div>
       </div>
@@ -224,17 +214,6 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
         </div>
       )}
 
-      {/* OSP flag */}
-      {data.ospFlag && (
-        <div style={{ background: "#fdeceb", borderRadius: 10, padding: "8px 12px", marginTop: 14, fontSize: 11.5, color: "#b3261e", display: "flex", gap: 6, alignItems: "flex-start" }}>
-          <span>⚠</span>
-          <span>
-            {data.ospGrantCount} active NIH grant{data.ospGrantCount === 1 ? "" : "s"} · verify with{" "}
-            <a href="https://research.unc.edu/osp" target="_blank" rel="noreferrer" style={{ color: "#b3261e", textDecoration: "underline" }}>UNC OSP</a>{" "}
-            before contact
-          </span>
-        </div>
-      )}
     </section>
   );
 }
