@@ -239,13 +239,13 @@ async def run_pipeline_stream(req: PipelineRequest):
                         try:
                             out_by_name[name] = fut.result(timeout=0.1)
                         except Exception as e:
-                            print(f"stream company err {name}: {e}")
+                            _log.warning("stream company err %s: %s", name, e)
                         done += 1
                         yield _sse({"type": "progress", "done": done,
                                     "total": total, "company": name})
                 except FuturesTimeout:
                     # Deadline hit — remaining companies keep their SEC-only stubs.
-                    print("stream fetch deadline reached")
+                    _log.warning("stream fetch deadline reached")
 
             company_data = [out_by_name[n] for n in seeds]
 
@@ -313,7 +313,7 @@ def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:
     try:
         discovered = sec.discover_companies(sector, limit=15)
     except Exception as e:
-        print(f"discovery failed for '{sector}': {e}")
+        _log.warning("discovery failed for %s: %s", sector, e)
         discovered = []
     if discovered:
         return discovered, "discovered"
@@ -338,7 +338,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         try:
             return fn()
         except Exception as e:
-            print(f"{label} failed for {name}: {e}")
+            _log.warning("%s failed for %s: %s", label, name, e)
             return default
 
     defaults = {
@@ -366,7 +366,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
             try:
                 results[k] = f.result(timeout=FETCH_BUDGET_SECONDS)
             except Exception as e:
-                print(f"{k} timed out for {name}: {e}")
+                _log.warning("%s timed out for %s: %s", k, name, e)
                 results[k] = defaults[k]
 
     # COI disclosures run sequentially — NOT inside the pool above — so the
@@ -454,7 +454,7 @@ def _fetch_all_concurrent(names: List[str], **clients) -> List[dict]:
             try:
                 out_by_name[name] = fut.result(timeout=max(0.1, remaining))
             except Exception as e:
-                print(f"Company fetch deadline/err for {name}: {e}")
+                _log.warning("Company fetch deadline/err for %s: %s", name, e)
                 # keep the SEC-only stub already in out_by_name
     return [out_by_name[n] for n in names]
 
