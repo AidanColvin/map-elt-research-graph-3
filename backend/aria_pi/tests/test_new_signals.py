@@ -32,8 +32,8 @@ def test_fetch_collaboration_8ks_merges_and_dedupes():
     page2 = {"hits": {"hits": [_efts_hit("0001-25-2", "2025-06-15"),
                                _efts_hit("0001-25-3", "2024-11-30")]}}
     client = SECEdgarClient()
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
-               side_effect=[FakeResponse(page1), FakeResponse(page2)]), \
+    with patch.object(client._session, "get",
+                      side_effect=[FakeResponse(page1), FakeResponse(page2)]), \
          patch("aria_pi.clients.sec_edgar_client.time.sleep"):
         out = client.fetch_collaboration_8ks("310158")
     assert out["collaboration_8k_count"] == 3
@@ -51,8 +51,7 @@ def test_fetch_collaboration_8ks_safe_defaults():
     empty = {"collaboration_8k_count": 0, "most_recent_8k_date": None,
              "most_recent_8k_description": None, "collaboration_8k_url": None}
     assert client.fetch_collaboration_8ks("") == empty
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
-               side_effect=RuntimeError("down")), \
+    with patch.object(client._session, "get", side_effect=RuntimeError("down")), \
          patch("aria_pi.clients.sec_edgar_client.time.sleep"):
         assert client.fetch_collaboration_8ks("310158") == empty
 

@@ -24,6 +24,7 @@ from aria_pi.clients.nih_reporter_client import NIHReporterClient, unc_pis_from_
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient, fetch_unc_sponsored_trials
 from aria_pi.clients.patents import fetch_unc_patents
 from aria_pi.clients.relationship_detector import fetch_relationship_signals
+from aria_pi.clients.openalex_client import search_unc_coauthorship
 from aria_pi.sectors import seeds_for
 from aria_pi.utils.name_resolver import normalize_company_name
 
@@ -228,13 +229,14 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     pubmed, sec, web = PubMedClient(), SECEdgarClient(), WebSearchClient()
     nih_client, trials_client = NIHReporterClient(), ClinicalTrialsClient()
     results = {}
-    with ThreadPoolExecutor(max_workers=5) as ex:
+    with ThreadPoolExecutor(max_workers=6) as ex:
         futures = {
             ex.submit(resolve_pubmed_bundle, company_name, pubmed): "pubmed",
             ex.submit(resolve_sec_verbatim, target, sec): "financial",
             ex.submit(resolve_ecosystem, target, web): "ecosystem",
             ex.submit(safe_nih, company_name, nih_client): "nih_grants",
             ex.submit(safe_trials, target, trials_client): "trials",
+            ex.submit(search_unc_coauthorship, company_name): "openalex",
         }
         for fut in as_completed(futures):
             results[futures[fut]] = fut.result()
@@ -243,6 +245,16 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     results["coi"] = bundle.get("coi")
     results["unc_units"] = bundle.get("unc_units")
     clinical = results.get("clinical") or {"count": 0, "top_authors": [], "papers": []}
+    # Merge OpenAlex papers into clinical, deduped by lowercased title so a
+    # paper found in both PubMed and OpenAlex is not counted twice.
+    openalex_papers = results.get("openalex") or []
+    if openalex_papers:
+        seen = {p["title"].lower() for p in clinical["papers"]}
+        for p in openalex_papers:
+            if p["title"].lower() not in seen:
+                seen.add(p["title"].lower())
+                clinical["papers"].append(p)
+        clinical["count"] = len(clinical["papers"])
     coi = results.get("coi") or {"count": 0, "papers": [], "window_years": _COI_WINDOW_YEARS}
     unc_units = results.get("unc_units") or []
     financial = results.get("financial") or {"quotes": [], "filing_url": "", "cik": ""}

@@ -129,6 +129,18 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
 
   return (
     <section style={{ fontFamily: FONT, padding: "24px 0", borderTop: `1px solid ${BORDER}` }}>
+      {/* Data-quality warning for deadline-truncated companies */}
+      {data.secOnlyStub && (
+        <div style={{
+          background: "#fffbeb", border: "1px solid #fcd34d", borderLeft: "4px solid #f59e0b",
+          borderRadius: 10, padding: "10px 14px", marginBottom: 16,
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <span style={{ fontSize: 13, color: "#92400e" }}>
+            <strong>Partial data</strong> — this company hit the 44 s fetch deadline. Only SEC EDGAR facts are shown; PubMed, NIH grants, clinical trials, and patents may be missing.
+          </span>
+        </div>
+      )}
       {/* Header */}
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
         <div>

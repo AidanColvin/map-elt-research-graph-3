@@ -65,5 +65,5 @@ def test_load_config_defaults():
     """
     cfg = load_config()
     assert isinstance(cfg, Config)
-    assert cfg.companies_per_report == 5
+    assert cfg.companies_per_report == 22
     assert cfg.selection_score_threshold == 55

@@ -747,6 +747,52 @@ export default function PartnershipsView({
               </div>
             )}
 
+            {/* ── Relationship signals — confirmed/probable evidence strength ── */}
+            {(data.relationship_signals ?? []).length > 0 && (() => {
+              const signals = data.relationship_signals!;
+              const confirmed = signals.filter((s) => s.strength === "confirmed");
+              const probable = signals.filter((s) => s.strength === "probable");
+              return (
+                <div data-testid="relationship-signals" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+                  <Eyebrow>Evidence strength</Eyebrow>
+                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "5px 0 16px", maxWidth: 580, lineHeight: 1.5 }}>
+                    Relationship signals ranked by source authority — confirmed signals come from structured public filings (SEC, ClinicalTrials.gov), probable signals from academic conflict-of-interest disclosures.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    {[...confirmed, ...probable].map((s, i) => {
+                      const isConfirmed = s.strength === "confirmed";
+                      const bg = isConfirmed ? "#f0fdf4" : "#fffbeb";
+                      const border = isConfirmed ? "#86efac" : "#fcd34d";
+                      const badgeBg = isConfirmed ? "#dcfce7" : "#fef9c3";
+                      const badgeColor = isConfirmed ? "#15803d" : "#92400e";
+                      return (
+                        <div key={i} style={{ background: bg, border: `1px solid ${border}`, borderRadius: 12, padding: "12px 15px", display: "flex", alignItems: "flex-start", gap: 12 }}>
+                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase" as const, color: badgeColor, background: badgeBg, borderRadius: 999, padding: "3px 10px", whiteSpace: "nowrap" as const, marginTop: 1 }}>
+                            {s.strength}
+                          </span>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ fontSize: 11.5, color: "#6b6b73", margin: "0 0 4px", fontWeight: 600 }}>
+                              {s.filing_type}{s.date ? ` · ${s.date}` : ""}
+                            </p>
+                            {s.excerpt && (
+                              <p style={{ fontSize: 13, color: "#1d1d1f", margin: 0, lineHeight: 1.45, display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical" as const, overflow: "hidden" }}>
+                                &ldquo;{s.excerpt}&rdquo;
+                              </p>
+                            )}
+                          </div>
+                          {s.source_url && (
+                            <a href={s.source_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: "#5b6cff", textDecoration: "none", whiteSpace: "nowrap" as const, marginTop: 2 }}>
+                              Source →
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* ── Current relationships — who at UNC, what's active, which schools ─ */}
             {hasSignal && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -942,6 +988,31 @@ export default function PartnershipsView({
                   )}
                 </Card>
               </div>
+
+              {(data.unc_patents ?? []).length > 0 && (
+                <div data-testid="card-patents">
+                  <Card title="UNC Patents" subtitle="UNC-assigned patents overlapping this company's area">
+                    <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
+                      {data.unc_patents!.map((p) => (
+                        <li key={p.patent_id} style={{ borderLeft: "2px solid #e5e5ea", paddingLeft: 12 }}>
+                          <p style={{ fontSize: 13.5, fontWeight: 500, color: "#1d1d1f", margin: 0 }}>{p.title || p.patent_id}</p>
+                          <p style={{ fontSize: 11.5, color: "#9a9aa2", margin: "3px 0 0" }}>
+                            {p.patent_id}{p.date ? ` · ${p.date}` : ""}{p.school ? ` · ${p.school}` : ""}
+                          </p>
+                          <a
+                            href={`https://search.patentsview.org/patent/${p.patent_id}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ fontSize: 12.5, color: "#5b6cff", textDecoration: "none", display: "inline-block", marginTop: 5 }}
+                          >
+                            PatentsView →
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                </div>
+              )}
             </div>
 
             {/* ── Section D — Deepen / where to start, tailored to this search ─ */}

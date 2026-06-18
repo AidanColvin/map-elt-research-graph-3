@@ -114,8 +114,7 @@ def test_search_by_sponsor_parses_and_filters():
                facilities=["UNC Medical Center"], nct="NCT123"),
         _study("Apple Cider Vinegar Group", nct="NCT999"),  # decoy, filtered
     ]}
-    with patch("aria_pi.clients.clinicaltrials_client.requests.get",
-               return_value=FakeResponse(payload)):
+    with patch.object(client._session, "get", return_value=FakeResponse(payload)):
         trials = client.search_by_sponsor("Moderna")
     assert len(trials) == 1
     t = trials[0]
@@ -133,8 +132,7 @@ def test_search_by_sponsor_network_error_returns_empty():
     Returns: An empty list (no exception escapes).
     """
     client = ClinicalTrialsClient()
-    with patch("aria_pi.clients.clinicaltrials_client.requests.get",
-               side_effect=RuntimeError("timeout")):
+    with patch.object(client._session, "get", side_effect=RuntimeError("timeout")):
         assert client.search_by_sponsor("Moderna") == []
 
 
@@ -145,8 +143,7 @@ def test_search_by_sponsor_handles_empty_studies():
     Returns: An empty list.
     """
     client = ClinicalTrialsClient()
-    with patch("aria_pi.clients.clinicaltrials_client.requests.get",
-               return_value=FakeResponse({"studies": []})):
+    with patch.object(client._session, "get", return_value=FakeResponse({"studies": []})):
         assert client.search_by_sponsor("Moderna") == []
 
 
@@ -159,8 +156,7 @@ def test_collaborators_and_facilities_truncated_to_six():
     client = ClinicalTrialsClient()
     many = [f"Moderna Partner {i}" for i in range(10)]
     payload = {"studies": [_study("Moderna", collabs=many, facilities=many)]}
-    with patch("aria_pi.clients.clinicaltrials_client.requests.get",
-               return_value=FakeResponse(payload)):
+    with patch.object(client._session, "get", return_value=FakeResponse(payload)):
         t = client.search_by_sponsor("Moderna")[0]
     assert len(t["collaborators"]) == 6
     assert len(t["facilities"]) == 6
