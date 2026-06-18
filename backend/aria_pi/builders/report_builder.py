@@ -561,7 +561,8 @@ class ReportBuilder:
                                           f"{t.get('nct_id', '')} ({t.get('status', '').lower()})"),
                     "active": "Yes" if "recruit" in (t.get("status") or "").lower()
                               or "active" in (t.get("status") or "").lower() else "Unknown",
-                    "sources": [t.get("url", "https://clinicaltrials.gov")],
+                    "sources": [t.get("url", "https://clinicaltrials.gov"),
+                                "https://clinicaltrials.gov"],
                 })
             for g in (c.get("nih_grants") or [])[:3]:
                 dept = g.get("department") or g.get("organization") or "UNC Chapel Hill"
@@ -571,7 +572,8 @@ class ReportBuilder:
                     "relationship_type": f"NIH-funded research — grant {g.get('project_num', '')} "
                                          f"(PI: {g.get('pi', 'n/a')})",
                     "active": "Yes" if g.get("fiscal_year") else "Unknown",
-                    "sources": [g.get("url", "https://reporter.nih.gov")],
+                    "sources": [g.get("url", "https://reporter.nih.gov"),
+                                "https://reporter.nih.gov"],
                 })
             for p in (c.get("pubmed") or [])[:5]:
                 school = p.get("unc_school") or "UNC Chapel Hill (per PubMed affiliation)"
@@ -581,7 +583,8 @@ class ReportBuilder:
                     "relationship_type": f"Co-authored publication ({p.get('year', 'n.d.')}) — "
                                          f"{p.get('journal', '')}",
                     "active": "Unknown",
-                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov")],
+                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
+                                "https://pubmed.ncbi.nlm.nih.gov"],
                 })
             for p in (c.get("pubmed_coi") or [])[:2]:
                 known.append({
@@ -590,7 +593,8 @@ class ReportBuilder:
                     "relationship_type": (f"COI / funding disclosure ({p.get('year', 'n.d.')}) — "
                                           f"{p.get('journal', '')}"),
                     "active": "Unknown — review disclosure",
-                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov")],
+                    "sources": [p.get("url", "https://pubmed.ncbi.nlm.nih.gov"),
+                                "https://pubmed.ncbi.nlm.nih.gov"],
                 })
 
         # ── UNC faculty: PIs from NIH grants (named + departmental) plus
@@ -951,6 +955,7 @@ class ReportBuilder:
             "what_unc_offers": offers,
             "signals": signals,
             "unc_alumni": unc_alumni,
+            "sec_only_stub": c.get("_sec_only_stub", False),
         }
 
     def _section5(self, sector: str, companies: List[dict] = None) -> dict:

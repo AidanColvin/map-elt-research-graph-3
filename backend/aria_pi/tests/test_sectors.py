@@ -20,10 +20,10 @@ ROUTING_CASES = [
     ("Solar Panels", None),
     ("HVAC", None),
     ("Coffee", None),
-    ("Video Games", None),
+    ("Video Games", "gaming"),
     ("Craft Beer", None),
     ("Electric Vehicle", None),
-    ("Consumer Electronics", None),
+    ("Consumer Electronics", "consumer electronics"),
     # Curated aliases (whole-string) -> mapped.
     ("AI", "artificial intelligence"),
     ("Healthcare", "healthcare"),

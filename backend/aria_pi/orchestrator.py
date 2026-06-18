@@ -334,7 +334,8 @@ def _empty_company(name: str) -> dict:
     return {"name": name, "facts": {"legal_name": name, "source": "https://www.sec.gov"},
             "trials": [], "unc_trials": [], "pubmed": [], "pubmed_coi": [],
             "nih_grants": [], "unc_alumni": [],
-            "patents": dict(EMPTY_PATENTS), "collab_8ks": {}, "tenk_text": ""}
+            "patents": dict(EMPTY_PATENTS), "collab_8ks": {}, "tenk_text": "",
+            "_sec_only_stub": True}
 
 
 def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
@@ -440,6 +441,7 @@ def _fetch_one_company(name: str, sec, trials, pubmed, nih) -> dict:
         "patents": results["patents"] or dict(EMPTY_PATENTS),
         "collab_8ks": collab_8ks or {},
         "tenk_text": tenk_text or "",
+        "_sec_only_stub": False,
     }
 
 

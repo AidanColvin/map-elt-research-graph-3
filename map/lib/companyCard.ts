@@ -38,6 +38,7 @@ export interface CompanyCardData {
   talkingPoints: CardTalkingPoint[];
   ospFlag: boolean;
   ospGrantCount: number;
+  secOnlyStub?: boolean;
 }
 
 const SEC = "https://www.sec.gov";
@@ -218,6 +219,7 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
     company, problem, goal, solution, contacts, assets, trials,
     rdPeers: rdPeersFinal, talkingPoints,
     ospFlag: grantCount > 0, ospGrantCount: grantCount,
+    secOnlyStub: profile?.sec_only_stub ?? false,
   };
 }
 
