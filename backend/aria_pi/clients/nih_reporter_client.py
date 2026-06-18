@@ -12,8 +12,11 @@ Endpoint:
 Docs:
   https://api.reporter.nih.gov/
 """
+import logging
 import requests
 from typing import List
+
+logger = logging.getLogger(__name__)
 
 ENDPOINT = "https://api.reporter.nih.gov/v2/projects/search"
 
@@ -61,7 +64,7 @@ def unc_pis_from_grants(grants: List[dict], limit: int = 3) -> List[dict]:
             if len(pis) >= limit:
                 break
     except Exception as e:
-        print(f"UNC PI extraction error: {e}")
+        logger.error("nih_reporter: UNC PI extraction failed: %s", e)
         return []
     return pis
 
@@ -103,8 +106,11 @@ class NIHReporterClient:
             r.raise_for_status()
             results = (r.json() or {}).get("results", []) or []
         except Exception as e:
-            print(f"NIH Reporter error for {company_name}: {e}")
+            logger.error("nih_reporter: unc_grants_mentioning request failed for %s: %s", company_name, e)
             return []
+
+        if not results:
+            logger.warning("nih_reporter: unc_grants_mentioning returned 0 results for %s", company_name)
 
         grants = []
         for g in results:
