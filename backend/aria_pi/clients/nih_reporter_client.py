@@ -145,8 +145,9 @@ def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dic
     """UNCFacultyLead list from NIH grants mentioning the company at UNC.
 
     Maps the existing grant records to the UNCFacultyLead shape expected by
-    the talking-points assembler: pi_name, pi_email, department, grant_number,
-    project_title, fiscal_year, award_amount.
+    the talking-points assembler: pi_name, department, grant_number,
+    project_title, fiscal_year, award_amount. (NIH Reporter does not expose
+    PI email publicly, so no pi_email key is emitted.)
     """
     client = NIHReporterClient()
     grants = client.unc_grants_mentioning(company_name, max_results=max_results)
@@ -154,7 +155,6 @@ def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dic
     for g in grants:
         leads.append({
             "pi_name": g.get("pi") or "",
-            "pi_email": "",  # NIH Reporter does not expose PI email publicly
             "department": g.get("department") or "",
             "grant_number": g.get("project_num") or "",
             "project_title": g.get("title") or "",
