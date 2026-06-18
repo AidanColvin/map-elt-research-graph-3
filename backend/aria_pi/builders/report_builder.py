@@ -19,7 +19,7 @@ import urllib.parse
 from datetime import datetime
 from typing import Dict, List, Any
 
-from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS
+from aria_pi.sectors import canonical_sector, SECTOR_NC_SEEDS, domain_for
 from aria_pi.clients.clinicaltrials_client import summarize_phases, unc_site_stats
 from aria_pi.clients.nih_reporter_client import unc_pis_from_grants
 
@@ -51,11 +51,21 @@ class ReportBuilder:
         self.sector_ctx = _load_json("sector_context.json") or {}
         self.datasets = _load_json("unc_datasets.json") or []
         self.programs_blob = _load_json("unc_programs.json") or {}
+        # Datasets relevant to the sector being built. Set per-request in build();
+        # all curated datasets are health/clinical, so they only surface for
+        # health-domain sectors. Defaults to all until build() narrows it.
+        self._sector_datasets = self.datasets
 
     def build(self, sector: str, real_data: dict) -> dict:
         """real_data: {'sector': str, 'companies': [{name, facts, trials, pubmed}]}"""
         ctx = self._sector_ctx(sector)
         companies = real_data.get("companies", []) or []
+        # UNC's curated data assets are all health/clinical. Surfacing the
+        # Carolina Data Warehouse for Health or the Lineberger Cancer Registry as
+        # "UNC Data Assets" for a tech or finance company is irrelevant and reads
+        # as nonsensical, so gate them to health-domain sectors only. Non-health
+        # sectors show no dataset block rather than an off-topic one.
+        self._sector_datasets = self.datasets if domain_for(sector) == "health" else []
 
         s1 = self._section1(ctx, sector, companies)
         s2 = self._section2(sector, companies)
@@ -639,11 +649,12 @@ class ReportBuilder:
             if len(unc_faculty) >= 20:
                 break
 
-        # ── Data assets: show all curated UNC datasets (analysts filter, not us).
+        # ── Data assets: curated UNC datasets relevant to this sector's domain
+        # (all are health/clinical, so empty for non-health sectors).
         data_assets = [
             {"name": d["name"], "description": d["description"],
              "held_by": d.get("held_by", "UNC"), "sources": d.get("sources", [])}
-            for d in self.datasets
+            for d in self._sector_datasets
         ]
 
         # ── Risk flags: any existing UNC partnership warrants OSP review.
@@ -873,23 +884,31 @@ class ReportBuilder:
                             "https://research.unc.edu"],
             })
         if not unc_alignment:
+            # No verified co-authorship or grant overlap on file. Fall back to
+            # the sector-relevant UNC units as a research-area adjacency — framed
+            # honestly as a starting point, NOT as an existing partnership. Use
+            # the company's industry (SIC) rather than a clinical "pipeline"
+            # placeholder, which is nonsensical for non-health companies.
+            company_focus = (pipeline[0]["program"] if pipeline
+                             else (facts.get("sic", "").strip() or f"{c['name']}'s sector"))
             for ctx_unit in (ctx.get("unc_units") or [])[:2]:
+                unit_name = ctx_unit.get("unit", "") or "A UNC research unit"
                 unc_alignment.append({
-                    "company_program": pipeline[0]["program"] if pipeline else "(see pipeline)",
+                    "company_program": company_focus,
                     "unc_unit": ctx_unit.get("unit", ""),
                     "company_fact": (pipeline[0]["program"] if pipeline
-                                     else f"SEC-registered {facts.get('sic', '')}"),
+                                     else (f"SEC-registered · {facts.get('sic', '')}".rstrip(" ·"))),
                     "unc_fact": ctx_unit.get("focus", ""),
-                    "rationale": (f"{ctx_unit.get('unit', 'This UNC unit')} is "
-                                  f"active in {c['name']}'s sector and is the "
-                                  f"natural entry point for a first meeting."),
+                    "rationale": (f"{unit_name} researches in areas adjacent to "
+                                  f"{company_focus} — a potential first point of "
+                                  f"contact, not an existing partnership."),
                     "sources": [ctx_unit.get("url", "https://www.unc.edu"),
                                 "https://research.unc.edu"],
                 })
 
         # What UNC can offer
         offers = []
-        for d in self.datasets[:3]:
+        for d in self._sector_datasets[:3]:
             offers.append({
                 "offering": d["name"],
                 "description": d["description"],
@@ -998,7 +1017,7 @@ class ReportBuilder:
                 {"name": d["name"], "description": d["description"],
                  "relevance": d["description"][:140],
                  "sources": d.get("sources", [])}
-                for d in self.datasets
+                for d in self._sector_datasets
             ],
             "research_capacity": capacity,
             "talent_pipeline": self.programs_blob.get("talent_programs", []),
@@ -1043,7 +1062,7 @@ class ReportBuilder:
                 "know_pipeline": _know_pipeline(c["name"], trials, edgar_url),
                 "know_moves": _know_moves(c["name"], latest_8k, edgar_url),
                 "unc_hook": _unc_hook(c["name"], grants, papers, coi_papers,
-                                      unc_trials, self.datasets),
+                                      unc_trials, self._sector_datasets),
             })
         return {"sector_opening": opening, "companies": cos}
 

@@ -7,6 +7,7 @@ Uses two SEC endpoints:
 import html as _html
 import logging
 import re
+import threading
 import time
 import requests
 from datetime import date, timedelta
@@ -19,6 +20,40 @@ logger = logging.getLogger(__name__)
 
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+
+# Process-wide SEC rate limiter. SEC tolerates ~10 requests/second from a
+# declared User-Agent and returns 403/429 above it. A sector scan now prefetches
+# financials for ~22 companies concurrently (2-3 SEC GETs each), which without a
+# shared throttle bursts well past that limit and zeroes out revenue/CIK
+# sector-wide. This lock+min-interval mirrors the PubMed client's throttle and
+# serializes every SEC GET (across threads) to a safe cadence. Only sec.gov
+# hosts are throttled — external company-website scrapes pass through untouched.
+_SEC_LOCK = threading.Lock()
+_SEC_MIN_INTERVAL = 0.11  # ~9 requests/second, comfortably under SEC's limit
+_sec_last_request = [0.0]
+
+
+def _sec_throttle() -> None:
+    """Block until at least _SEC_MIN_INTERVAL has elapsed since the last SEC GET."""
+    with _SEC_LOCK:
+        wait = _SEC_MIN_INTERVAL - (time.monotonic() - _sec_last_request[0])
+        if wait > 0:
+            time.sleep(wait)
+        _sec_last_request[0] = time.monotonic()
+
+
+# Generic corporate-suffix and sector words that are NOT discriminating on their
+# own. A CIK match must never hinge on one of these alone, or a private company
+# hijacks an unrelated public filer that merely shares a common word — e.g.
+# "Epic Games" → "Motorsport GAMES Inc." or "clean ENERGY" → some "X Energy Corp".
+_GENERIC_NAME_TOKENS = {
+    "games", "technologies", "technology", "systems", "holdings", "holding",
+    "group", "corp", "corporation", "inc", "incorporated", "company", "co",
+    "networks", "network", "solutions", "international", "global", "services",
+    "service", "industries", "partners", "capital", "financial", "energy",
+    "health", "healthcare", "labs", "digital", "data", "media", "platforms",
+    "llc", "ltd", "plc", "the", "and",
+}
 
 
 def _active_cik_titles() -> dict:
@@ -45,6 +80,17 @@ class SECEdgarClient:
         # on every requests.get; the session carries the standard SEC headers.
         self._session = requests.Session()
         self._session.headers.update(HEADERS)
+
+    def _get(self, url: str, **kwargs):
+        """Session GET that respects the process-wide SEC rate limit.
+
+        Throttles only sec.gov hosts (efts/data/www.sec.gov); external company
+        websites scraped for leadership bios are not subject to SEC's limit and
+        pass straight through so they don't slow the scan.
+        """
+        if "sec.gov" in (url or ""):
+            _sec_throttle()
+        return self._session.get(url, **kwargs)
 
     def discover_companies(self, term: str, limit: int = 10) -> List[str]:
         """Find real, currently-traded public companies for ANY free-text term.
@@ -133,7 +179,7 @@ class SECEdgarClient:
                 params["from"] = page * 10
                 time.sleep(0.35)  # be gentle: efts throttles rapid requests
             try:
-                r = self._session.get(self.search_url,
+                r = self._get(self.search_url,
                                       timeout=8, params=params)
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
@@ -167,7 +213,7 @@ class SECEdgarClient:
 
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = self._session.get(url, timeout=6)
+            r = self._get(url, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
@@ -236,7 +282,7 @@ class SECEdgarClient:
         """
         try:
             url = self.companyfacts_url.format(cik=str(cik).zfill(10))
-            r = self._session.get(url, timeout=6)
+            r = self._get(url, timeout=6)
             r.raise_for_status()
             data = r.json()
         except Exception as e:
@@ -249,8 +295,10 @@ class SECEdgarClient:
         def latest_annual(concept_name: str, unit: str, source: dict = us_gaap):
             concept = source.get(concept_name) or {}
             entries = ((concept.get("units") or {}).get(unit) or [])
-            # Prefer 10-K filings (annual). Fall back to most recent.
-            annual = [e for e in entries if e.get("form") == "10-K" and e.get("fp") == "FY"]
+            # Prefer annual filings: 10-K (domestic) or 20-F (foreign private
+            # issuers like Spotify). Fall back to most recent of any form.
+            annual = [e for e in entries
+                      if e.get("form") in ("10-K", "20-F") and e.get("fp") == "FY"]
             pool = annual or entries
             if not pool:
                 return None
@@ -296,7 +344,7 @@ class SECEdgarClient:
             for name in concept_names:
                 concept = src.get(name) or {}
                 for e in ((concept.get("units") or {}).get(unit) or []):
-                    if e.get("form") != "10-K" or e.get("fp") != "FY":
+                    if e.get("form") not in ("10-K", "20-F") or e.get("fp") != "FY":
                         continue
                     fy = e.get("fy")
                     val = e.get("val")
@@ -356,7 +404,7 @@ class SECEdgarClient:
             params = {"q": q, "forms": "8-K", "startdt": start,
                       "enddt": end, "ciks": cik10}
             try:
-                r = self._session.get(self.search_url,
+                r = self._get(self.search_url,
                                       timeout=8, params=params)
                 r.raise_for_status()
                 hits = r.json().get("hits", {}).get("hits", []) or []
@@ -424,7 +472,7 @@ class SECEdgarClient:
         """Most recent 10-K document URL from the full submissions index."""
         try:
             url = self.submissions_url.format(cik=str(cik).zfill(10))
-            r = self._session.get(url, timeout=6)
+            r = self._get(url, timeout=6)
             r.raise_for_status()
             recent = (r.json().get("filings") or {}).get("recent") or {}
             forms = recent.get("form", []) or []
@@ -487,7 +535,7 @@ class SECEdgarClient:
                 'startdt': '2018-01-01',
                 'enddt': date.today().isoformat(),
             }
-            r = self._session.get(self.search_url, timeout=8, params=params)
+            r = self._get(self.search_url, timeout=8, params=params)
             r.raise_for_status()
             hits = r.json().get('hits', {}).get('hits', []) or []
             for hit in hits:
@@ -510,7 +558,7 @@ class SECEdgarClient:
             return url  # already a direct document link
         try:
             assert_public_url(url)  # SSRF guard: only public http(s) hosts
-            r = self._session.get(url, timeout=8)
+            r = self._get(url, timeout=8)
             r.raise_for_status()
             assert_public_url(r.url)  # re-check after any redirect
             # Find .htm links; prefer ones with "proxy" or "def14a" in the name
@@ -529,7 +577,7 @@ class SECEdgarClient:
         """Fetch a proxy document, capped at max_bytes, returned as str."""
         try:
             assert_public_url(url)  # SSRF guard: only public http(s) hosts
-            r = self._session.get(
+            r = self._get(
                 url, timeout=14, stream=True,
             )
             r.raise_for_status()
@@ -573,7 +621,7 @@ class SECEdgarClient:
                 # SSRF guard: the company website is external/SEC-provided, and
                 # requests follows redirects — block any private/metadata host.
                 assert_public_url(url)
-                r = self._session.get(
+                r = self._get(
                     url,
                     headers={'User-Agent': USER_AGENT,
                              'Accept': 'text/html,application/xhtml+xml'},
@@ -631,16 +679,16 @@ class SECEdgarClient:
                 score = 80
             elif q in title.split():
                 score = 60
-            elif len(q) >= 5 and q in title:
-                score = 50
             if score > best_score:
                 best_score = score
                 best = t
-        # Require a reasonably strong match. A bare substring (old score 40)
-        # let private names like "OpenAI" mis-resolve to unrelated public filers
-        # that merely contain the token, producing wrong, "doesn't-make-sense"
-        # company data. We now demand a whole-word or exact match (>= 50).
-        if best and best_score >= 50:
+        # Require a whole-word or exact match (>= 60). The old bare-substring
+        # rule (len(q) >= 5 and q in title, score 50) mis-resolved short private
+        # names embedded in unrelated public titles — e.g. "Pendo" → "oPENDOor
+        # Technologies" — attributing the wrong company's financials. A substring
+        # is no longer sufficient; the name must match a whole title word, a
+        # title prefix, or the ticker/title exactly.
+        if best and best_score >= 60:
             return str(best["cik_str"])
 
         # Fallback to full-text search, but only trust a hit whose resolved
@@ -649,8 +697,15 @@ class SECEdgarClient:
         # naming "OpenAI"), which would attribute the wrong company's data.
         try:
             active = _active_cik_titles()
-            q_tokens = {w for w in q.split() if len(w) >= 4}
-            r = self._session.get(self.search_url,
+            # Significant query tokens: drop generic corporate/sector words so a
+            # single shared common word ("games", "energy") can never satisfy a
+            # match. A full-text hit is trusted only when the resolved title
+            # contains ALL of the query's discriminating tokens (or matches it
+            # exactly / by prefix) — otherwise the hit is just a filer that
+            # *mentions* the name and would attribute the wrong company's data.
+            q_tokens = {w for w in q.split() if len(w) >= 3}
+            sig_tokens = q_tokens - _GENERIC_NAME_TOKENS
+            r = self._get(self.search_url,
                                   params={"q": company_name}, timeout=6)
             r.raise_for_status()
             hits = r.json().get("hits", {}).get("hits", []) or []
@@ -665,7 +720,8 @@ class SECEdgarClient:
                     if not title:
                         continue
                     title_tokens = set(title.split())
-                    if q == title or (q_tokens and q_tokens & title_tokens):
+                    if (q == title or title.startswith(q + " ")
+                            or (sig_tokens and sig_tokens.issubset(title_tokens))):
                         return str(ci)
             return None
         except Exception as e:
