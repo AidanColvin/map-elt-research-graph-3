@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { authFetch } from "@/lib/authFetch";
-import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { CompanyExportBar } from "./CompanyExportBar";
 import { ProjectSaveControl } from "./ProjectSaveControl";
 import { SaveControl } from "./SavedReports";
@@ -114,6 +113,25 @@ function Card({ title, subtitle, children }: { title: string; subtitle: string; 
       <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>{title}</p>
       <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 14px" }}>{subtitle}</p>
       {children}
+    </div>
+  );
+}
+
+// takes: a numeric value, a short label, and an accent color
+// does: renders one at-a-glance metric tile — a large number, an uppercase
+//       label, and a short accent rule that greys out when the value is zero
+// returns: the metric-tile element
+function StatTile({ value, label, accent }: { value: number; label: string; accent: string }) {
+  const has = value > 0;
+  return (
+    <div style={{
+      background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 16,
+      padding: "15px 17px", boxShadow: "0 1px 2px rgba(0,0,0,0.04)",
+      display: "flex", flexDirection: "column", gap: 7,
+    }}>
+      <span style={{ fontSize: "clamp(26px,3vw,32px)", fontWeight: 700, lineHeight: 1, letterSpacing: "-0.02em", color: has ? "#1d1d1f" : "#c4c4cc" }}>{value}</span>
+      <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.07em", textTransform: "uppercase", color: "#8a8a92" }}>{label}</span>
+      <span style={{ height: 3, width: 26, borderRadius: 999, background: has ? accent : "#e8e8ec", marginTop: 1 }} />
     </div>
   );
 }
@@ -564,14 +582,20 @@ export default function PartnershipsView({
                       )}
                     </div>
                   </div>
-                  <div className="workspace-md">
-                    <MarkdownArticle markdown={reportMd.replace(/^#\s+.*\n?/, "")} />
-                  </div>
-                  <hr style={{ border: "none", borderTop: "1px solid rgba(0,0,0,0.08)", margin: "10px 0 0" }} />
-                  <Eyebrow>Interactive detail · clickable sources</Eyebrow>
                 </div>
               );
             })()}
+
+            {/* At-a-glance metrics — the scannable hero of the key signal
+                counts. The full prose report is available from the export bar
+                above (PDF / DOCX / Markdown). */}
+            <div data-testid="partnership-metrics" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(138px, 1fr))", gap: 12 }}>
+              <StatTile value={paperCount} label="Co-authored papers" accent="#2563eb" />
+              <StatTile value={nihGrants} label="NIH grants" accent="#7c3aed" />
+              <StatTile value={uncTrialCount} label="UNC trials" accent="#0891b2" />
+              <StatTile value={coiCount} label="COI disclosures" accent="#d97706" />
+              <StatTile value={secMentions} label="SEC mentions" accent="#475569" />
+            </div>
 
             {/* Typo correction notice */}
             {data.resolved_name &&
@@ -618,8 +642,8 @@ export default function PartnershipsView({
 
               <div style={{ textAlign: "right", minWidth: 150 }}>
                 {isPartner ? (
-                  <p style={{ fontSize: 12.5, color: "#6b6b73", margin: 0, lineHeight: 1.6 }}>
-                    {paperCount} papers · {nihGrants} NIH grants · {uncTrialCount} UNC trials · {secMentions} SEC mentions
+                  <p style={{ fontSize: 12, color: "#9a9aa2", margin: 0, lineHeight: 1.6 }}>
+                    Verified from primary sources<br />PubMed · NIH RePORTER · ClinicalTrials.gov · SEC
                   </p>
                 ) : (
                   <button
