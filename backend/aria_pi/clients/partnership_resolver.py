@@ -12,7 +12,9 @@ the frontend payload can never balloon.
 """
 
 import logging
+import math
 import re
+import unicodedata
 from datetime import datetime
 from urllib.parse import quote_plus
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -25,6 +27,7 @@ from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient, fetch_un
 from aria_pi.clients.patents import fetch_unc_patents
 from aria_pi.clients.relationship_detector import fetch_relationship_signals
 from aria_pi.clients.openalex_client import search_unc_coauthorship
+from aria_pi.clients.partnership_fit import build_fit, infer_domain_tags
 from aria_pi.sectors import (
     canonical_sector, SECTOR_SEEDS, SECTOR_NC_SEEDS, DEFAULT_SEEDS,
 )
@@ -95,7 +98,8 @@ _ORG_WORDS = {
     "network", "consortium", "european", "american", "national", "international",
     "academy", "organization", "organisation", "programme", "program", "federation",
     "center", "centre", "university", "college", "hospital", "clinic", "working",
-    "collaborative", "task", "force", "board", "council", "panel", "team",
+    "collaborative", "collaboration", "task", "force", "board", "council",
+    "panel", "team",
 }
 
 
@@ -110,18 +114,114 @@ def _is_person_name(name: str) -> bool:
     return True
 
 
+def _ascii_fold(s: str) -> str:
+    """Strip diacritics so 'Tüfekçi' and 'Tufekci' compare equal."""
+    return "".join(
+        c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c)
+    )
+
+
+_TITLE_PREFIX_RE = re.compile(
+    r"^(author\s+)?(correction|erratum|reply|comment|editorial|response)\b[:\-\s]*", re.I
+)
+
+
+def _title_fingerprint(title: str) -> str:
+    """Normalize a paper title to a dedupe key: drop an 'Erratum:'/'Reply' lead,
+    lowercase, and strip every non-alphanumeric so cross-source punctuation and
+    casing differences collapse to one identity."""
+    t = _TITLE_PREFIX_RE.sub("", title or "")
+    return re.sub(r"[^a-z0-9]", "", t.lower())
+
+
+def _doi_key(doi: str) -> str:
+    """Normalize a DOI to a comparable key (lowercased, scheme/host stripped)."""
+    if not doi:
+        return ""
+    d = doi.lower().strip()
+    d = re.sub(r"^https?://(dx\.)?doi\.org/", "", d)
+    return d
+
+
+def _display_name(name: str) -> str:
+    """Normalize a name for display: reorder a 'Last, First' form to 'First Last'
+    (OpenAlex occasionally returns 'Chen, Tianlong')."""
+    n = " ".join((name or "").split())
+    if "," in n:
+        last, first = (x.strip() for x in n.split(",", 1))
+        if last and first and " " not in last:        # looks like "Last, First[ M]"
+            n = f"{first} {last}"
+    return n
+
+
+def _person_key(name: str):
+    """Collapse author-name variants to one identity: PubMed's "Rowe SP",
+    OpenAlex's "Steven P. Rowe", "Chen, Tianlong", and accented "Tüfekçi" all
+    resolve to one (last name, first initial) key.
+    """
+    n = _ascii_fold(_display_name(name)).replace(".", "")
+    parts = n.split()
+    if not parts:
+        return (name.lower(),)
+    if len(parts) >= 2 and parts[-1].isupper() and len(parts[-1]) <= 3:
+        # PubMed form: trailing token is the initials block.
+        return (" ".join(parts[:-1]).lower(), parts[-1][0].lower())
+    return (parts[-1].lower(), parts[0][0].lower())
+
+
+def _name_richness(name: str) -> int:
+    """Prefer the spelled-out form ("Steven P. Rowe") over initials ("Rowe SP")
+    when both name a person — more lowercase letters = more informative."""
+    return sum(1 for ch in name if ch.islower())
+
+
+def _paper_weight(total_authors) -> float:
+    """Down-weight a co-authorship on a giant multi-institution paper.
+
+    A UNC author on a 4-person study is a meaningful collaborator; one of 80
+    signatories on a consortium "vision statement" is not. Papers with > 15
+    authors get 1/log2(n) credit so a single mega-consortium paper can't
+    manufacture five "top contacts".
+    """
+    n = total_authors or 0
+    if n > 15:
+        return 1.0 / math.log2(n)
+    return 1.0
+
+
+def _unc_top_authors(papers: list) -> list:
+    """Rank the named UNC authors across a set of verified co-authored papers.
+
+    Tallies ``unc_authors`` (authors whose OWN affiliation is UNC Chapel Hill),
+    NOT every co-author — so the contact list never shows a paper's unrelated
+    non-UNC first author as a "UNC Research Contact". Names are deduped across
+    PubMed/OpenAlex spelling differences (keeping the most informative form),
+    and credit is down-weighted for huge-consortium papers.
+    """
+    counts, display = {}, {}
+    for p in papers:
+        weight = _paper_weight(p.get("total_authors"))
+        seen = set()
+        for a in p.get("unc_authors") or []:
+            if not _is_person_name(a):
+                continue
+            key = _person_key(a)
+            if key in seen:                       # one credit per paper per person
+                continue
+            seen.add(key)
+            counts[key] = counts.get(key, 0) + weight
+            if key not in display or _name_richness(a) > _name_richness(display[key]):
+                display[key] = a
+    ordered = sorted(counts.items(), key=lambda kv: -kv[1])
+    return [_display_name(display[key]) for key, _ in ordered][:5]
+
+
 def resolve_pubmed(company_name: str, pubmed: PubMedClient) -> dict:
     try:
         papers = pubmed.search_unc_with_company(company_name, max_results=8) or []
-        tally = {}
-        for p in papers:
-            for a in p.get("authors") or []:
-                tally[a] = tally.get(a, 0) + 1
-        top_authors = [
-            a for a, _ in sorted(tally.items(), key=lambda kv: -kv[1])
-            if _is_person_name(a)
-        ][:5]
-        return {"count": len(papers), "top_authors": top_authors, "papers": papers}
+        return {"count": len(papers),
+                "top_authors": _unc_top_authors(papers),
+                "papers": papers}
     except Exception as e:
         logger.error("partnership_resolver: PubMed resolve failed for %s: %s", company_name, e)
         return {"count": 0, "top_authors": [], "papers": []}
@@ -273,13 +373,22 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     # Merge OpenAlex papers into clinical, deduped by lowercased title so a
     # paper found in both PubMed and OpenAlex is not counted twice.
     openalex_papers = results.get("openalex") or []
-    if openalex_papers:
-        seen = {p["title"].lower() for p in clinical["papers"]}
-        for p in openalex_papers:
-            if p["title"].lower() not in seen:
-                seen.add(p["title"].lower())
-                clinical["papers"].append(p)
-        clinical["count"] = len(clinical["papers"])
+    # Merge PubMed + OpenAlex and dedupe on a normalized title fingerprint (and
+    # DOI when present). The old key was the raw lowercased title, so the same
+    # work counted twice whenever punctuation/casing differed across sources or
+    # an "Erratum:"/"Reply" variant appeared — inflating paper counts ~2x.
+    merged, seen = [], set()
+    for p in (clinical["papers"] or []) + openalex_papers:
+        keys = {k for k in (_doi_key(p.get("doi")), _title_fingerprint(p.get("title", ""))) if k}
+        if keys & seen:
+            continue
+        seen |= keys
+        merged.append(p)
+    clinical["papers"] = merged
+    clinical["count"] = len(merged)
+    # Re-rank UNC contacts across the deduped PubMed + OpenAlex set so a UNC
+    # author found only via OpenAlex is also surfaced.
+    clinical["top_authors"] = _unc_top_authors(merged)
     coi = results.get("coi") or {"count": 0, "papers": [], "window_years": _COI_WINDOW_YEARS}
     unc_units = results.get("unc_units") or []
     financial = results.get("financial") or {"quotes": [], "filing_url": "", "cik": ""}
@@ -294,6 +403,15 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     relationship_signals = fetch_relationship_signals(
         company_name, financial, coi, trials["unc_trials"]
     )
+
+    # Partnership Fit — which UNC unit fits, what the tie looks like (or could),
+    # and why. Only pay for a SIC lookup when the company can't already be
+    # classified from the curated map or the units it co-publishes with.
+    sic = ""
+    if not infer_domain_tags(company_name):
+        sic = sec.sic_for_cik(financial.get("cik", ""))
+    fit = build_fit(target, sic, unc_units, nih["grants"],
+                    clinical["papers"], trials["unc_trials"])
 
     return {
         "query": company_name,
@@ -313,6 +431,7 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
         "unc_patents": unc_patents,
         "unc_joint_trials": unc_joint_trials,
         "relationship_signals": relationship_signals,
+        "fit": fit,
         "mention_count": clinical["count"] + coi["count"] + len(financial["quotes"]) + len(ecosystem),
     }
 

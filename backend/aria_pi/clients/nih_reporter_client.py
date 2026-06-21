@@ -13,14 +13,27 @@ Docs:
   https://api.reporter.nih.gov/
 """
 import logging
+import re
 import requests
 from typing import List
+
+from aria_pi.utils.affiliation import company_aliases
 
 logger = logging.getLogger(__name__)
 
 ENDPOINT = "https://api.reporter.nih.gov/v2/projects/search"
 
 _UNC_ORG_KEYWORDS = ("north carolina", "unc", "chapel hill")
+
+# Core award id inside an NIH project number, e.g. "5R01AI186609-03A1" -> the
+# IC + serial "AI186609". All fiscal-year rows of one award share this core, so
+# it is the right key for collapsing renewals into a single grant.
+_CORE_AWARD_RE = re.compile(r"([A-Z]{2}\d{6,8})")
+
+
+def _core_award_id(project_num: str) -> str:
+    m = _CORE_AWARD_RE.search(project_num or "")
+    return m.group(1) if m else (project_num or "")
 
 
 def _coerce_award(value) -> int:
@@ -100,15 +113,23 @@ class NIHReporterClient:
         Returns a list of dicts with PI, department, project number, agency,
         award year, fiscal year, and a stable reporter.nih.gov project URL.
         """
+        # Match the company as a QUOTED PHRASE in the grant's text fields, using
+        # its real corporate names. The previous `operator:"and", field:"all"`
+        # tokenized the name and matched the tokens anywhere, so "Duke Energy"
+        # hit "...energy..." grants, "Bandwidth" hit fMRI "signal bandwidth",
+        # and "Meta" hit "metabolic". Quoted phrases + corporate aliases (Meta →
+        # "Meta Platforms"/"Facebook") keep the grant-mention signal honest.
+        phrases = company_aliases(company_name) or [company_name]
+        search_text = " OR ".join(f'"{p}"' for p in phrases)
         payload = {
             "criteria": {
                 "org_names": [
                     "UNIV OF NORTH CAROLINA CHAPEL HILL",
                 ],
                 "advanced_text_search": {
-                    "operator": "and",
-                    "search_field": "all",
-                    "search_text": company_name,
+                    "operator": "advanced",
+                    "search_field": "projecttitle,abstracttext,terms",
+                    "search_text": search_text,
                 },
             },
             "include_fields": [
@@ -117,7 +138,10 @@ class NIHReporterClient:
                 "AgencyIcAdmin", "ProjectStartDate", "ProjectEndDate",
             ],
             "offset": 0,
-            "limit": max_results,
+            # Over-fetch: a single award appears once per funded fiscal year, so
+            # we pull extra rows and collapse them by core award id below, then
+            # keep the top `max_results` DISTINCT grants.
+            "limit": min(max(max_results * 6, 30), 50),
             "sort_field": "fiscal_year",
             "sort_order": "desc",
         }
@@ -174,7 +198,18 @@ class NIHReporterClient:
                 "agency": g.get("agency_ic_admin", {}).get("name", "") if isinstance(g.get("agency_ic_admin"), dict) else "",
                 "url": f"https://reporter.nih.gov/project-details/{proj_num}" if proj_num else "https://reporter.nih.gov",
             })
-        return grants
+        # Collapse the multiple fiscal-year rows of one award into a single grant
+        # (a 5-year R01 returns up to 5 rows for the same core id), keeping the
+        # most recent year, then return the top distinct grants. Without this a
+        # single ongoing grant was counted as 5, fabricating "5 NIH ties".
+        distinct = {}
+        for g in grants:
+            core = _core_award_id(g["project_num"])
+            cur = distinct.get(core)
+            if cur is None or str(g.get("fiscal_year", "")) > str(cur.get("fiscal_year", "")):
+                distinct[core] = g
+        deduped = sorted(distinct.values(), key=lambda g: str(g.get("fiscal_year", "")), reverse=True)
+        return deduped[:max_results]
 
 
 def fetch_unc_faculty_leads(company_name: str, max_results: int = 5) -> List[dict]:
