@@ -22,6 +22,10 @@ class FakeResponse:
         self._content = content or text.encode("utf-8")
         self._raise_exc = raise_exc
 
+    @property
+    def content(self):
+        return self._content
+
     def json(self):
         if self._json is None:
             raise ValueError("No JSON payload")

@@ -226,6 +226,23 @@ class SECEdgarClient:
         ranked = sorted(order, key=lambda ci: (-freq[ci], first_seen[ci]))
         return [active[ci] for ci in ranked[:limit]]
 
+    def sic_for_cik(self, cik: str) -> str:
+        """Lightweight SIC-description lookup for a known CIK (no XBRL/filings).
+
+        Used by the partnership-fit layer to classify a company's industry when
+        it isn't in the curated domain map. Returns "" on any failure.
+        """
+        if not cik:
+            return ""
+        try:
+            url = self.submissions_url.format(cik=str(cik).zfill(10))
+            r = self._get(url, timeout=6)
+            r.raise_for_status()
+            return str(r.json().get("sicDescription") or "")
+        except Exception as e:
+            logger.warning("SEC sic_for_cik error: %s", e)
+            return ""
+
     def get_company_facts(self, company_name: str) -> dict:
         """Search EDGAR for a company and return enriched facts.
 

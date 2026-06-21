@@ -24,6 +24,8 @@ import logging
 import requests
 from typing import List
 
+from aria_pi.utils.affiliation import company_affiliation_regex
+
 logger = logging.getLogger(__name__)
 
 UNC_ROR = "https://ror.org/0130frc33"
@@ -32,7 +34,7 @@ USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 TIMEOUT = 8
 
 _SELECT = ",".join([
-    "id", "title", "publication_year", "primary_location",
+    "id", "doi", "title", "publication_year", "primary_location",
     "authorships", "open_access",
 ])
 
@@ -79,6 +81,12 @@ def search_unc_coauthorship(company_name: str, max_results: int = 8) -> List[dic
         logger.error("openalex: search failed for %s: %s", company_name, e)
         return []
 
+    # OpenAlex's raw_affiliation_strings.search is a fuzzy match, so "Meta"
+    # still pulls "Meta-Research"/"metabolic" works. Re-verify each work the
+    # same way the PubMed client does: keep it only if a UNC-Chapel-Hill author
+    # (by ROR) and a real company author are BOTH present, and name the UNC
+    # author(s) so the contact list shows actual UNC people.
+    company_re = company_affiliation_regex(company_name)
     papers: List[dict] = []
     for w in results:
         title = (w.get("title") or "").strip()
@@ -89,18 +97,40 @@ def search_unc_coauthorship(company_name: str, max_results: int = 8) -> List[dic
         source_obj = loc.get("source") or {}
         journal = (source_obj.get("display_name") or "").strip()
         url = _build_url(w)
+
+        authorships = w.get("authorships") or []
+        total_authors = len(authorships)
         authors: List[str] = []
-        for a in (w.get("authorships") or [])[:6]:
+        unc_authors: List[str] = []
+        has_company = False
+        for a in authorships:
             name = ((a.get("author") or {}).get("display_name") or "").strip()
-            if name:
+            insts = a.get("institutions") or []
+            affs = list(a.get("raw_affiliation_strings") or [])
+            affs += [i.get("display_name") for i in insts if i.get("display_name")]
+            joined = " ; ".join(s for s in affs if s)
+            is_unc = any(i.get("ror") == UNC_ROR for i in insts)
+            if name and len(authors) < 6:
                 authors.append(name)
+            if name and is_unc:
+                unc_authors.append(name)
+            if company_re and company_re.search(joined):
+                has_company = True
+
+        # Drop works that are not a genuine UNC×company co-authorship.
+        if not (unc_authors and has_company):
+            continue
+
         papers.append({
             "pmid": "",
+            "doi": w.get("doi") or "",
             "title": title,
             "year": year,
             "journal": journal,
             "url": url,
             "authors": authors,
+            "unc_authors": list(dict.fromkeys(unc_authors))[:5],
+            "total_authors": total_authors,
             "source": "OpenAlex",
         })
 

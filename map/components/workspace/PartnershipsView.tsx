@@ -61,11 +61,30 @@ export interface TalkingPoint {
   strength: 'high' | 'medium' | 'low';
 }
 
+export interface FitUnit {
+  key: string;
+  name: string;
+  url: string;
+  why: string;
+  current: string;
+  documented: boolean;
+  evidence_papers: number;
+  forms: string[];
+}
+export interface PartnershipFit {
+  headline: string;
+  summary: string;
+  has_documented_tie: boolean;
+  caveat?: string;
+  best_units: FitUnit[];
+}
+
 export interface PartnerData {
   query: string;
   resolved_name?: string;
   type: PartnerType;
   links?: { pubmed?: string; edgar?: string; unc_web?: string };
+  fit?: PartnershipFit;
   clinical: { count: number; top_authors: string[]; papers: Paper[] };
   coi?: { count: number; papers: Paper[]; window_years: number };
   unc_units?: Unit[];
@@ -302,6 +321,55 @@ function unitInfo(name: string) {
   return UNC_UNIT_INFO.find((u) => u.match.test(name));
 }
 
+// takes: the backend-computed partnership fit and the resolved company name
+// does: renders the "UNC Partnership Fit" card — which UNC unit fits, what the
+//       tie looks like today (or could look like), and why. Every line is the
+//       deterministic recommender's output (no invented partnerships).
+// returns: the fit card, or null when no fit was computed
+function FitCard({ fit }: { fit?: PartnershipFit }) {
+  if (!fit || !fit.best_units?.length) return null;
+  return (
+    <div data-testid="partnership-fit" style={{ background: "#fff", border: "1px solid rgba(0,0,0,0.06)", borderRadius: 18, padding: 22, boxShadow: "0 8px 30px rgba(0,0,0,0.04)" }}>
+      <Eyebrow>UNC Partnership Fit</Eyebrow>
+      <p style={{ fontSize: 16, fontWeight: 700, letterSpacing: "-0.01em", margin: "8px 0 4px", color: "#1d1d1f" }}>{fit.headline}</p>
+      <p style={{ fontSize: 13.5, color: "#3a3a40", margin: 0, lineHeight: 1.5, maxWidth: 680 }}>{fit.summary}</p>
+
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 14, marginTop: 18 }}>
+        {fit.best_units.map((u) => (
+          <div key={u.key} style={{ border: "1px solid rgba(0,0,0,0.07)", borderRadius: 14, padding: "14px 16px", background: "#fcfcfd" }}>
+            <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+              <a href={u.url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 14, fontWeight: 700, color: "#1d1d1f", textDecoration: "none" }}>{u.name}</a>
+              <span style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", whiteSpace: "nowrap",
+                borderRadius: 999, padding: "3px 9px",
+                color: u.documented ? "#15803d" : "#5b6cff",
+                background: u.documented ? "#dcfce7" : "#eef0ff",
+              }}>
+                {u.documented ? `Engaged · ${u.evidence_papers} paper${u.evidence_papers !== 1 ? "s" : ""}` : "Opportunity"}
+              </span>
+            </div>
+            <p style={{ fontSize: 12, color: "#6b6b73", margin: "7px 0 0", lineHeight: 1.45 }}>{u.current}</p>
+            <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase", color: "#9a9aa2", margin: "12px 0 5px" }}>
+              {u.documented ? "How to deepen it" : "What it could look like"}
+            </p>
+            <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 5 }}>
+              {u.forms.map((f, i) => (
+                <li key={i} style={{ fontSize: 12.5, color: "#3a3a40", lineHeight: 1.4, paddingLeft: 14, position: "relative" }}>
+                  <span style={{ position: "absolute", left: 0, color: "#c4c4cc" }}>→</span>{f}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+      </div>
+
+      {fit.caveat ? (
+        <p style={{ fontSize: 12.5, color: "#9a6b4a", margin: "14px 0 0", lineHeight: 1.45 }}>⚠ {fit.caveat}</p>
+      ) : null}
+    </div>
+  );
+}
+
 export function buildPartnershipMarkdown(data: PartnerData): string {
   const resolvedName = data.resolved_name ?? data.query;
   const paperCount = data.clinical.count;
@@ -411,6 +479,31 @@ export function buildPartnershipMarkdown(data: PartnerData): string {
     L.push("_No official UNC web mentions found._");
   }
   L.push("");
+
+  // UNC Partnership Fit — which unit fits, what the tie looks like (or could),
+  // and why. Comes straight from the backend's deterministic recommender.
+  if (data.fit) {
+    const fit = data.fit;
+    L.push("## UNC Partnership Fit");
+    L.push("");
+    L.push(`**${fit.headline}.** ${fit.summary}`);
+    L.push("");
+    for (const u of fit.best_units) {
+      const tag = u.documented
+        ? `Already engaged — ${u.evidence_papers} paper${u.evidence_papers !== 1 ? "s" : ""}`
+        : "Open opportunity";
+      L.push(`### ${u.name}  _(${tag})_`);
+      L.push(`- **Why:** ${u.why}`);
+      L.push(`- **Today:** ${u.current}`);
+      L.push(`- **What it could look like:** ${u.forms.join("; ")}`);
+      if (u.url) L.push(`- ${u.url}`);
+      L.push("");
+    }
+    if (fit.caveat) {
+      L.push(`> ⚠ ${fit.caveat}`);
+      L.push("");
+    }
+  }
 
   L.push(`## ${isPartner ? "Deepen the Relationship" : "Why UNC"}`);
   L.push("");
@@ -759,6 +852,11 @@ export default function PartnershipsView({
                 )}
               </div>
             </div>
+
+            {/* UNC Partnership Fit — which unit fits, what the tie looks like
+                (or could), and why. Answers the BD question the raw signals
+                don't: where should this company sit at UNC? */}
+            <FitCard fit={data.fit} />
 
             {/* Jump-to-source links */}
             {data.links && (
