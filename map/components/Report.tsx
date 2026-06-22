@@ -644,10 +644,6 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
     .map((p) => ({ label: p.company_name, value: p.pipeline?.length || 0 }))
     .filter((d) => d.value > 0)
     .sort((a, b) => b.value - a.value);
-  const alignData = profiles
-    .map((p) => ({ label: p.company_name, value: p.unc_alignment?.length || 0 }))
-    .filter((d) => d.value > 0)
-    .sort((a, b) => b.value - a.value);
   const rdData = profiles
     .map((p) => ({ label: p.company_name, value: parseMoney(p.facts?.['rd expense']?.value || p.facts?.['rd_expense']?.value) }))
     .filter((d) => d.value > 0)
@@ -870,11 +866,6 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
             ])}
           />
         ) : <Empty label="None identified." />}
-        {alignData.length > 0 && (
-          <div style={styles.chartGridSingle}>
-            <HBars title="UNC alignment signals by company" subtitle="Matched grants, trials, and publications" data={alignData} />
-          </div>
-        )}
 
         <H3>2.2 UNC Faculty with Verified Sector Expertise</H3>
         {data.section2_internal_mapping.unc_faculty?.length ? (

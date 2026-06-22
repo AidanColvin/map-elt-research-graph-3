@@ -9,6 +9,7 @@
  * left empty and its section is omitted, never fabricated.
  */
 import { parseMoney } from "@/components/Report";
+import { isHealthSector, looksClinical, visiblePipeline } from "@/lib/domain";
 
 export interface CardBullet { text: string; url?: string }
 export interface CardStat { value: string; label: string }
@@ -97,8 +98,24 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const metaLine = [ticker, hq, cik && `CIK ${cik}`, fyEnd && `FY end ${fyEnd}`]
     .filter(Boolean).join(" · ");
 
-  const pipeline: any[] = Array.isArray(profile?.pipeline) ? profile.pipeline : [];
-  const uncAlignment: any[] = Array.isArray(profile?.unc_alignment) ? profile.unc_alignment : [];
+  // Sector domain — clinical-trial content is only legitimate for health/
+  // life-sciences sectors. For everything else (streaming, banks, retail) the
+  // pipeline/trial rows are ClinicalTrials.gov sponsor-name-collision false
+  // positives and must be gated out. Single source of truth: lib/domain.ts.
+  const health = isHealthSector(report?.report_meta?.sector);
+  const rawPipeline: any[] = Array.isArray(profile?.pipeline) ? profile.pipeline : [];
+  const pipeline: any[] = visiblePipeline(rawPipeline, health);
+  const uncAlignment: any[] = (Array.isArray(profile?.unc_alignment) ? profile.unc_alignment : [])
+    // Drop placeholder/non-informative overlaps ("(see SEC filings)", bare
+    // "Research overlap") and — for non-health sectors — clinical false
+    // positives, so the Goal/Solution sections read honestly instead of echoing
+    // sponsor-name-collision trial titles.
+    .filter((a: any) => {
+      const prog = (a?.company_program || "").trim();
+      if (!prog || /^\(see\b/i.test(prog) || /^research overlap$/i.test(prog)) return false;
+      if (!health && looksClinical(`${prog} ${a?.unc_fact || ""} ${a?.rationale || ""}`)) return false;
+      return true;
+    });
   const whatOffers: any[] = Array.isArray(profile?.what_unc_offers) ? profile.what_unc_offers : [];
   const uncPis: any[] = Array.isArray(profile?.unc_pis) ? profile.unc_pis : [];
   const collabCount: number = Number(profile?.collaboration_8k_count) || 0;
@@ -139,7 +156,7 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const sic = fv("sic");
   const programs = pipeline.slice(0, 3).map((p) => p.program).filter(Boolean).join(", ");
   if (sic || programs) company.push({ text: `Focus · ${[sic, programs].filter(Boolean).join(" — ")}`, url: edgarUrl });
-  if (pipeline.length) company.push({ text: `Clinical pipeline · ${pipeline.length} trial${pipeline.length === 1 ? "" : "s"} on ClinicalTrials.gov`, url: firstTrialUrl });
+  if (health && pipeline.length) company.push({ text: `Clinical pipeline · ${pipeline.length} trial${pipeline.length === 1 ? "" : "s"} on ClinicalTrials.gov`, url: firstTrialUrl });
   if (partnershipTerms > 0) company.push({ text: `Partnership signal · ${partnershipTerms} partnership-language mention${partnershipTerms === 1 ? "" : "s"} in latest 10-K`, url: edgarUrl });
   if (collabCount > 0) company.push({ text: `Deal track · ${collabCount} collaboration/licensing 8-K${collabCount === 1 ? "" : "s"}${collab8kDate ? ` (latest ${collab8kDate})` : ""}`, url: collab8kUrl });
   company.push({ text: `UNC status · ${uncStatus}${grantCount ? ` · ${grantCount} NIH grant${grantCount === 1 ? "" : "s"} overlapping` : ""}`, url: grantCount ? (uncPis[0]?.grant_url) : edgarUrl });
@@ -148,19 +165,30 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const problem: CardBullet[] = [];
   if (collabCount === 0) problem.push({ text: "No collaboration or licensing 8-K on file (2018–present)", url: edgarUrl });
   if (!profile?.existing_unc_tie) problem.push({ text: "No documented UNC research tie found in public databases", url: edgarUrl });
-  if (pipeline.length) problem.push({ text: `${pipeline.length} active trial${pipeline.length === 1 ? "" : "s"} — clinical evidence is being generated now`, url: firstTrialUrl });
+  if (health && pipeline.length) problem.push({ text: `${pipeline.length} active trial${pipeline.length === 1 ? "" : "s"} — clinical evidence is being generated now`, url: firstTrialUrl });
 
-  // Goal — sourced UNC overlaps (where company work meets a UNC unit).
-  const goal: CardBullet[] = uncAlignment.slice(0, 3).map((a) => ({
-    text: `${trunc(a.company_program || "Research overlap", 60)} → ${a.unc_unit || "UNC"}`,
-    url: firstSource(a.sources),
-  }));
+  // Goal — sourced UNC overlaps (where company work meets a UNC unit), deduped
+  // (the backend can emit the same overlap several times).
+  const goalSeen = new Set<string>();
+  const goal: CardBullet[] = [];
+  for (const a of uncAlignment) {
+    const text = `${trunc(a.company_program, 60)} → ${a.unc_unit || "UNC"}`;
+    if (goalSeen.has(text)) continue;
+    goalSeen.add(text);
+    goal.push({ text, url: firstSource(a.sources) });
+    if (goal.length >= 3) break;
+  }
 
-  // Solution — sourced "why it matters" rationale.
-  const solution: CardBullet[] = uncAlignment.slice(0, 3).map((a) => ({
-    text: trunc(a.rationale || a.unc_fact || "", 140),
-    url: firstSource(a.sources),
-  })).filter((b) => b.text);
+  // Solution — sourced "why it matters" rationale, deduped.
+  const solSeen = new Set<string>();
+  const solution: CardBullet[] = [];
+  for (const a of uncAlignment) {
+    const text = trunc(a.rationale || a.unc_fact || "", 140);
+    if (!text || solSeen.has(text)) continue;
+    solSeen.add(text);
+    solution.push({ text, url: firstSource(a.sources) });
+    if (solution.length >= 3) break;
+  }
 
   // UNC contacts — named PIs with their grant link (sourced to RePORTER).
   const contacts: CardContact[] = uncPis.slice(0, 6).map((p) => ({
@@ -203,10 +231,25 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   // Talking points — from the report's sourced talking-point block.
   const tpEntry = (report?.section6_talking_points?.companies || []).find((c: any) => c.company === name);
   const talkingPoints: CardTalkingPoint[] = [];
+  // Drop low-signal talking points: generic 8-K "material event" filler, bare
+  // revenue restatements (already in the stat tile), and ClinicalTrials.gov
+  // boilerplate. Clinical content is additionally dropped on non-health sectors.
+  const TP_DROP = [
+    /filed its most recent 8-K/i,
+    /material event disclosure/i,
+    /reported FY\d*\s+revenue of/i,
+    /no active ClinicalTrials\.gov entries/i,
+  ];
   for (const key of ["unc_hook", "know_pipeline", "know_moves", "know_company"]) {
+    // `know_pipeline` is inherently a clinical-trial summary ("lead disclosed
+    // study is …" / "no active ClinicalTrials.gov entries"); irrelevant for
+    // non-health sectors.
+    if (!health && key === "know_pipeline") continue;
     const s = tpEntry?.[key];
     if (!s?.text) continue;
     const txt: string = s.text;
+    if (TP_DROP.some((re) => re.test(txt))) continue;
+    if (!health && looksClinical(txt)) continue;
     const dash = txt.indexOf(" — ");
     const bold = dash > 0 ? txt.slice(0, dash) : txt.split(" ").slice(0, 5).join(" ");
     const rest = dash > 0 ? txt.slice(dash + 3) : txt.slice(bold.length);

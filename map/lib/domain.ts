@@ -38,16 +38,19 @@ export function looksClinical(text?: string): boolean {
 }
 
 // takes: a company's pipeline rows and whether the sector is health
-// does: for non-health sectors, drops rows that read as clinical-trial
-//       contamination; health sectors are returned untouched
+// does: a `profile.pipeline` row is always a ClinicalTrials.gov entry, so for a
+//       NON-health sector EVERY row is a sponsor-name-collision false positive
+//       (a streaming/bank/retail company does not run clinical trials) — these
+//       are dropped wholesale. Keyword matching alone is insufficient because
+//       real study titles ("Hemodynamic Repercussions … in Premature Newborn")
+//       carry no clinical keyword. Health sectors are returned untouched.
 // returns: the pipeline rows safe to render for this sector
 export function visiblePipeline<T extends { program?: string; indication?: string; stage?: string }>(
   pipeline: T[] | undefined,
   health: boolean,
 ): T[] {
   const list = Array.isArray(pipeline) ? pipeline : [];
-  if (health) return list;
-  return list.filter((r) => !looksClinical(`${r.program || ""} ${r.indication || ""} ${r.stage || ""}`));
+  return health ? list : [];
 }
 
 // takes: a section-3 "UNC Alignment" string and whether the sector is health
