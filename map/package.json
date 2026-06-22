@@ -11,7 +11,8 @@
     "test": "playwright test",
     "test:e2e": "playwright test",
     "test:unit": "vitest run",
-    "test:install": "playwright install --with-deps chromium"
+    "test:install": "playwright install --with-deps chromium",
+    "shoot": "node scripts/shoot.mjs"
   },
   "dependencies": {
     "@sentry/nextjs": "^8.55.2",
@@ -36,6 +37,7 @@
     "@types/react": "^19.0.7",
     "@types/react-dom": "^19.0.3",
     "autoprefixer": "^10.5.0",
+    "playwright": "^1.61.0",
     "postcss": "^8.5.15",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.7.3",
