@@ -105,7 +105,7 @@ test('All nav tabs still work after Package completes', async ({ page }) => {
   await page.getByTestId('package-btn').click();
   await expect(page.getByTestId('package-done')).toBeVisible({ timeout: 60000 });
 
-  for (const label of ['Dashboard', 'Company', 'Sector', 'UNC', 'Database']) {
+  for (const label of ['Dashboard', 'Company', 'Sector', 'Partnerships', 'Data']) {
     await clickNav(page, label);
     await page.waitForTimeout(600);
     const body = await page.locator('body').innerText();
@@ -114,12 +114,12 @@ test('All nav tabs still work after Package completes', async ({ page }) => {
   }
 });
 
-test('Database tab loads without crash after Package', async ({ page }) => {
+test('Data tab loads without crash after Package', async ({ page }) => {
   test.setTimeout(120000);
   await runScanAndWait(page);
   await page.getByTestId('package-btn').click();
   await expect(page.getByTestId('package-done')).toBeVisible({ timeout: 60000 });
-  await clickNav(page, 'Database');
+  await clickNav(page, 'Data');
   await page.waitForTimeout(1000);
   const body = await page.locator('body').innerText();
   expect(body).not.toContain('This page could not be found');

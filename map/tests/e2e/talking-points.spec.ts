@@ -67,7 +67,7 @@ test.beforeEach(async ({ page }) => {
 
 async function goToUNCTab(page: Page) {
   await gotoWorkspace(page);
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
 }
 
@@ -92,8 +92,9 @@ test('Talking Points card renders both mocked headlines', async ({ page }) => {
 test('"Copy all as text" button copies talking points to clipboard', async ({ page }) => {
   test.setTimeout(60000);
 
-  // Grant clipboard-write permission.
-  await page.context().grantPermissions(['clipboard-write']);
+  // Grant clipboard read + write — the test writes via the Copy button and then
+  // reads the clipboard back to verify (readText needs clipboard-read).
+  await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
 
   await goToUNCTab(page);
   await runSearch(page);
