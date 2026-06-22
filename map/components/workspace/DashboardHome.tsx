@@ -3,6 +3,7 @@
 import { useState, useRef } from "react";
 import { OrbitNetwork } from "@/components/Chart3D";
 import { getCompanySuggestion } from "./companySuggestions";
+import MapOnePager from "./MapOnePager";
 
 const ORBIT_POINTS = [
   { label: "Merck",       size: 0.8,  highlight: true  },
@@ -374,6 +375,11 @@ export default function DashboardHome({
         <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase" }}>
           Free · Keyless · Primary-Source
         </p>
+      </div>
+
+      {/* How MAP works — visual one-pager (distinct section, full-width parent) */}
+      <div style={{ marginTop: 32, paddingTop: 20, borderTop: "1px solid #f2f2f7" }}>
+        <MapOnePager />
       </div>
     </div>
   );
