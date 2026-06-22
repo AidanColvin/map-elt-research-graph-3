@@ -65,6 +65,49 @@ def test_is_actual_sponsor_empty_name_is_false():
     assert _is_actual_sponsor("", "Anything", ["Other"]) is False
 
 
+def test_is_actual_sponsor_rejects_namesake_institution():
+    """
+    Takes: "Amazon" vs the Brazilian "Amazon University" (lead and as a
+           collaborator) — the real sponsor-name collision that attached
+           premature-newborn trials to the retailer.
+    Does: Checks sponsorship.
+    Returns: False — a commercial company is not its academic namesake.
+    """
+    assert _is_actual_sponsor("Amazon", "Amazon University", []) is False
+    assert _is_actual_sponsor("Amazon", "Max O'Donnell", ["Amazon University"]) is False
+    assert _is_actual_sponsor("Apple", "Apple County Hospital", []) is False
+
+
+def test_is_actual_sponsor_keeps_real_company_and_institutional_company():
+    """
+    Takes: A real Amazon sponsor (no institution word) and an institutional
+           company ("Mayo Clinic") matching its own clinic trial.
+    Does: Checks sponsorship.
+    Returns: True for both — the institution guard only fires when the company
+             itself is not an institution.
+    """
+    assert _is_actual_sponsor("Amazon", "Amazon.com Services LLC", []) is True
+    assert _is_actual_sponsor("Mayo Clinic", "Mayo Clinic", []) is True
+
+
+def test_search_by_sponsor_drops_namesake_institution():
+    """
+    Takes: A payload with a genuine company trial and an "Amazon University"
+           decoy.
+    Does: Searches by sponsor for the company.
+    Returns: Only the genuine trial; the namesake-institution decoy is dropped.
+    """
+    client = ClinicalTrialsClient()
+    payload = {"studies": [
+        _study("Amazon.com Services LLC", nct="NCT_REAL", title="Real Amazon Study"),
+        _study("Amazon University", nct="NCT_DECOY",
+               title="Hemodynamic Repercussions in Premature Newborn"),
+    ]}
+    with patch.object(client._session, "get", return_value=FakeResponse(payload)):
+        trials = client.search_by_sponsor("Amazon")
+    assert [t["nct_id"] for t in trials] == ["NCT_REAL"]
+
+
 def test_detect_unc_finds_affiliation():
     """
     Takes: A list of facility/collaborator strings, one UNC-affiliated.

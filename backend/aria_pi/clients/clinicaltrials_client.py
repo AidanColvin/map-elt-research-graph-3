@@ -14,6 +14,20 @@ from typing import List
 _NOISE = {'inc', 'corp', 'ltd', 'llc', 'lp', 'plc', 'co', 'the', 'and',
           'of', 'for', 'a', 'an', 'is', 'by', 'at'}
 
+# Tokens that mark a sponsor as an academic / medical / government INSTITUTION
+# (incl. common ES/PT/FR/DE forms — many ClinicalTrials.gov sponsors are
+# international). A commercial company that merely shares a word with such an
+# entity ("Amazon" vs "Amazon University", "Apple" vs an "Apple County Hospital")
+# is NOT the trial's sponsor. Used to reject those collisions.
+_INSTITUTION = {
+    'university', 'universidad', 'universidade', 'universite', 'universitario',
+    'universitaria', 'universitat', 'college', 'hospital', 'hospitalar',
+    'hopital', 'clinic', 'clinica', 'klinik', 'klinikum', 'institute',
+    'instituto', 'institut', 'foundation', 'fundacao', 'fundacion', 'center',
+    'centre', 'centro', 'zentrum', 'ministry', 'school', 'escola', 'academy',
+    'academia', 'hospitais', 'sanitaria', 'sanitario',
+}
+
 
 def _sponsor_tokens(name: str) -> set:
     """Meaningful lowercase tokens from an org name, noise words removed."""
@@ -29,13 +43,30 @@ def _is_actual_sponsor(company_name: str, lead: str, collabs: List[str]) -> bool
     trials showed up under Apple Inc.; random research devices under Samsung.
     This check requires the company's meaningful name tokens to overlap with
     those of the actual lead sponsor or a listed collaborator.
+
+    Token overlap alone is still too loose: a single common token matches a
+    DIFFERENT entity that merely contains the word — "Amazon" matched the
+    Brazilian "Amazon University", attaching premature-newborn trials to the
+    retailer. So a candidate is rejected when it is an academic / medical /
+    government institution that the company itself is not.
     """
     q = _sponsor_tokens(company_name)
     if not q:
         return False
-    if q & _sponsor_tokens(lead):
+    company_is_institution = bool(q & _INSTITUTION)
+
+    def _matches(name: str) -> bool:
+        toks = _sponsor_tokens(name)
+        if not (q & toks):
+            return False
+        # Reject "Amazon" -> "Amazon University": the candidate is an institution
+        # type the company is not. (Institutional companies like "Mayo Clinic"
+        # keep matching their own clinic trials.)
+        if not company_is_institution and (toks & _INSTITUTION):
+            return False
         return True
-    return any(q & _sponsor_tokens(c) for c in collabs)
+
+    return _matches(lead) or any(_matches(c) for c in collabs)
 
 
 class ClinicalTrialsClient:
