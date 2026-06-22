@@ -1414,8 +1414,13 @@ select.ws-input {
     /* Clear the notch when the phone is held in landscape. */
     padding-left: max(12px, env(safe-area-inset-left)) !important;
     padding-right: max(12px, env(safe-area-inset-right)) !important;
+    gap: 8px;
   }
   .ws-wordmark { display: none; }
+  /* The logo / account flanks carry inline flex:1 + minWidth:0, so on a phone
+     they shrink below the logo's own width and it bleeds into the nav. Pin them
+     to their content width and let only the nav shrink + scroll. */
+  .ws-header > div { flex: 0 0 auto !important; }
   /* The six tabs can't all fit a phone's width, so let the nav itself shrink
      and scroll horizontally (flex-shrink:0 inline would otherwise force the
      whole page to scroll sideways). The scrollbar is hidden — it's a swipe. */

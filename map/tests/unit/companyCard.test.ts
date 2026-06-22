@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildCardData } from "@/lib/companyCard";
+import { buildCardData, buildCompanyCard } from "@/lib/companyCard";
 import { buildSectorReport } from "@/lib/sectorReport";
 
 // A non-health (Streaming) company whose ClinicalTrials.gov rows are
@@ -108,5 +108,43 @@ describe("buildSectorReport — data-asset relevance", () => {
     const names = m.dataAssets.map((a) => a.name).join(" | ");
     expect(names).not.toMatch(/health informatics/i);
     expect(names).toMatch(/RENCI/);
+  });
+});
+
+describe("buildCompanyCard — single-company runs", () => {
+  it("gates clinical content + synthesizes talking points for a non-health company", () => {
+    const md = "# Acme Cloud\n\n**Listing:** ACME (Nasdaq)\n**HQ:** Austin, TX\n**Industry:** Services-Prepackaged Software\n**Fiscal year end:** 1231\n\nAcme generated $5.2 billion in revenue in FY2025, with net income of $1.1 billion at a 30.0% gross margin.";
+    const partner = {
+      resolved_name: "Acme Cloud",
+      clinical: { count: 2 },
+      financial: { quotes: ["…UNC…"] },
+      trials: [{ title: "COVID-19 risk evaluation", url: "https://clinicaltrials.gov/x" }], // sponsor-name collision
+      nih_pis: [], nc_based: true,
+      links: { edgar: "https://sec.gov", pubmed: "https://pubmed.gov" },
+    };
+    const card = buildCompanyCard("Acme Cloud", md, partner);
+    // Financials parse from the "generated $X in revenue" prose phrasing.
+    expect(card.stats.find((s) => s.label === "Revenue")?.value).toMatch(/\$5\.2/);
+    expect(card.stats.some((s) => /\$1\.1/.test(s.value))).toBe(true);
+    expect(card.company.some((b) => /clinical pipeline/i.test(b.text))).toBe(false);
+    expect(card.trials).toHaveLength(0);
+    expect(card.stats.some((s) => /active trial/i.test(s.label))).toBe(false);
+    expect(card.stats.find((s) => /UNC paper/i.test(s.label))?.value).toBe("2");
+    expect(card.talkingPoints.length).toBeGreaterThanOrEqual(2);
+    expect(card.talkingPoints.some((t) => /UNC co-authored paper/i.test(`${t.bold} ${t.rest}`))).toBe(true);
+  });
+
+  it("keeps clinical content + leads with NIH overlap for a health company", () => {
+    const md = "# Beta Bio\n\n**Industry:** Pharmaceutical Preparations\n";
+    const partner = {
+      resolved_name: "Beta Bio",
+      nih_pis: [{ name: "Dr. Jane Roe", grant_url: "https://reporter.nih.gov/g" }],
+      trials: [{ title: "A Phase 2 oncology study", url: "https://clinicaltrials.gov/t" }],
+      clinical: { count: 1 }, trials_total: 1,
+    };
+    const card = buildCompanyCard("Beta Bio", md, partner);
+    expect(card.company.some((b) => /clinical pipeline/i.test(b.text))).toBe(true);
+    expect(card.stats.some((s) => /active trial/i.test(s.label))).toBe(true);
+    expect(/UNC NIH grant.*overlap/i.test(`${card.talkingPoints[0]?.bold}`)).toBe(true);
   });
 });
