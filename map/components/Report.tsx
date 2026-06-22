@@ -2,6 +2,7 @@
 
 import React, { CSSProperties } from 'react';
 import { downloadMarkdown, downloadPdf, downloadDocx } from '@/lib/report-export';
+import { isHealthSector, visiblePipeline, cleanAlignment } from '@/lib/domain';
 import { downloadExcel } from '@/lib/report-excel';
 import { downloadPptx } from '@/lib/report-slides';
 
@@ -621,6 +622,11 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
 
   // ── Aggregates for the thesis + visualizations (all from real report data) ──
   const profiles = data.section4_profiles || [];
+  // Health vs non-health gate: clinical-trial content (pipeline programs, the
+  // trials chart/tile, "N clinical trials documented" alignment strings) is a
+  // ClinicalTrials.gov sponsor-name-collision false positive for non-health
+  // sectors, so we suppress it there. See lib/domain.ts.
+  const health = isHealthSector(m.sector);
   const nCos = profiles.length;
   const tied = profiles.filter((p) => p.existing_unc_tie);
   const strategic = profiles.filter((p) => p.partnership_type === 'Strategic').length;
@@ -744,7 +750,7 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
             <Tile label="Documented UNC tie" value={tied.length} />
             <Tile label="Strategic scale" value={strategic} />
             <Tile label="NC-based" value={ncBased} />
-            <Tile label="Trial programs" value={totalTrials} />
+            {health && <Tile label="Trial programs" value={totalTrials} />}
             {v && <Tile label="Claims sourced" value={`${v.verified}/${v.total_claims}`} />}
           </div>
 
@@ -908,18 +914,18 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
       <section id="sec-3" data-export-block style={styles.section}>
         <H2 n={3} title="Company Selection" />
 
-        <H3>3.2 Companies Selected</H3>
+        <H3>3.1 Companies Selected</H3>
         {data.section3_selection.selected?.length ? (
           <Table
             headers={['Company', 'UNC Alignment', 'Existing Tie', 'Ref.']}
             rows={data.section3_selection.selected.map((s) => [
-              <strong key="n">{s.company}</strong>, s.unc_alignment, s.existing_tie,
+              <strong key="n">{s.company}</strong>, cleanAlignment(s.unc_alignment, health), s.existing_tie,
               <Cite key="s" urls={s.sources} />,
             ])}
           />
         ) : <Empty label="No selections recorded." />}
 
-        <H3>3.3 Companies Reviewed and Excluded</H3>
+        <H3>3.2 Companies Reviewed and Excluded</H3>
         {data.section3_selection.excluded?.length ? (
           <Table
             headers={['Company', 'Reason', 'Ref.']}
@@ -934,7 +940,7 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
       <section id="sec-4" style={styles.section}>
         <div data-export-block>
           <H2 n={4} title="Company Profiles" />
-          {trialsData.length > 0 && (
+          {health && trialsData.length > 0 && (
             <div style={styles.chartGridSingle}>
               <HBars title="Clinical-trial programs by company" subtitle="Documented on ClinicalTrials.gov" data={trialsData} />
             </div>
@@ -1000,10 +1006,10 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
             )}
 
             <H3>Pipeline and Platform</H3>
-            {p.pipeline?.length ? (
+            {visiblePipeline(p.pipeline, health).length ? (
               <Table
                 headers={['Program', 'Indication', 'Stage', 'Ref.']}
-                rows={p.pipeline.map((r) => [
+                rows={visiblePipeline(p.pipeline, health).map((r) => [
                   <strong key="n">{r.program}</strong>, r.indication,
                   <span key="s" style={styles.stagePill}>{r.stage}</span>,
                   <Cite urls={r.sources} />,
@@ -1162,7 +1168,7 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
           />
         ) : <Empty label="None documented." />}
 
-        <H3>5.6 Partnership Models Available</H3>
+        <H3>5.5 Partnership Models Available</H3>
         <Table
           headers={['Model', 'Description', 'UNC Unit']}
           rows={(data.section5_value_prop.partnership_models || []).map((d) => [

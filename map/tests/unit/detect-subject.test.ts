@@ -9,7 +9,10 @@ describe("detectSubjectKind", () => {
     }
   });
   it("treats plain company names as companies", () => {
-    for (const c of ["Apple", "Bandwidth", "Lockheed Martin", "Moderna", "Epic Games"]) {
+    // "Intel" / "Arm" are substrings of "Artificial Intelligence" / "Pharmaceutical"
+    // respectively — they must NOT be read as sectors (regression: sectors.ts
+    // no longer matches when a sector name merely contains the typed text).
+    for (const c of ["Apple", "Bandwidth", "Lockheed Martin", "Moderna", "Epic Games", "Intel", "Arm"]) {
       expect(detectSubjectKind(c), c).toBe("company");
     }
   });

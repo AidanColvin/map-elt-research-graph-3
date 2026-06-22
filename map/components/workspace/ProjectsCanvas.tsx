@@ -539,9 +539,9 @@ export default function ProjectsCanvas({
         ...(partnershipReportMd
           ? [
               { label: "Partnership Report (PDF)", fn: () => sectorModel
-                ? downloadPartnershipPdf(sectorModel, cards.map(cardToMarkdown), `${subjTitle} — Partnership Report`)
-                : downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`) },
-              { label: "Partnership Report (DOCX)", fn: () => downloadMarkdownDocx(partnershipReportMd, `${subjTitle} — Partnership Report`) },
+                ? downloadPartnershipPdf(sectorModel, cards.map(cardToMarkdown), `${subjTitle}: Partnership Report`)
+                : downloadMarkdownPdf(partnershipReportMd, `${subjTitle}: Partnership Report`) },
+              { label: "Partnership Report (DOCX)", fn: () => downloadMarkdownDocx(partnershipReportMd, `${subjTitle}: Partnership Report`) },
             ]
           : []),
         { label: "Full Report (PDF)", fn: () => downloadPdf(sectorData) },
@@ -663,10 +663,10 @@ export default function ProjectsCanvas({
                   {partnershipReportMd && (
                     <div style={{ display: "flex", gap: 7, flexShrink: 0 }}>
                       <button onClick={() => sectorModel
-                        ? downloadPartnershipPdf(sectorModel, cards.map(cardToMarkdown), `${subjTitle} — Partnership Report`)
-                        : downloadMarkdownPdf(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "none", background: "#1d1d1f", color: "#fff" }}>↓ PDF</button>
-                      <button onClick={() => downloadMarkdownText(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ Markdown</button>
-                      <button onClick={() => downloadMarkdownDocx(partnershipReportMd, `${subjTitle} — Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ DOCX</button>
+                        ? downloadPartnershipPdf(sectorModel, cards.map(cardToMarkdown), `${subjTitle}: Partnership Report`)
+                        : downloadMarkdownPdf(partnershipReportMd, `${subjTitle}: Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "none", background: "#1d1d1f", color: "#fff" }}>↓ PDF</button>
+                      <button onClick={() => downloadMarkdownText(partnershipReportMd, `${subjTitle}: Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ Markdown</button>
+                      <button onClick={() => downloadMarkdownDocx(partnershipReportMd, `${subjTitle}: Partnership Report`)} style={{ fontSize: 12, fontWeight: 600, padding: "6px 13px", borderRadius: 999, cursor: "pointer", border: "1px solid #ececf0", background: "#fff", color: "#1d1d1f" }}>↓ DOCX</button>
                     </div>
                   )}
                 </div>
@@ -699,8 +699,8 @@ export default function ProjectsCanvas({
                   </div>
                   <CompanyReportCard
                     data={companyCard}
-                    onDownloadPDF={() => downloadMarkdownPdf(cardToMarkdown(companyCard), `${subjTitle} — Partnership Report`)}
-                    onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(companyCard), `${subjTitle} — Partnership Report`)}
+                    onDownloadPDF={() => downloadMarkdownPdf(cardToMarkdown(companyCard), `${subjTitle}: Partnership Report`)}
+                    onDownloadDOCX={() => downloadMarkdownDocx(cardToMarkdown(companyCard), `${subjTitle}: Partnership Report`)}
                   />
                 </section>
               )}

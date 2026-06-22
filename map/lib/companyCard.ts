@@ -122,9 +122,9 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const rd = stripFy(fv("rd_expense"));
   const netInc = stripFy(fv("net_income"));
   const stats: CardStat[] = [
-    { value: stripFy(fv("revenue")) || "—", label: "Revenue" },
-    rd ? { value: rd, label: "R&D" } : { value: netInc || "—", label: "Net income" },
-    { value: stripFy(fv("total_assets")) || "—", label: "Total assets" },
+    { value: stripFy(fv("revenue")) || "n/a", label: "Revenue" },
+    rd ? { value: rd, label: "R&D" } : { value: netInc || "n/a", label: "Net income" },
+    { value: stripFy(fv("total_assets")) || "n/a", label: "Total assets" },
     { value: String(pipeline.length), label: pipeline.length === 1 ? "Active trial" : "Active trials" },
   ];
 
@@ -270,11 +270,11 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
 
   // Stat tiles — same four-up bar as the sector card. "—" when not on file.
   const stats: CardStat[] = [
-    { value: revenue || "—", label: "Revenue" },
+    { value: revenue || "n/a", label: "Revenue" },
     netIncome ? { value: netIncome, label: "Net income" }
-      : netLoss ? { value: `–${netLoss}`, label: "Net loss" }
-      : { value: grossMargin || "—", label: "Gross margin" },
-    { value: totalAssets || "—", label: "Total assets" },
+      : netLoss ? { value: `-${netLoss}`, label: "Net loss" }
+      : { value: grossMargin || "n/a", label: "Gross margin" },
+    { value: totalAssets || "n/a", label: "Total assets" },
     { value: String(trialCount), label: trialCount === 1 ? "Active trial" : "Active trials" },
   ];
 
