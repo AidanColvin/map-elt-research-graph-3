@@ -7,6 +7,7 @@
  * sources (SEC EDGAR, NIH RePORTER, PubMed, ClinicalTrials.gov).
  */
 import { parseMoney } from "@/components/Report";
+import { isHealthSector } from "@/lib/domain";
 
 export interface PeerBar { name: string; valueB: number; isSubject?: boolean }
 export interface QuickRef { name: string; detail: string; nc?: boolean }
@@ -80,23 +81,50 @@ const ASSET_GROUPS: { match: RegExp; assets: DataAsset[] }[] = [
     { name: "Institute of Marine Sciences", url: "https://ims.unc.edu/", description: "Coastal field stations and long-term ocean datasets.", relevance: "Site climate-resilience projects with on-the-ground data.", heldBy: "UNC-Chapel Hill" },
     { name: "The Water Institute", url: "https://waterinstitute.unc.edu/", description: "Water, sanitation, and resource-management research.", relevance: "Back water-risk and ESG programs with peer-reviewed methods.", heldBy: "Gillings School of Global Public Health" },
   ] },
+  // Arts / entertainment / broadcast / journalism — placed BEFORE the tech group
+  // so "Broadcasting" resolves to the media school, not data science.
+  { match: /\barts?\b|entertainment|recreation|broadcast|journalism|\bfilm\b|\bmusic\b|publishing/i, assets: [
+    { name: "Hussman School of Journalism and Media", url: "https://hussman.unc.edu/", description: "Media, advertising, and audience research.", relevance: "Sharpen content, distribution, and audience strategy.", heldBy: "UNC-Chapel Hill" },
+    { name: "Department of Communication", url: "https://comm.unc.edu/", description: "Media studies, performance, and digital-culture research.", relevance: "Inform programming and engagement with media scholarship.", heldBy: "UNC-Chapel Hill" },
+    { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey and behavioral-data archive plus analytics methods.", relevance: "Measure audience behavior on trusted data.", heldBy: "UNC-Chapel Hill" },
+  ] },
   { match: /\bai\b|artificial intelligence|machine learning|\bml\b|data scien|software|cloud|comput|cyber|semiconductor|\bchip|informatics|analytics|quantum|robot|\btech\b|technolog|information technology|\bit\b|internet|hardware|electronic|telecom|\bnetwork|\b5g\b|streaming|\bmedia\b|gaming|video game|\bsaas\b|platform|digital|communication|broadcast|publishing|advertis/i, assets: [
     { name: "RENCI — Renaissance Computing Institute", url: "https://renci.org/", description: "Applied-AI engineering and high-performance computing with national-lab ties.", relevance: "Co-build ML systems and run models on serious compute.", heldBy: "UNC-Chapel Hill" },
     { name: "School of Data Science and Society", url: "https://datascience.unc.edu/", description: "University-wide data-science faculty and a deep graduate talent pool.", relevance: "Source research partners and hire trained data scientists.", heldBy: "UNC-Chapel Hill" },
     { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "A century-old archive of survey and behavioral data, plus analytics methods.", relevance: "Sharpen audience, recommendation, and behavioral analytics.", heldBy: "UNC-Chapel Hill" },
   ] },
   // Materials / chemicals / mining — UNC's chemistry & applied physical sciences.
-  { match: /material|chemical|mining|\bmetals?\b|\bsteel\b|cement|\bpaper\b|packaging|polymer|coating|\bplastic/i, assets: [
+  // ("chemistr" routes Computational Chemistry here, to UNC Chemistry, rather
+  // than to clinical assets.)
+  { match: /material|chemical|chemistr|mining|\bmetals?\b|\bsteel\b|cement|\bpaper\b|packaging|polymer|coating|\bplastic/i, assets: [
     { name: "UNC Department of Chemistry", url: "https://chem.unc.edu/", description: "Top-ranked materials, polymer, and synthetic-chemistry labs.", relevance: "Develop and characterize new materials and formulations.", heldBy: "UNC-Chapel Hill" },
     { name: "Department of Applied Physical Sciences", url: "https://aps.unc.edu/", description: "Materials science, soft matter, and advanced-manufacturing research.", relevance: "Move lab-stage materials toward manufacturable products.", heldBy: "UNC-Chapel Hill" },
     { name: "Frank Hawkins Kenan Institute", url: "https://kenaninstitute.unc.edu/", description: "Commercialization and industry-partnership programs.", relevance: "Structure licensing and scale-up pathways.", heldBy: "Kenan-Flagler Business School" },
   ] },
-  { match: /fintech|financ|bank|insur|capital|invest|business|econom|\bmarket|retail|consumer|staple|discretionary|real estate|\breit|propert|apparel|restaurant|hotel|leisure|homebuild|industrial|manufactur/i, assets: [
+  // Real estate / construction / proptech — built environment & planning.
+  { match: /real estate|\breit\b|propert|proptech|construction|\bbuilding\b|architecture|housing|homebuild/i, assets: [
+    { name: "UNC Department of City and Regional Planning", url: "https://planning.unc.edu/", description: "Top-ranked land-use, housing, and urban-development research.", relevance: "Site, zone, and model real-estate and infrastructure projects.", heldBy: "UNC-Chapel Hill" },
+    { name: "Frank Hawkins Kenan Institute of Private Enterprise", url: "https://kenaninstitute.unc.edu/", description: "Real-estate economics and private-capital research.", relevance: "Underwrite markets and capital strategy with rigorous data.", heldBy: "Kenan-Flagler Business School" },
+    { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic, and administrative-data archive.", relevance: "Analyze markets and demand on trusted data.", heldBy: "UNC-Chapel Hill" },
+  ] },
+  { match: /fintech|financ|bank|insur|capital|invest|business|econom|\bmarket|retail|consumer|staple|discretionary|apparel|restaurant|hotel|leisure|industrial|manufactur/i, assets: [
     { name: "Frank Hawkins Kenan Institute of Private Enterprise", url: "https://kenaninstitute.unc.edu/", description: "Economic forecasting and applied market research.", relevance: "Pressure-test market and growth assumptions.", heldBy: "Kenan-Flagler Business School" },
     { name: "Institute for Private Capital", url: "https://uncipc.org/", description: "Private-equity, venture, and fund-performance datasets.", relevance: "Benchmark deals and returns against rigorous data.", heldBy: "Kenan-Flagler Business School" },
     { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic, and administrative-data archive.", relevance: "Run consumer and market research on trusted data.", heldBy: "UNC-Chapel Hill" },
   ] },
-  { match: /population|social|demograph|policy|education|\bedtech|\bed ?tech|workforce|government|public health/i, assets: [
+  // Education / edtech — UNC School of Education + learning sciences.
+  { match: /education|edtech|\bed ?tech\b|\blearning\b|teaching|curriculum|pedagog|e-?learning/i, assets: [
+    { name: "UNC School of Education", url: "https://ed.unc.edu/", description: "Learning sciences, education policy, and teacher-prep research.", relevance: "Ground curriculum and product decisions in education research.", heldBy: "UNC-Chapel Hill" },
+    { name: "William & Ida Friday Center for Continuing Education", url: "https://fridaycenter.unc.edu/", description: "Online and continuing-education delivery at scale.", relevance: "Pilot and distribute learning programs to real cohorts.", heldBy: "UNC-Chapel Hill" },
+    { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, assessment, and quantitative-methods support.", relevance: "Design and evaluate learning studies rigorously.", heldBy: "UNC-Chapel Hill" },
+  ] },
+  // Government / public sector — UNC School of Government is the largest US program.
+  { match: /\bgovernment\b|public sector|public administration|civic|municipal|\bpolicy\b/i, assets: [
+    { name: "UNC School of Government", url: "https://www.sog.unc.edu/", description: "The largest university-based local-government program in the US.", relevance: "Tap public-administration expertise and government networks.", heldBy: "UNC-Chapel Hill" },
+    { name: "Carolina Population Center", url: "https://www.cpc.unc.edu/", description: "Population and demographic longitudinal data.", relevance: "Inform policy with population-scale evidence.", heldBy: "UNC-Chapel Hill" },
+    { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic, and administrative-data archive.", relevance: "Analyze public programs on trusted data.", heldBy: "UNC-Chapel Hill" },
+  ] },
+  { match: /population|demograph|\bsocial\b|workforce|public health/i, assets: [
     { name: "Carolina Population Center", url: "https://www.cpc.unc.edu/", description: "Longitudinal population, health, and demographic studies.", relevance: "Anchor policy and product decisions in population data.", heldBy: "UNC-Chapel Hill" },
     { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey research, data archiving, and quantitative methods.", relevance: "Design and analyze rigorous field studies.", heldBy: "UNC-Chapel Hill" },
     { name: "Cecil G. Sheps Center", url: "https://www.shepscenter.unc.edu/", description: "Health-services, workforce, and rural-health research.", relevance: "Evaluate programs and workforce strategy.", heldBy: "UNC-Chapel Hill" },
@@ -116,12 +144,22 @@ const GENERIC_ASSETS: DataAsset[] = [
   { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic, and administrative-data archive.", relevance: "Run rigorous analytics on trusted data.", heldBy: "UNC-Chapel Hill" },
 ];
 
+// Oncology asset group, reused by the health branch below.
+const ONCOLOGY_GROUP = ASSET_GROUPS[0];
+
 // takes: the report's sector name
-// does: picks the UNC data assets relevant to that topic; sectors that match no
-//       specific domain get cross-cutting research infrastructure, NOT health
-//       datasets (showing a cancer registry to a tech firm reads as nonsensical)
+// does: picks the UNC data assets relevant to that topic. Health sectors ALWAYS
+//       get health assets first (so "Biotechnology", "Medical Device
+//       Manufacturing", "Health IT" etc. aren't mis-routed to data-science or
+//       finance assets by a tech/finance token in the name). Non-health sectors
+//       match a domain group, falling back to cross-cutting research
+//       infrastructure — NEVER a health dataset (a cancer registry shown to a
+//       tech firm reads as nonsensical).
 // returns: up to 3 tailored DataAssets
 function pickDataAssets(sector: string): DataAsset[] {
+  if (isHealthSector(sector)) {
+    return ONCOLOGY_GROUP.match.test(sector || "") ? ONCOLOGY_GROUP.assets : DATA_ASSETS.slice(0, 3);
+  }
   const hit = ASSET_GROUPS.find((g) => g.match.test(sector || ""));
   return hit ? hit.assets : GENERIC_ASSETS;
 }

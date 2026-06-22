@@ -15,7 +15,11 @@
 
 // Health / life-sciences sectors. Mirrors sectorReport.ts oncology + broad-health
 // matchers, plus "medtech" (which lacks a \btech\b boundary and otherwise misses).
-const HEALTH_RE = /health|medical|medicine|clinical|onco|cancer|tumou?r|carcinoma|leukem|lymphoma|melanoma|disease|therap|drug|pharma|\bbio|genom|\bgene\b|immun|diabet|cardio|neuro|vaccine|patient|\bdevice|diagnostic|surg|hospital|life ?scien|medtech|med ?tech/i;
+// `neuro(?!morphic)` keeps neuroscience/neurology/neurodegenerative as health
+// but excludes "neuromorphic computing" (an AI sector). `neural ?interface`
+// catches brain-computer-interface health tech without matching "neural network"
+// (AI). `proteom` covers proteomics.
+const HEALTH_RE = /health|medical|medicine|clinical|onco|cancer|tumou?r|carcinoma|leukem|lymphoma|melanoma|disease|therap|drug|pharma|\bbio|genom|\bgene\b|proteom|immun|diabet|cardio|neuro(?!morphic)|neural ?interface|vaccine|patient|\bdevice|diagnostic|surg|hospital|life ?scien|medtech|med ?tech/i;
 
 // takes: the report's sector name (e.g. report_meta.sector)
 // does: decides whether the sector is a health / life-sciences domain, where
