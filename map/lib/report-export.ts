@@ -11,6 +11,7 @@ import type { ReportData, CitationIndex } from '@/components/Report';
 import { normalize, buildCitationIndex, parseMoney, fmtUsd } from '@/components/Report';
 import { PdfDoc, wrapText, textWidth } from '@/lib/pdf-writer';
 import type { SectorReportModel } from '@/lib/sectorReport';
+import { isHealthSector, visiblePipeline, cleanAlignment } from '@/lib/domain';
 
 // ── Block intermediate representation ──────────────────────────────────────
 export type ChartSeries = { label: string; value: number; color?: string };
@@ -70,6 +71,9 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
   const cites = buildCitationIndex(data);
   const b: Block[] = [];
   const m = data.report_meta;
+  // Mirror Report.tsx: suppress clinical-trial content for non-health sectors so
+  // downloaded PDF/Word/Markdown match the on-screen report. See lib/domain.ts.
+  const health = isHealthSector(m.sector);
 
   // Header + metadata
   b.push({ t: 'h1', text: m.sector });
@@ -117,7 +121,7 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
       ['Documented UNC tie', String(tied.length)],
       ['Strategic scale', String(strategic)],
       ['NC-based', String(ncBased)],
-      ['Trial programs', String(totalTrials)],
+      ...(health ? [['Trial programs', String(totalTrials)] as [string, string]] : []),
     ] });
     const thesis = `We reviewed ${nCos} ${m.sector} ${nCos === 1 ? 'company' : 'companies'} as research partners for UNC Chapel Hill. `
       + `${tied.length} of ${nCos} have a documented UNC link: a shared trial, an NIH grant, or a co-authored paper. `
@@ -197,12 +201,12 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
   // Section 3 — Company Selection
   const s3 = data.section3_selection;
   b.push({ t: 'h2', text: '03  Company Selection' });
-  b.push({ t: 'h3', text: '3.2 Companies Selected' });
+  b.push({ t: 'h3', text: '3.1 Companies Selected' });
   b.push(s3.selected.length
     ? { t: 'table', headers: ['Company', 'UNC Alignment', 'Existing Tie', 'Ref.'],
-        rows: s3.selected.map((s) => [s.company, s.unc_alignment, s.existing_tie, mark(s.sources, cites).trim()]) }
+        rows: s3.selected.map((s) => [s.company, cleanAlignment(s.unc_alignment, health), s.existing_tie, mark(s.sources, cites).trim()]) }
     : { t: 'p', text: 'No selections recorded.' });
-  b.push({ t: 'h3', text: '3.3 Companies Reviewed and Excluded' });
+  b.push({ t: 'h3', text: '3.2 Companies Reviewed and Excluded' });
   b.push(s3.excluded.length
     ? { t: 'table', headers: ['Company', 'Reason', 'Ref.'],
         rows: s3.excluded.map((s) => [s.company, s.reason, mark(s.sources, cites).trim()]) }
@@ -210,7 +214,7 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
 
   // Section 4 - Company Profiles
   b.push({ t: 'h2', text: '04  Company Profiles' });
-  if (trialSeries.length) b.push({ t: 'chart', chartKind: 'bars', title: 'Clinical-trial programs by company', subtitle: 'Documented on ClinicalTrials.gov', series: trialSeries });
+  if (health && trialSeries.length) b.push({ t: 'chart', chartKind: 'bars', title: 'Clinical-trial programs by company', subtitle: 'Documented on ClinicalTrials.gov', series: trialSeries });
   data.section4_profiles.forEach((p) => {
     const tie = p.existing_unc_tie ? 'Existing UNC tie' : 'No UNC tie';
     b.push({ t: 'h3', text: `${p.company_name} (${p.partnership_type}, ${tie})` });
@@ -235,10 +239,11 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
       }
     }
 
-    if (p.pipeline.length) {
+    const pipelineRows = visiblePipeline(p.pipeline, health);
+    if (pipelineRows.length) {
       b.push({ t: 'h3', text: 'Pipeline and Platform' });
       b.push({ t: 'table', headers: ['Program', 'Indication', 'Stage', 'Ref.'],
-        rows: p.pipeline.map((r) => [r.program, r.indication, r.stage, mark(r.sources, cites).trim()]) });
+        rows: pipelineRows.map((r) => [r.program, r.indication, r.stage, mark(r.sources, cites).trim()]) });
     }
     if (p.partnering_history.length) {
       b.push({ t: 'h3', text: 'External Partnering History' });
@@ -288,7 +293,7 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
     ? { t: 'table', headers: ['Asset', 'Description', 'Ref.'],
         rows: s5.nc_access.map((d) => [d.asset, d.description, mark(d.sources, cites).trim()]) }
     : { t: 'p', text: 'None documented.' });
-  b.push({ t: 'h3', text: '5.6 Partnership Models Available' });
+  b.push({ t: 'h3', text: '5.5 Partnership Models Available' });
   b.push({ t: 'table', headers: ['Model', 'Description', 'UNC Unit'],
     rows: s5.partnership_models.map((d) => [d.model, d.description, d.unit]) });
 

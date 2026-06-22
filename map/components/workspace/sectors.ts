@@ -93,10 +93,14 @@ const SECTOR_KEYWORDS = [
 export function detectSubjectKind(text: string): "company" | "sector" {
   const v = (text || "").trim().toLowerCase();
   if (!v) return "company";
-  // Curated sector list — exact, or one contained in the other.
+  // Curated sector list — exact match, or the typed text contains a full
+  // sector name. We deliberately do NOT match when a sector name merely
+  // contains the typed text (the old `ls.includes(v)` branch): that misread
+  // short company names embedded in a sector word as sectors — "Intel" inside
+  // "Artificial Intelligence", "Arm" inside "Pharmaceutical".
   for (const s of SECTORS) {
     const ls = s.toLowerCase();
-    if (ls === v || v.includes(ls) || ls.includes(v)) return "sector";
+    if (ls === v || v.includes(ls)) return "sector";
   }
   // Multi-word sector phrases anywhere in the text (e.g. "artificial intelligence").
   for (const kw of SECTOR_KEYWORDS) {

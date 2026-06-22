@@ -114,18 +114,26 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
         </div>
       )}
 
-      {/* Sector snapshot — revenue + R&D charts */}
-      <Eyebrow>Sector snapshot</Eyebrow>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginBottom: 28 }}>
-        <div>
-          <Eyebrow>Revenue (SEC XBRL · latest FY)</Eyebrow>
-          <PeerChart peers={m.revenuePeers} color="#93b8f5" />
+      {/* Sector snapshot — revenue + R&D charts. The R&D column only renders
+          when companies report R&D (banks, REITs, insurers do not), so a
+          non-R&D sector never shows a dangling "R&D spend" label with no chart. */}
+      {(m.revenuePeers.length > 0 || m.rdPeers.length > 0) && <>
+        <Eyebrow>Sector snapshot</Eyebrow>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginBottom: 28 }}>
+          {m.revenuePeers.length > 0 && (
+            <div>
+              <Eyebrow>Revenue (SEC XBRL · latest FY)</Eyebrow>
+              <PeerChart peers={m.revenuePeers} color="#93b8f5" />
+            </div>
+          )}
+          {m.rdPeers.length > 0 && (
+            <div>
+              <Eyebrow>R&amp;D spend</Eyebrow>
+              <PeerChart peers={m.rdPeers} color="#9ed8bf" />
+            </div>
+          )}
         </div>
-        <div>
-          <Eyebrow>R&amp;D spend</Eyebrow>
-          <PeerChart peers={m.rdPeers} color="#9ed8bf" />
-        </div>
-      </div>
+      </>}
 
       {/* UNC alignment-signal chart */}
       {m.alignmentChart.length > 0 && <div style={{ marginBottom: 28 }}>
