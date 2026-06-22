@@ -109,9 +109,6 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
   const trialSeries = profs
     .map((p) => ({ label: p.company_name, value: p.pipeline?.length || 0 }))
     .filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
-  const alignSeries = profs
-    .map((p) => ({ label: p.company_name, value: p.unc_alignment?.length || 0 }))
-    .filter((d) => d.value > 0).sort((a, b) => b.value - a.value);
 
   if (nCos > 0) {
     b.push({ t: 'h2', text: 'Summary' });
@@ -181,7 +178,6 @@ export function buildBlocks(rawData: any): { blocks: Block[]; cites: CitationInd
     ? { t: 'table', headers: ['Company', 'UNC Unit', 'Type', 'Active?', 'Ref.'],
         rows: s2.known_partnerships.map((p) => [p.company, p.unc_unit, p.relationship_type, p.active, mark(p.sources, cites).trim()]) }
     : { t: 'p', text: 'None identified.' });
-  if (alignSeries.length) b.push({ t: 'chart', chartKind: 'bars', title: 'UNC alignment signals by company', subtitle: 'Matched grants, trials, and publications', series: alignSeries });
   b.push({ t: 'h3', text: '2.2 UNC Investigators on Company-Overlapping NIH Grants' });
   b.push(s2.unc_faculty.length
     ? { t: 'table', headers: ['Faculty', 'School', 'Research Focus', 'Ref.'],
@@ -875,12 +871,6 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
     t: 'chart', chartKind: 'bars', title: 'R&D spend',
     series: m.rdPeers.map((p) => ({ label: p.name, value: p.valueB * 1e9 })),
     money: true, barColor: RD_BAR,
-  });
-
-  if (m.alignmentChart.length) b.push({
-    t: 'chart', chartKind: 'bars', title: 'UNC alignment signals by company',
-    subtitle: 'Matched grants, trials, and publications',
-    series: m.alignmentChart.map((a) => ({ label: a.name, value: a.count })),
   });
 
   if (m.dataAssets.length) {

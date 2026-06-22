@@ -25,7 +25,6 @@ export interface FacultyRow {
   topic?: string; fy?: string; overlap: string;
 }
 export interface DataAsset { name: string; url: string; description: string; heldBy: string }
-export interface AlignmentBar { name: string; count: number }
 
 export interface SectorReportModel {
   sector: string;
@@ -43,7 +42,6 @@ export interface SectorReportModel {
   revenuePeers: PeerBar[];
   rdPeers: PeerBar[];
   matrix: MatrixRow[];
-  alignmentChart: AlignmentBar[];
   faculty: FacultyRow[];
   dataAssets: DataAsset[];
 }
@@ -77,7 +75,7 @@ const ASSET_GROUPS: { match: RegExp; assets: DataAsset[] }[] = [
   { match: /\bai\b|artificial intelligence|machine learning|\bml\b|data scien|software|cloud|comput|cyber|semiconductor|\bchip|informatics|analytics|quantum|robot|\btech\b|technolog|information technology|\bit\b|internet|hardware|electronic|telecom|\bnetwork|\b5g\b|streaming|\bmedia\b|gaming|video game|\bsaas\b|platform|digital|communication|broadcast|publishing|advertis/i, assets: [
     { name: "RENCI — Renaissance Computing Institute", url: "https://renci.org/", description: "Applied AI, cyberinfrastructure & large-scale data science", heldBy: "UNC-Chapel Hill" },
     { name: "School of Data Science and Society", url: "https://datascience.unc.edu/", description: "Cross-disciplinary data-science research & talent", heldBy: "UNC-Chapel Hill" },
-    { name: "Carolina Health Informatics Program", url: "https://tracs.unc.edu/", description: "Health-data analytics, EHR & biomedical informatics", heldBy: "UNC-Chapel Hill" },
+    { name: "Odum Institute for Research in Social Science", url: "https://odum.unc.edu/", description: "Survey, economic & administrative-data archive · analytics methods", heldBy: "UNC-Chapel Hill" },
   ] },
   // Materials / chemicals / mining — UNC's chemistry & applied physical sciences.
   { match: /material|chemical|mining|\bmetals?\b|\bsteel\b|cement|\bpaper\b|packaging|polymer|coating|\bplastic/i, assets: [
@@ -214,13 +212,6 @@ export function buildSectorReport(report: any): SectorReportModel {
     matrix.push({ company: noneNames.join(" · "), tier: "Translational", signal: "None", contact: "—", firstMove: "Cold outreach" });
   }
 
-  // UNC alignment-signal chart — one bar per company (count of sourced UNC
-  // alignment links), tallest first; the header colors them by count.
-  const alignmentChart: AlignmentBar[] = profiles
-    .map((p) => ({ name: p.company_name as string, count: (Array.isArray(p?.unc_alignment) ? p.unc_alignment.length : 0) }))
-    .filter((x) => x.count > 0)
-    .sort((a, b) => b.count - a.count);
-
   // UNC investigators with RECENT (last 5 FY) NIH grants overlapping a sector
   // company, deduped, newest FY first. We do NOT claim vetted "sector expertise"
   // — only a verified, recent RePORTER overlap (older grants are filtered out).
@@ -246,6 +237,6 @@ export function buildSectorReport(report: any): SectorReportModel {
   return {
     sector, date, companiesReviewed: profiles.length, uncTies, nihOverlaps, pubmedPapers,
     combinedRevenueB, ncHeadquartered, contactNow, warm, cold, ospCompanies,
-    revenuePeers, rdPeers, matrix, alignmentChart, faculty: faculty.slice(0, 12), dataAssets: pickDataAssets(sector),
+    revenuePeers, rdPeers, matrix, faculty: faculty.slice(0, 12), dataAssets: pickDataAssets(sector),
   };
 }
