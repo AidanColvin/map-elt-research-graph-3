@@ -52,54 +52,41 @@ test.describe('Map workspace — interactive flows', () => {
   });
 
   /**
-   * 1b. The dashboard search is a controlled input with a Company/Sector mode
-   *     toggle. Typing reflects live, and switching mode swaps the placeholder —
-   *     proving the interactive controls mutate state.
+   * 1b. The dashboard project search is a controlled input: typing reflects live,
+   *     proving the interactive control mutates React state.
    */
-  test('dashboard search input is controlled and the mode toggle works', async ({ page }) => {
+  test('dashboard project search input is controlled', async ({ page }) => {
     await gotoWorkspace(page);
     // Default landing view is the Dashboard.
     const view = visibleView(page);
-    const search = view.locator('input[placeholder*="company" i]').first();
+    const search = view.locator('input[placeholder*="project" i]').first();
     await expect(search).toBeVisible({ timeout: 8000 });
     await expect(search).toHaveValue('');
 
     await search.fill('Pfizer');
     await expect(search).toHaveValue('Pfizer');
-
-    // Switching to Sector mode swaps the placeholder copy.
-    await view.getByRole('button', { name: /^Sector$/ }).click();
-    await expect(view.locator('input[placeholder*="sector" i]').first()).toBeVisible();
   });
 
   /**
-   * 2. Cross-loading a company: running a curated company from the Dashboard
-   *    search hands it to the Company canvas and switches focus there, with the
-   *    streamed report appearing under that company's name.
+   * 2. Running from the dashboard: submitting the project search spins up a named
+   *    project and runs its pipeline, landing the user in the Projects view with
+   *    the company's artifacts rendered.
    */
-  test('running a company from the dashboard cross-loads the Company view', async ({ page }) => {
+  test('running a subject from the dashboard search opens its project', async ({ page }) => {
     test.setTimeout(REPORT_TIMEOUT + 20000);
     await gotoWorkspace(page);
 
-    // Dashboard is in "company" mode by default — type a company and submit.
+    // The dashboard search runs a new project for whatever you type.
     const dash = visibleView(page);
-    const search = dash.locator('input[placeholder*="company" i]').first();
+    const search = dash.locator('input[placeholder*="project" i]').first();
     await expect(search).toBeVisible({ timeout: 8000 });
     await search.fill('Apple');
     await search.press('Enter');
 
-    // We should now be on the Company canvas...
-    const company = visibleView(page);
-    await expect(company.getByRole('heading', { name: 'Apple', exact: true })).toBeVisible({
-      timeout: REPORT_TIMEOUT,
-    });
-
-    // ...and the streamed report content for Apple should render.
-    const report = company.locator('article, .workspace-md, [class*="markdown"]').first();
-    await expect(report).toBeVisible({ timeout: REPORT_TIMEOUT });
-    const text = await report.innerText();
-    expect(text.length).toBeGreaterThan(300);
-    expect(text.toLowerCase()).toContain('apple');
+    // We land in the Projects view on the "Apple" project…
+    await expect(visibleView(page).getByText(/PROJECT — APPLE/i)).toBeVisible({ timeout: REPORT_TIMEOUT });
+    // …and the company pipeline renders its artifacts.
+    await expect(visibleView(page).getByText('Company Profile', { exact: false }).first()).toBeVisible({ timeout: REPORT_TIMEOUT });
   });
 
   /**

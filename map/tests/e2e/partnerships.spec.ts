@@ -1,12 +1,12 @@
 import { test, expect, Page } from '@playwright/test';
 import { mockBackend, gotoWorkspace } from './helpers';
 
-// NOTE: The Partnerships feature is surfaced in the workspace sub-nav as the
-// "UNC" tab (the live VIEWS are Dashboard / Company / Sector / UNC / Database —
-// see map/app/page.tsx). The PartnershipsView component renders its own
-// "Partnerships" heading and the company/sector toggle inside that view. These
-// specs are CI-safe: mockBackend stubs /api/partnerships, so they never hit a
-// real backend.
+// NOTE: The Partnerships feature is the "Partnerships" tab in the workspace
+// sub-nav (the live VIEWS are Dashboard / Company / Sector / Partnerships / Data
+// / Projects — see map/app/page.tsx). The PartnershipsView component renders its
+// own "Partnerships" heading and the company/sector toggle inside that view.
+// These specs are CI-safe: mockBackend stubs /api/partnerships, so they never
+// hit a real backend.
 
 // Arm offline backend + image-host mocks before every test.
 test.beforeEach(async ({ page }) => {
@@ -24,7 +24,7 @@ test('Partnerships tab is reachable and renders the three result cards', async (
 
   // Click the Partnerships tab — it toggles an in-app view (no route change,
   // so navigation never replays the intro splash).
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await expect(page.getByRole('heading', { name: 'Partnerships' })).toBeVisible();
 
@@ -51,7 +51,7 @@ test('Partnerships tab is reachable and renders the three result cards', async (
 test('navigating to Partnerships and back does NOT replay the intro splash', async ({ page }) => {
   await signInGuest(page);
   // Navigate across tabs including the (formerly route-based) Partnerships view.
-  for (const label of ['UNC', 'Sector', 'UNC', 'Dashboard']) {
+  for (const label of ['Partnerships', 'Sector', 'Partnerships', 'Dashboard']) {
     await page.locator('nav').getByText(label, { exact: true }).first().click();
     await page.waitForTimeout(600);
     const body = await page.locator('body').innerText();
@@ -61,13 +61,13 @@ test('navigating to Partnerships and back does NOT replay the intro splash', asy
     expect(body).not.toContain('MAPPING ARCHITECTURE PLATFORM');
   }
   // The workspace nav is still present (we never left the SPA / re-gated auth).
-  await expect(page.locator('nav').getByText('UNC', { exact: true }).first()).toBeVisible();
+  await expect(page.locator('nav').getByText('Partnerships', { exact: true }).first()).toBeVisible();
 });
 
 test('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('tab', { name: /company/i }).click();
   await page.getByLabel('Partnership search').fill('Eli Lily');
@@ -86,7 +86,7 @@ test('typo "Eli Lily" is corrected and shown to the user', async ({ page }) => {
 test('typo fix lets the strict SEC client surface verbatim text (Liquidia)', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByRole('tab', { name: /company/i }).click();
   // Liquidia is a UNC-Chapel Hill spinout whose 10-K names UNC verbatim; the
@@ -105,7 +105,7 @@ test('typo fix lets the strict SEC client surface verbatim text (Liquidia)', asy
 test('partner status banner shows Active for Eli Lilly', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByLabel('Partnership search').fill('Eli Lilly');
   await page.getByRole('button', { name: /^Search$/ }).click();
@@ -119,7 +119,7 @@ test('partner status banner shows Active for Eli Lilly', async ({ page }) => {
 test('NIH staff section shows PI name from grant data', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByLabel('Partnership search').fill('Eli Lilly');
   await page.getByRole('button', { name: /^Search$/ }).click();
@@ -136,7 +136,7 @@ test('NIH staff section shows PI name from grant data', async ({ page }) => {
 test('downloadable UNC report renders with export + save controls', async ({ page }) => {
   test.setTimeout(120000);
   await signInGuest(page);
-  await page.locator('nav').getByText('UNC', { exact: true }).first().click();
+  await page.locator('nav').getByText('Partnerships', { exact: true }).first().click();
   await page.getByLabel('Partnership search').waitFor({ state: 'visible', timeout: 15000 });
   await page.getByLabel('Partnership search').fill('Eli Lilly');
   await page.getByRole('button', { name: /^Search$/ }).click();

@@ -56,20 +56,19 @@ test('dashboard hero renders correctly', async ({ page }) => {
   expect(body).toContain('Sector Scan');
 });
 
-test('dashboard search toggles between company and sector modes', async ({ page }) => {
+test('dashboard shows the project search and canvas shortcuts', async ({ page }) => {
   await signIn(page);
   const view = visibleView(page);
-  // Default mode is "company".
-  const search = view.locator('input[placeholder*="company" i]').first();
-  await expect(search).toBeVisible({ timeout: 8000 });
-  // Switching to the Sector toggle swaps the placeholder copy.
-  await view.getByRole('button', { name: /^Sector$/ }).click();
-  await expect(view.locator('input[placeholder*="sector" i]').first()).toBeVisible();
+  // The Dashboard leads with a single project search…
+  await expect(view.locator('input[placeholder*="project" i]').first()).toBeVisible({ timeout: 8000 });
+  // …and "Open a canvas" shortcuts into the Company and Sector workspaces.
+  await expect(view.getByText('Company Profile', { exact: false }).first()).toBeVisible();
+  await expect(view.getByText('Sector Scan', { exact: false }).first()).toBeVisible();
 });
 
 test('all nav tabs load without a not-found page', async ({ page }) => {
   await signIn(page);
-  for (const label of ['Dashboard', 'Company', 'Sector', 'Database']) {
+  for (const label of ['Dashboard', 'Company', 'Sector', 'Data']) {
     await clickNav(page, label);
     await page.waitForTimeout(800);
     const body = await page.locator('body').innerText();

@@ -40,11 +40,13 @@ test('Run full pipeline shows all four artifact panels with downloads', async ({
   await expect(view.getByTestId('pipeline-results')).toBeVisible({ timeout: 30000 });
   await expect(view.getByTestId('save-run')).toBeVisible({ timeout: 90000 });
 
+  // A company subject runs the company pipeline → Company Profile + UNC
+  // Partnership Profile panels plus the board-ready Partnership Report card.
+  // (Sector Scan / Database are the sector-mode artifacts; not produced here.)
   const body = await page.locator('body').innerText();
   expect(body).toContain('Company Profile');
   expect(body).toContain('UNC Partnership Profile');
-  expect(body).toContain('Sector Scan');
-  expect(body).toContain('Database');
+  expect(body).toContain('Partnership Report');
 });
 
 test('Saving a run makes it reopenable in the project', async ({ page }) => {
@@ -66,7 +68,7 @@ test('All nav tabs still work after a pipeline run', async ({ page }) => {
   await view.getByTestId('run-pipeline').click();
   await expect(view.getByTestId('save-run')).toBeVisible({ timeout: 90000 });
 
-  for (const label of ['Dashboard', 'Company', 'Sector', 'UNC', 'Database', 'Projects']) {
+  for (const label of ['Dashboard', 'Company', 'Sector', 'Partnerships', 'Data', 'Projects']) {
     await clickNav(page, label);
     await page.waitForTimeout(500);
     const body = await page.locator('body').innerText();

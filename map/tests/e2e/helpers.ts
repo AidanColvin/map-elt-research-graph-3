@@ -105,11 +105,10 @@ export function sectorFixture(sector: string) {
 /**
  * Build the SSE body the frontend's `parseSseFrames` expects: "\n\n"-delimited
  * frames, each a single `data:` line of JSON. Ends with a `done` event whose
- * `report` is the full ReportData.
+ * `report` is the full ReportData. Works for ANY fixture (default or custom).
  */
-function sectorSseBody(sector: string): string {
-  const fixture = sectorFixture(sector);
-  const total = fixture.section4_profiles.length;
+export function sseFromFixture(fixture: any): string {
+  const total = (fixture?.section4_profiles?.length as number) || 1;
   const frame = (obj: unknown) => `data: ${JSON.stringify(obj)}\n\n`;
   return (
     frame({ type: 'stage', key: 'resolved', total }) +
@@ -117,6 +116,24 @@ function sectorSseBody(sector: string): string {
     frame({ type: 'progress', done: total, total }) +
     frame({ type: 'stage', key: 'building' }) +
     frame({ type: 'done', report: fixture })
+  );
+}
+
+function sectorSseBody(sector: string): string {
+  return sseFromFixture(sectorFixture(sector));
+}
+
+/**
+ * Override the sector-scan endpoints with a SPECIFIC fixture (so a spec can feed
+ * realistic / deliberately-contaminated data and assert how the report renders
+ * it). Call AFTER `mockBackend` — the later-registered route wins in Playwright.
+ */
+export async function installSectorMock(page: Page, fixture: any): Promise<void> {
+  await page.route('**/api/run-pipeline-stream', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/event-stream; charset=utf-8', body: sseFromFixture(fixture) }),
+  );
+  await page.route('**/api/run-pipeline', (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ data: fixture }) }),
   );
 }
 
