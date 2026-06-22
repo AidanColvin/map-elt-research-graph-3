@@ -79,6 +79,16 @@ function matchMd(md: string, re: RegExp): string {
   return m ? cleanMd(m[1]) : "";
 }
 
+// First non-empty capture across several patterns (prose phrasing varies, e.g.
+// "generated $X in revenue" vs "reported revenue of $X").
+function firstMatchMd(md: string, res: RegExp[]): string {
+  for (const re of res) {
+    const v = matchMd(md, re);
+    if (v) return v;
+  }
+  return "";
+}
+
 // takes: one raw sector-scan profile, the full report (for sector peers +
 //        talking points), all sourced from the backend
 // does: builds the card data model using only sourced facts
@@ -308,13 +318,33 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
   const md = companyMd || "";
   const name = (partner?.resolved_name || subject || matchMd(md, /^#\s+(.+)$/m) || "Company").trim();
 
-  // ── Financials, parsed from the Company Profile prose (live-report template).
-  const moneyRe = "(\\$[\\d.,]+\\s*(?:billion|million|trillion|[BMKT])?)";
-  const revenue = matchMd(md, new RegExp(`reported revenue of ${moneyRe}`, "i"));
-  const netIncome = matchMd(md, new RegExp(`[Nn]et income was ${moneyRe}`));
-  const netLoss = matchMd(md, new RegExp(`net loss of ${moneyRe}`, "i"));
-  const grossMargin = matchMd(md, /[Gg]ross margin was ([\d.]+%)/);
-  const totalAssets = matchMd(md, new RegExp(`[Tt]otal assets(?:\\s+were|\\s+of)?\\s+${moneyRe}`));
+  // ── Financials, parsed from the Company Profile prose. Phrasing varies
+  // ("Apple generated $416.2B in revenue" vs "reported revenue of $X"), so each
+  // metric tries several patterns.
+  const M = "(\\$[\\d.,]+\\s*(?:billion|million|trillion|[BMKT])?)";
+  const revenue = firstMatchMd(md, [
+    new RegExp(`${M}\\s+in (?:total\\s+)?revenue`, "i"),
+    new RegExp(`revenue of ${M}`, "i"),
+    new RegExp(`reported revenue of ${M}`, "i"),
+  ]);
+  const netIncome = firstMatchMd(md, [
+    new RegExp(`net income of ${M}`, "i"),
+    new RegExp(`net income was ${M}`, "i"),
+    new RegExp(`${M}\\s+in net income`, "i"),
+  ]);
+  const netLoss = firstMatchMd(md, [
+    new RegExp(`net loss of ${M}`, "i"),
+    new RegExp(`${M}\\s+net loss`, "i"),
+  ]);
+  const grossMargin = firstMatchMd(md, [
+    /([\d.]+%)\s+gross margin/i,
+    /gross margin (?:was|of)\s+([\d.]+%)/i,
+  ]);
+  const totalAssets = firstMatchMd(md, [
+    new RegExp(`total assets (?:were|of)\\s+${M}`, "i"),
+    new RegExp(`total assets\\s+${M}`, "i"),
+    new RegExp(`${M}\\s+in total assets`, "i"),
+  ]);
 
   // ── UNC ties, from the structured partnership payload.
   const nihPis: any[] = Array.isArray(partner?.nih_pis) ? partner.nih_pis : [];
@@ -340,6 +370,13 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
   const fyEnd = matchMd(md, /\*\*Fiscal year end:\*\*\s*([^\n]+)/);
   const metaLine = [listing, hq, fyEnd && `FY end ${fyEnd}`].filter(Boolean).join(" · ");
 
+  // Clinical-trial framing is only legitimate for health companies (derived from
+  // the parsed industry). For non-health, the company's own ClinicalTrials.gov
+  // rows are sponsor-name collisions and are gated out — but UNC-joint trials
+  // (a verified collaboration) still surface in Goal/talking points.
+  const health = isHealthSector(industry);
+  const visTrials: any[] = health ? trials : [];
+
   // Stat tiles — same four-up bar as the sector card. "—" when not on file.
   const stats: CardStat[] = [
     { value: revenue || "n/a", label: "Revenue" },
@@ -347,7 +384,9 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
       : netLoss ? { value: `-${netLoss}`, label: "Net loss" }
       : { value: grossMargin || "n/a", label: "Gross margin" },
     { value: totalAssets || "n/a", label: "Total assets" },
-    { value: String(trialCount), label: trialCount === 1 ? "Active trial" : "Active trials" },
+    health
+      ? { value: String(trialCount), label: trialCount === 1 ? "Active trial" : "Active trials" }
+      : { value: String(papers), label: papers === 1 ? "UNC paper" : "UNC papers" },
   ];
 
   // Signal pills (the "Active NIH"/"UNC research" ones are rendered via the
@@ -359,11 +398,11 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
   const links: CardLink[] = [];
   if (edgar) links.push({ label: "SEC EDGAR", url: edgar });
   if (pubmed && papers > 0) links.push({ label: `${papers} UNC paper${papers === 1 ? "" : "s"}`, url: pubmed });
-  if (trials.length) links.push({ label: `${trials.length} trial${trials.length === 1 ? "" : "s"}`, url: trials[0]?.url || "https://clinicaltrials.gov" });
+  if (visTrials.length) links.push({ label: `${visTrials.length} trial${visTrials.length === 1 ? "" : "s"}`, url: visTrials[0]?.url || "https://clinicaltrials.gov" });
 
   const company: CardBullet[] = [];
   if (industry) company.push({ text: `Focus · ${industry}`, url: edgar });
-  if (trials.length) company.push({ text: `Clinical pipeline · ${trials.length} trial${trials.length === 1 ? "" : "s"} on ClinicalTrials.gov`, url: trials[0]?.url });
+  if (health && visTrials.length) company.push({ text: `Clinical pipeline · ${visTrials.length} trial${visTrials.length === 1 ? "" : "s"} on ClinicalTrials.gov`, url: visTrials[0]?.url });
   if (papers > 0) company.push({ text: `Research footprint · ${papers} UNC co-authored paper${papers === 1 ? "" : "s"} in PubMed`, url: pubmed });
   if (secMentions > 0) company.push({ text: `Partnership signal · ${secMentions} verbatim UNC mention${secMentions === 1 ? "" : "s"} in SEC filings`, url: edgar });
   company.push({ text: `UNC status · ${uncStatus}${grants.length ? ` · ${grants.length} NIH grant${grants.length === 1 ? "" : "s"} overlapping` : ""}`, url: grants.length ? grants[0]?.url : edgar });
@@ -372,7 +411,7 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
   const problem: CardBullet[] = [];
   if (!uncActive) problem.push({ text: "No co-authored papers, NIH grants, or trials with UNC found in public databases", url: edgar });
   if (secMentions === 0) problem.push({ text: "No verbatim UNC mention on file in recent SEC filings", url: edgar });
-  if (trials.length) problem.push({ text: `${trials.length} active trial${trials.length === 1 ? "" : "s"} — clinical evidence is being generated now`, url: trials[0]?.url });
+  if (health && visTrials.length) problem.push({ text: `${visTrials.length} active trial${visTrials.length === 1 ? "" : "s"} — clinical evidence is being generated now`, url: visTrials[0]?.url });
 
   // Goal — sourced UNC joint trials (where the company's work meets UNC).
   const goal: CardBullet[] = jointTrials.slice(0, 3).map((t) => ({
@@ -406,17 +445,42 @@ export function buildCompanyCard(subject: string, companyMd: string, partner: an
     url: pubmed,
   })).filter((a) => a.name);
 
-  // Active trials list (ClinicalTrials.gov).
-  const trialsList: CardTrial[] = trials.slice(0, 6).map((t) => ({
+  // Active trials list (ClinicalTrials.gov) — gated to health companies.
+  const trialsList: CardTrial[] = visTrials.slice(0, 6).map((t) => ({
     title: trunc(t.title || "Trial", 60), status: t.status || t.phase || "",
     url: t.url || "https://clinicaltrials.gov",
   }));
 
   const grantCount = nihPis.length || grants.length;
+
+  // Talking points — synthesized from the structured UNC partnership evidence
+  // into a logical outreach argument (warmest tie first), mirroring the sector
+  // card. Was previously empty on single-company runs.
+  const tp: CardTalkingPoint[] = [];
+  let usedPapers = false, usedSec = false;
+  if (grantCount > 0) {
+    const pi = nihPis[0] || {};
+    tp.push({ bold: `${grantCount} UNC NIH grant${grantCount === 1 ? "" : "s"} overlap ${name}`, rest: `${pi.name ? `${pi.name} ` : ""}holds federal funding in a related area — route first through UNC OSP.`, boldUrl: pi.grant_url || grants[0]?.url || "https://research.unc.edu/osp" });
+  } else if (papers > 0) {
+    usedPapers = true;
+    tp.push({ bold: `${papers} UNC co-authored paper${papers === 1 ? "" : "s"} on record`, rest: `${name} and UNC already publish together — the warmest public starting point.`, boldUrl: pubmed });
+  } else if (jointTrials.length) {
+    tp.push({ bold: `${jointTrials.length} UNC-joint clinical trial${jointTrials.length === 1 ? "" : "s"}`, rest: `${name} runs trials with UNC as a site or collaborator — an active, documented tie.`, boldUrl: jointTrials[0]?.url });
+  } else if (secMentions > 0) {
+    usedSec = true;
+    tp.push({ bold: `${name} names UNC in SEC filings`, rest: `${secMentions} verbatim UNC mention${secMentions === 1 ? "" : "s"} — an acknowledged relationship to build on.`, boldUrl: edgar });
+  } else {
+    tp.push({ bold: "No documented UNC tie yet", rest: `Greenfield — open through UNC's Office of Technology Commercialization and OSP.`, boldUrl: "https://otc.unc.edu/" });
+  }
+  if (papers > 0 && !usedPapers) tp.push({ bold: `${papers} UNC co-authored paper${papers === 1 ? "" : "s"}`, rest: `Published research links ${name} to UNC investigators in PubMed.`, boldUrl: pubmed });
+  if (secMentions > 0 && !usedSec) tp.push({ bold: `${secMentions} UNC mention${secMentions === 1 ? "" : "s"} in SEC filings`, rest: `${name} references UNC verbatim in its filings — an acknowledged connection.`, boldUrl: edgar });
+  if (partner?.nc_based) tp.push({ bold: "NC-headquartered", rest: `In-state presence supports in-person engagement and a state economic-development framing.`, boldUrl: edgar });
+  const talkingPoints = tp.slice(0, 4);
+
   return {
     name, metaLine, tier: "Translational", uncStatus, pills, stats, links,
     company, problem, goal, solution, contacts: contactsFinal, assets, trials: trialsList,
-    rdPeers: [], talkingPoints: [],
+    rdPeers: [], talkingPoints,
     ospFlag: grants.length > 0, ospGrantCount: grantCount,
   };
 }
