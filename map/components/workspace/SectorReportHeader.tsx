@@ -68,7 +68,7 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
       </p>
 
       {/* Stat strip */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${stats.length}, 1fr)`, gap: 1, background: BORDER, border: `1px solid ${BORDER}`, borderRadius: 14, overflow: "hidden", marginBottom: 24 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(110px, 1fr))", gap: 1, background: BORDER, border: `1px solid ${BORDER}`, borderRadius: 14, overflow: "hidden", marginBottom: 24 }}>
         {stats.map((s, i) => (
           <div key={i} style={{ background: "#fafafa", padding: "16px 18px" }}>
             <p style={{ fontSize: 22, fontWeight: 800, letterSpacing: "-0.02em", color: INK, margin: 0 }}>{s.n}</p>
@@ -90,7 +90,7 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
           non-R&D sector never shows a dangling "R&D spend" label with no chart. */}
       {(m.revenuePeers.length > 0 || m.rdPeers.length > 0) && <>
         <Eyebrow>Sector snapshot</Eyebrow>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 40, marginBottom: 28 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 40, marginBottom: 28 }}>
           {m.revenuePeers.length > 0 && (
             <div>
               <Eyebrow>Revenue (SEC XBRL · latest FY)</Eyebrow>
@@ -108,7 +108,7 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
 
       {/* Data assets */}
       <Eyebrow>UNC data assets available to partners</Eyebrow>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 8 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14, marginBottom: 8 }}>
         {m.dataAssets.map((a, i) => (
           <div key={i} style={{ border: `1px solid ${BORDER}`, borderRadius: 14, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
             <a href={a.url} target="_blank" rel="noreferrer" style={{ fontSize: 14, fontWeight: 700, color: BLUE, textDecoration: "none", letterSpacing: "-0.1px" }}>{a.name}</a>
