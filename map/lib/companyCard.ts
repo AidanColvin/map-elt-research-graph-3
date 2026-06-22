@@ -9,7 +9,7 @@
  * left empty and its section is omitted, never fabricated.
  */
 import { parseMoney } from "@/components/Report";
-import { isHealthSector, looksClinical, visiblePipeline } from "@/lib/domain";
+import { isHealthSector, visiblePipeline } from "@/lib/domain";
 
 export interface CardBullet { text: string; url?: string }
 export interface CardStat { value: string; label: string }
@@ -92,7 +92,9 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const edgarUrl = fs("cik") || fs("revenue") || fs("legal_name") || firstSource(profile?.overview?.sources) || SEC;
 
   const ticker = fv("ticker"); // e.g. "AMZN (Nasdaq)"
-  const hq = fv("hq");
+  // Some foreign filers carry a literal "NONE"/"N/A" state from EDGAR — strip it
+  // so the meta line reads "Luxembourg" not "Luxembourg, NONE".
+  const hq = fv("hq").replace(/,\s*(none|n\/?a|null)\s*$/i, "").trim();
   const cik = fv("cik");
   const fyEnd = fv("fy_end");
   const metaLine = [ticker, hq, cik && `CIK ${cik}`, fyEnd && `FY end ${fyEnd}`]
@@ -105,17 +107,7 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   const health = isHealthSector(report?.report_meta?.sector);
   const rawPipeline: any[] = Array.isArray(profile?.pipeline) ? profile.pipeline : [];
   const pipeline: any[] = visiblePipeline(rawPipeline, health);
-  const uncAlignment: any[] = (Array.isArray(profile?.unc_alignment) ? profile.unc_alignment : [])
-    // Drop placeholder/non-informative overlaps ("(see SEC filings)", bare
-    // "Research overlap") and — for non-health sectors — clinical false
-    // positives, so the Goal/Solution sections read honestly instead of echoing
-    // sponsor-name-collision trial titles.
-    .filter((a: any) => {
-      const prog = (a?.company_program || "").trim();
-      if (!prog || /^\(see\b/i.test(prog) || /^research overlap$/i.test(prog)) return false;
-      if (!health && looksClinical(`${prog} ${a?.unc_fact || ""} ${a?.rationale || ""}`)) return false;
-      return true;
-    });
+  const uncAlignment: any[] = Array.isArray(profile?.unc_alignment) ? profile.unc_alignment : [];
   const whatOffers: any[] = Array.isArray(profile?.what_unc_offers) ? profile.what_unc_offers : [];
   const uncPis: any[] = Array.isArray(profile?.unc_pis) ? profile.unc_pis : [];
   const collabCount: number = Number(profile?.collaboration_8k_count) || 0;
@@ -142,7 +134,12 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
     { value: stripFy(fv("revenue")) || "n/a", label: "Revenue" },
     rd ? { value: rd, label: "R&D" } : { value: netInc || "n/a", label: "Net income" },
     { value: stripFy(fv("total_assets")) || "n/a", label: "Total assets" },
-    { value: String(pipeline.length), label: pipeline.length === 1 ? "Active trial" : "Active trials" },
+    // Trials only mean something for health sectors. Elsewhere the count is
+    // always 0 (collisions are gated out), so show the decision-relevant UNC
+    // signal instead.
+    health
+      ? { value: String(pipeline.length), label: pipeline.length === 1 ? "Active trial" : "Active trials" }
+      : { value: String(grantCount), label: grantCount === 1 ? "UNC NIH overlap" : "UNC NIH overlaps" },
   ];
 
   // Links row.
@@ -167,19 +164,28 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   if (!profile?.existing_unc_tie) problem.push({ text: "No documented UNC research tie found in public databases", url: edgarUrl });
   if (health && pipeline.length) problem.push({ text: `${pipeline.length} active trial${pipeline.length === 1 ? "" : "s"} — clinical evidence is being generated now`, url: firstTrialUrl });
 
-  // Goal — sourced UNC overlaps (where company work meets a UNC unit), deduped
-  // (the backend can emit the same overlap several times).
+  // Goal — "company program → UNC unit" overlaps. Only meaningful for health
+  // sectors: there `company_program` is a real pipeline/program. For non-health
+  // it's a ClinicalTrials.gov collision title or a bare SIC restatement
+  // ("SEC-registered Services-Computer Programming…"), so the section is omitted.
+  // Placeholders dropped, deduped.
   const goalSeen = new Set<string>();
   const goal: CardBullet[] = [];
-  for (const a of uncAlignment) {
-    const text = `${trunc(a.company_program, 60)} → ${a.unc_unit || "UNC"}`;
-    if (goalSeen.has(text)) continue;
-    goalSeen.add(text);
-    goal.push({ text, url: firstSource(a.sources) });
-    if (goal.length >= 3) break;
+  if (health) {
+    for (const a of uncAlignment) {
+      const prog = (a?.company_program || "").trim();
+      if (!prog || /^\(see\b/i.test(prog) || /^research overlap$/i.test(prog) || /^sec-registered/i.test(prog)) continue;
+      const text = `${trunc(prog, 60)} → ${a.unc_unit || "UNC"}`;
+      if (goalSeen.has(text)) continue;
+      goalSeen.add(text);
+      goal.push({ text, url: firstSource(a.sources) });
+      if (goal.length >= 3) break;
+    }
   }
 
-  // Solution — sourced "why it matters" rationale, deduped.
+  // Solution — the sourced "why it matters" rationale (UNC faculty federally
+  // funded on overlapping topics, co-authored publications). Useful for any
+  // sector, deduped. Unlike the program titles, the rationale is clean prose.
   const solSeen = new Set<string>();
   const solution: CardBullet[] = [];
   for (const a of uncAlignment) {
