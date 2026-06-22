@@ -84,7 +84,7 @@ describe("buildCardData — non-health sector gating", () => {
     // A real, layered argument is present.
     expect(card.talkingPoints.length).toBeGreaterThanOrEqual(3);
     expect(texts.some((t) => /Prior UNC tie/i.test(t))).toBe(true);
-    expect(texts.some((t) => /Actively courting partners.*21/i.test(t))).toBe(true);
+    expect(texts.some((t) => /Partnerships cited 21/i.test(t))).toBe(true);
     expect(texts.some((t) => /R&D budget/i.test(t))).toBe(true);
   });
 });
@@ -138,13 +138,18 @@ describe("buildCompanyCard — single-company runs", () => {
     const md = "# Beta Bio\n\n**Industry:** Pharmaceutical Preparations\n";
     const partner = {
       resolved_name: "Beta Bio",
-      nih_pis: [{ name: "Dr. Jane Roe", grant_url: "https://reporter.nih.gov/g" }],
+      nih_pis: [{ name: "Dr. Jane Roe", project_title: "CAR-T resistance in solid tumors", grant_url: "https://reporter.nih.gov/project-details/5R01CA999-02" }],
       trials: [{ title: "A Phase 2 oncology study", url: "https://clinicaltrials.gov/t" }],
       clinical: { count: 1 }, trials_total: 1,
     };
     const card = buildCompanyCard("Beta Bio", md, partner);
     expect(card.company.some((b) => /clinical pipeline/i.test(b.text))).toBe(true);
     expect(card.stats.some((s) => /active trial/i.test(s.label))).toBe(true);
-    expect(/UNC NIH grant.*overlap/i.test(`${card.talkingPoints[0]?.bold}`)).toBe(true);
+    // The lead talking point names the PI and their exact funded topic + grant.
+    const lead = `${card.talkingPoints[0]?.bold} ${card.talkingPoints[0]?.rest}`;
+    expect(/UNC investigator.*overlap/i.test(lead)).toBe(true);
+    expect(lead).toContain("Dr. Jane Roe");
+    expect(lead).toContain("CAR-T resistance in solid tumors");
+    expect(lead).toContain("5R01CA999-02");
   });
 });
