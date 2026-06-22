@@ -13,9 +13,12 @@ function streamingProfile() {
       hq: { value: "Seattle, WA" },
       sic: { value: "Retail-Catalog & Mail-Order Houses" },
       revenue: { value: "$716.92B (FY2025)" },
+      rd_expense: { value: "$88.0B (FY2025)" },
       net_income: { value: "$77.67B (FY2025)" },
       total_assets: { value: "$818.04B" },
     },
+    partnership_term_count: 21,
+    collaboration_8k_count: 0,
     pipeline: [
       { program: "Hemodynamic Repercussions in Different Therapeutic Positions in Premature Newborn", stage: "completed", sources: [] },
       { program: "Plasma Therapy of COVID-19 in Severely Ill Patients", stage: "phase 2", sources: [] },
@@ -67,13 +70,17 @@ describe("buildCardData — non-health sector gating", () => {
     expect(card.goal).toHaveLength(0);
   });
 
-  it("drops 8-K filler, revenue restatement, and clinical talking points", () => {
+  it("synthesizes a logical talking-point argument and drops the weak filler", () => {
     const texts = card.talkingPoints.map((t) => `${t.bold} ${t.rest}`);
-    expect(texts.some((t) => /8-K|material event/i.test(t))).toBe(false);
+    // Junk filler is gone.
+    expect(texts.some((t) => /filed its most recent 8-K|material event disclosure/i.test(t))).toBe(false);
     expect(texts.some((t) => /reported FY\d* revenue/i.test(t))).toBe(false);
-    expect(texts.some((t) => /hemodynamic|ClinicalTrials\.gov entries/i.test(t))).toBe(false);
-    // The genuine UNC hook survives.
-    expect(texts.some((t) => /Deborah F\. Tate/.test(t))).toBe(true);
+    expect(texts.some((t) => /hemodynamic|ClinicalTrials\.gov entries|lead disclosed study/i.test(t))).toBe(false);
+    // A real, layered argument is present.
+    expect(card.talkingPoints.length).toBeGreaterThanOrEqual(3);
+    expect(texts.some((t) => /Prior UNC tie/i.test(t))).toBe(true);
+    expect(texts.some((t) => /Actively courting partners.*21/i.test(t))).toBe(true);
+    expect(texts.some((t) => /R&D budget/i.test(t))).toBe(true);
   });
 });
 

@@ -110,9 +110,11 @@ export default function SectorReportHeader({ m }: { m: SectorReportModel }) {
       <Eyebrow>UNC data assets available to partners</Eyebrow>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 8 }}>
         {m.dataAssets.map((a, i) => (
-          <div key={i} style={{ border: `1px solid ${BORDER}`, borderRadius: 14, padding: "16px 18px" }}>
+          <div key={i} style={{ border: `1px solid ${BORDER}`, borderRadius: 14, padding: "16px 18px", display: "flex", flexDirection: "column", gap: 8 }}>
             <a href={a.url} target="_blank" rel="noreferrer" style={{ fontSize: 14, fontWeight: 700, color: BLUE, textDecoration: "none", letterSpacing: "-0.1px" }}>{a.name}</a>
-            <p style={{ fontSize: 12, color: MUTED, margin: "6px 0 0", lineHeight: 1.45 }}>{a.description} · held by {a.heldBy}</p>
+            <p style={{ fontSize: 12.5, color: INK, margin: 0, lineHeight: 1.45 }}>{a.description}</p>
+            <p style={{ fontSize: 12, color: MUTED, margin: 0, lineHeight: 1.45 }}><span style={{ fontWeight: 600, color: INK }}>Why it fits:</span> {a.relevance}</p>
+            <p style={{ fontSize: 11, color: MUTED, margin: "auto 0 0", paddingTop: 2 }}>Held by {a.heldBy}</p>
           </div>
         ))}
       </div>
