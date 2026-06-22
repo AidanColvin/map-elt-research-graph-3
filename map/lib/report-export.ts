@@ -875,7 +875,7 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
 
   if (m.dataAssets.length) {
     b.push({ t: 'h2', text: 'UNC data assets available to partners' });
-    b.push({ t: 'list', items: m.dataAssets.map((a) => `${a.name} — ${a.description} · held by ${a.heldBy}`) });
+    b.push({ t: 'list', items: m.dataAssets.map((a) => `${a.name} — ${a.description} Why it fits: ${a.relevance} (held by ${a.heldBy})`) });
   }
 
   return b;

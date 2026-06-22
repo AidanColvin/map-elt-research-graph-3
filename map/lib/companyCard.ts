@@ -228,33 +228,56 @@ export function buildCardData(profile: any, report: any): CompanyCardData {
   // Only keep the chart if the subject company appears in it.
   const rdPeersFinal = rdPeers.some((p) => p.isSubject) ? rdPeers : [];
 
-  // Talking points — from the report's sourced talking-point block.
-  const tpEntry = (report?.section6_talking_points?.companies || []).find((c: any) => c.company === name);
+  // Talking points — synthesized from the structured, sourced facts into a
+  // logical outreach argument (warmest tie first, then demand signal, deal
+  // posture, and scale). The backend's own talking-point strings are weak
+  // filler ("filed its most recent 8-K", revenue restatements, clinical
+  // boilerplate), so we build our own — except the prior-tie hook, which names
+  // the specific co-authored work and is worth keeping when present.
+  const hook = (report?.section6_talking_points?.companies || []).find((c: any) => c.company === name)?.unc_hook;
   const talkingPoints: CardTalkingPoint[] = [];
-  // Drop low-signal talking points: generic 8-K "material event" filler, bare
-  // revenue restatements (already in the stat tile), and ClinicalTrials.gov
-  // boilerplate. Clinical content is additionally dropped on non-health sectors.
-  const TP_DROP = [
-    /filed its most recent 8-K/i,
-    /material event disclosure/i,
-    /reported FY\d*\s+revenue of/i,
-    /no active ClinicalTrials\.gov entries/i,
-  ];
-  for (const key of ["unc_hook", "know_pipeline", "know_moves", "know_company"]) {
-    // `know_pipeline` is inherently a clinical-trial summary ("lead disclosed
-    // study is …" / "no active ClinicalTrials.gov entries"); irrelevant for
-    // non-health sectors.
-    if (!health && key === "know_pipeline") continue;
-    const s = tpEntry?.[key];
-    if (!s?.text) continue;
-    const txt: string = s.text;
-    if (TP_DROP.some((re) => re.test(txt))) continue;
-    if (!health && looksClinical(txt)) continue;
+
+  // 1 · The entry point — warmest documented tie first.
+  if (grantCount > 0) {
+    const pi = uncPis[0] || {};
+    talkingPoints.push({
+      bold: `${grantCount} UNC NIH grant${grantCount === 1 ? "" : "s"} overlap ${name}`,
+      rest: `${pi.name ? `${pi.name} ` : ""}holds active federal funding in a directly related area — route first through UNC OSP.`,
+      boldUrl: pi.grant_url || "https://research.unc.edu/osp",
+    });
+  } else if (profile?.existing_unc_tie && hook?.text && / co-author|publication|paper/i.test(hook.text)) {
+    const txt: string = hook.text;
     const dash = txt.indexOf(" — ");
-    const bold = dash > 0 ? txt.slice(0, dash) : txt.split(" ").slice(0, 5).join(" ");
-    const rest = dash > 0 ? txt.slice(dash + 3) : txt.slice(bold.length);
-    talkingPoints.push({ bold: bold.trim(), rest: rest.trim(), boldUrl: firstSource(s.sources) });
-    if (talkingPoints.length >= 4) break;
+    talkingPoints.push({
+      bold: (dash > 0 ? txt.slice(0, dash) : "Prior UNC tie on record").trim(),
+      rest: (dash > 0 ? txt.slice(dash + 3) : txt).trim(),
+      boldUrl: firstSource(hook.sources),
+    });
+  } else if (profile?.existing_unc_tie) {
+    talkingPoints.push({ bold: "Prior UNC tie on record", rest: `${name} and UNC share a documented research link — a warm, public starting point.`, boldUrl: edgarUrl });
+  } else {
+    talkingPoints.push({ bold: "No documented UNC tie yet", rest: `Greenfield — open through UNC's Office of Technology Commercialization and OSP.`, boldUrl: "https://otc.unc.edu/" });
+  }
+
+  // 2 · Demand signal — does the 10-K show appetite for partnering?
+  if (partnershipTerms > 0) {
+    talkingPoints.push({ bold: "Actively courting partners", rest: `${name}'s latest 10-K uses partnership language ${partnershipTerms}× — a clear appetite for outside collaboration.`, boldUrl: edgarUrl });
+  }
+
+  // 3 · Deal posture — open field, or a company that already contracts R&D.
+  if (collabCount === 0) {
+    talkingPoints.push({ bold: "No committed R&D deal on file", rest: `No collaboration or licensing 8-K since 2018 — no incumbent academic partner to displace.`, boldUrl: edgarUrl });
+  } else {
+    talkingPoints.push({ bold: `${collabCount} disclosed deal${collabCount === 1 ? "" : "s"}`, rest: `${name} files collaboration/licensing 8-Ks${collab8kDate ? ` (latest ${collab8kDate})` : ""} — it contracts external R&D and knows the motions.`, boldUrl: collab8kUrl });
+  }
+
+  // 4 · Scale — where UNC fits against the company's research spend / footprint.
+  if (rd) {
+    const idx = rdPeersFinal.findIndex((p) => p.isSubject);
+    const rank = idx >= 0 ? ` — #${idx + 1} among the set's top R&D spenders` : "";
+    talkingPoints.push({ bold: `${rd} R&D budget`, rest: `${name} funds research at scale${rank}; capacity to back university work.`, boldUrl: edgarUrl });
+  } else if (profile?.nc_based) {
+    talkingPoints.push({ bold: "NC-headquartered", rest: `In-state presence supports in-person engagement and a state economic-development framing.`, boldUrl: edgarUrl });
   }
 
   return {
