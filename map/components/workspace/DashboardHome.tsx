@@ -1,24 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { OrbitNetwork } from "@/components/Chart3D";
 import { getCompanySuggestion } from "./companySuggestions";
 import MapOnePager from "./MapOnePager";
-
-const ORBIT_POINTS = [
-  { label: "Merck",       size: 0.8,  highlight: true  },
-  { label: "Pfizer",      size: 0.8,  highlight: true  },
-  { label: "Amgen",       size: 0.7,  highlight: true  },
-  { label: "Regeneron",   size: 0.7,  highlight: true  },
-  { label: "BMS",         size: 0.55, highlight: false },
-  { label: "AstraZeneca", size: 0.55, highlight: false },
-  { label: "Novartis",    size: 0.55, highlight: false },
-  { label: "Roche",       size: 0.55, highlight: false },
-  { label: "J&J",         size: 0.5,  highlight: false },
-  { label: "AbbVie",      size: 0.5,  highlight: false },
-  { label: "Gilead",      size: 0.5,  highlight: false },
-  { label: "Sanofi",      size: 0.5,  highlight: false },
-];
+import NetworkGraph from "./NetworkGraph";
 
 export default function DashboardHome({
   onRunProject,
@@ -157,14 +142,9 @@ export default function DashboardHome({
         </div>
       </div>
 
-      {/* 3D orbit */}
-      <div style={{ marginBottom: 32, borderRadius: 20, overflow: "hidden", background: "#f9f9fb", border: "1px solid #e5e5ea", boxShadow: "inset 0 1px 0 rgba(255,255,255,0.6), 0 2px 6px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.05)" }}>
-        <OrbitNetwork
-          points={ORBIT_POINTS}
-          centerLabel="map"
-          height={320}
-          baseColor="#007aff"
-        />
+      {/* 3D neural network graph */}
+      <div style={{ marginBottom: 32 }}>
+        <NetworkGraph />
       </div>
 
       {/* Footer */}
