@@ -165,7 +165,7 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
       </div>
 
       {/* Stat bar */}
-      <div style={{ display: "grid", gridTemplateColumns: `repeat(${data.stats.length}, 1fr)`, gap: 1, background: BORDER, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 1, background: BORDER, borderRadius: 12, overflow: "hidden", marginBottom: 16 }}>
         {data.stats.map((s, i) => (
           <div key={i} style={{ background: "#fafafad0", padding: "14px 16px" }}>
             <p style={{ fontSize: 18, fontWeight: 700, letterSpacing: "-0.02em", color: INK, margin: 0 }}>{s.value}</p>
@@ -196,7 +196,7 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
       )}
 
       {/* Body grid */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 32 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 32 }}>
         <div>
           {data.company.length > 0 && <><SectionLabel>Company</SectionLabel><Bullets items={data.company} /></>}
           {data.problem.length > 0 && <div style={{ marginTop: 16 }}><SectionLabel>Problem</SectionLabel><Bullets items={data.problem} /></div>}
@@ -213,7 +213,7 @@ export default function CompanyReportCard({ data, onDownloadPDF, onDownloadDOCX 
       {data.talkingPoints.length > 0 && (
         <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 18, marginTop: 18 }}>
           <SectionLabel>Talking Points</SectionLabel>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 28px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "0 28px" }}>
             {data.talkingPoints.map((tp: CardTalkingPoint, i) => (
               <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", padding: "10px 0", borderBottom: i < data.talkingPoints.length - (data.talkingPoints.length % 2 === 0 ? 2 : 1) ? `1px solid ${BORDER}` : "none" }}>
                 <span style={{ width: 6, height: 6, borderRadius: 999, background: INK, marginTop: 7, flexShrink: 0 }} />
