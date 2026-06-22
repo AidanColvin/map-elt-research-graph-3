@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Intro from "@/components/Intro";
 import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
@@ -223,6 +223,18 @@ export default function MapHome() {
   // Per-user saved reports (Firestore for signed-in accounts, device-local for
   // guests). Lives at the page level so every view shares one synced list.
   const saved = useSavedReports(user);
+
+  // Skip the intro animation when ?screenshot=1 is present (used by the
+  // Playwright screenshot harness): dismiss the intro and seed the same guest
+  // session the "Continue as guest" button creates, so the dashboard renders
+  // immediately. Read window only after mount to avoid a hydration mismatch —
+  // the server always renders with showIntro = true and no user.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("screenshot")) {
+      setShowIntro(false);
+      setUser({ email: "guest", guest: true, role: "user" });
+    }
+  }, []);
 
   // takes: a company name selected from a sector ticker card
   // does: triggers a deep dive and mirrors the choice into the draft input;
