@@ -108,8 +108,11 @@ test('non-health sector: clinical contamination + weak filler are gated out', as
   expect(body).not.toContain('Lineberger');
   expect(body).not.toContain('Carolina Health Informatics');
 
-  // A synthesized, logical talking point is present.
-  expect(body).toMatch(/Actively courting partners|No committed R&D deal on file/);
+  // Synthesized, company-specific talking points are present (not boilerplate):
+  // the co-authored-publication tie, the R&D-budget capacity line, and the
+  // 10-K partnership-posture line (count-driven).
+  expect(body).toMatch(/Partnerships cited \d+/);
+  expect(body).toMatch(/R&D budget|Co-authored UNC publication/);
 });
 
 test('health sector: clinical content + clinical data assets are preserved', async ({ page }) => {
