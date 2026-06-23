@@ -56,6 +56,14 @@ export interface UNCPatent {
   date?: string;
   school?: string;
 }
+export interface StrategicOverlap {
+  matched_title: string;
+  source_type: 'paper' | 'grant' | 'trial';
+  matched_phrase?: string | null;
+  matched_terms?: string[];
+  risk_excerpt: string;
+  filing_url?: string;
+}
 export interface TalkingPoint {
   category: 'Research Overlap' | 'Existing Relationship' | 'Partnership Opportunity' | 'Contact' | 'Strategic Overlap';
   headline: string;
@@ -105,6 +113,7 @@ export interface PartnerData {
   relationship_signals?: RelationshipSignal[];
   unc_joint_trials?: UNCTrial[];
   unc_patents?: UNCPatent[];
+  strategic_overlap?: StrategicOverlap | null;
 }
 
 // Static UNC partnership assets — copied VERBATIM from the backend
@@ -305,8 +314,11 @@ function TalkingPointRow({ tp }: { tp: TalkingPoint }) {
   const pillColor = tp.strength === "high" ? "#15803d" : tp.strength === "medium" ? "#a16207" : "#6b7280";
   const isUrl = tp.detail.startsWith("http://") || tp.detail.startsWith("https://");
   const urlMatch = tp.detail.match(/(https?:\/\/\S+)/);
+  // The strategic-overlap row carries its own testid so the shoot harness can
+  // capture it as a close-up; every other row stays "talking-point-row".
+  const rowTestId = tp.category === "Strategic Overlap" ? "strategic-overlap" : "talking-point-row";
   return (
-    <li data-testid="talking-point-row" style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
+    <li data-testid={rowTestId} style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
         <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9aa2" }}>{tp.category}</span>
         <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 9px", background: pillBg, color: pillColor }}>
@@ -679,6 +691,7 @@ export default function PartnershipsView({
           relationship_signals: pd.relationship_signals ?? [],
           unc_trials: pd.unc_joint_trials ?? [],
           unc_patents: pd.unc_patents ?? [],
+          strategic_overlap: pd.strategic_overlap ?? null,
           company_summary: "",
         }),
       });

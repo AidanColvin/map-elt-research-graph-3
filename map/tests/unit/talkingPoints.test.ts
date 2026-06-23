@@ -122,6 +122,33 @@ describe('assembleTalkingPoints', () => {
     expect(body).toContain('Source: https://src/0');
   });
 
+  it('surfaces a Strategic Overlap R&D point on a real 10-K match', () => {
+    const body: TalkingPointsRequest = {
+      company_name: 'Acme',
+      strategic_overlap: {
+        matched_title: 'Advances in semiconductor lithography',
+        source_type: 'grant',
+        matched_phrase: 'semiconductor lithography',
+        matched_terms: ['semiconductor', 'lithography'],
+        risk_excerpt: 'any disruption to semiconductor lithography could harm us',
+        filing_url: 'https://sec.gov/filing',
+      },
+    };
+    const points = assembleTalkingPoints(body, NOW);
+    const overlap = points.find((p) => p.category === 'Strategic Overlap');
+    expect(overlap).toBeTruthy();
+    expect(overlap!.angle).toBe('R&D');
+    // A shared phrase is the strong path.
+    expect(overlap!.strength).toBe('high');
+    expect(overlap!.headline).toContain('semiconductor lithography');
+    expect(overlap!.source_url).toBe('https://sec.gov/filing');
+  });
+
+  it('emits no Strategic Overlap point when there is no match', () => {
+    const points = assembleTalkingPoints({ company_name: 'Acme', strategic_overlap: null }, NOW);
+    expect(points.some((p) => p.category === 'Strategic Overlap')).toBe(false);
+  });
+
   it('keeps a talent point even when many high-strength R&D signals compete', () => {
     const many: TalkingPointsRequest = {
       company_name: 'Acme',
