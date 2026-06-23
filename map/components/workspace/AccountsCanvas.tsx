@@ -16,7 +16,13 @@ import { CanvasCard } from "./ui";
 //       interactive table (live search, type filters, sortable columns, CSV +
 //       Excel / PDF / Markdown exports of the currently filtered set)
 // returns: the database canvas card element
-export default function AccountsCanvas({ extraRows = [] }: { extraRows?: AccountProfile[] }) {
+export default function AccountsCanvas({
+  extraRows = [],
+  onRunDeepDive,
+}: {
+  extraRows?: AccountProfile[];
+  onRunDeepDive?: (company: string) => void;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
   // Merge any session-added rows (e.g. from a sector Package) ahead of render,
   // deduped by company name against the static Database.
@@ -41,6 +47,7 @@ export default function AccountsCanvas({ extraRows = [] }: { extraRows?: Account
       <InteractiveAccountsTable
         accounts={allAccounts}
         busyExport={busy}
+        onRunDeepDive={onRunDeepDive}
         onExportExcel={(rows) => run("Excel", downloadAccountsExcel, rows)}
         onExportPdf={(rows) => run("PDF", downloadAccountsPdf, rows)}
         onExportMarkdown={(rows) => run("Markdown", downloadAccountsMarkdown, rows)}
