@@ -108,7 +108,7 @@ export default function DashboardHome({
 
       {/* Hero headline */}
       <h1 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, marginBottom: 20 }}>
-        <span style={{ color: "#1d1d1f" }}>Board-ready intelligence, </span>
+        <span style={{ color: "#1d1d1f" }}>Map the company, generate the report, </span>
         <span style={{
           background: "linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)",
           WebkitBackgroundClip: "text",
@@ -185,17 +185,8 @@ export default function DashboardHome({
         </div>
       </div>
 
-      {/* Platform positioning — intro block (appears exactly once) */}
+      {/* Platform positioning */}
       <div style={{ marginBottom: 48 }}>
-        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase", marginBottom: 10 }}>
-          MAP — Market and Accounts Platform
-        </p>
-        <p style={{ fontSize: 22, fontWeight: 300, letterSpacing: "-0.015em", color: "#1d1d1f", lineHeight: 1.35, marginBottom: 6 }}>
-          A program that does the research and writes the report
-        </p>
-        <p style={{ fontSize: 15, fontWeight: 400, color: "#6e6e73", lineHeight: 1.7, marginBottom: 36 }}>
-          MAP supports the Research and Intelligence team. Type a company or sector. It pulls the data and drafts the report for you to review.
-        </p>
 
         {/* Problem space */}
         <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase", marginBottom: 12 }}>
