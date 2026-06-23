@@ -6,6 +6,7 @@ import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { authFetch } from "@/lib/authFetch";
 import { buildMailtoHref } from "@/lib/talkingPoints";
 import { partnershipCsv } from "@/lib/partnershipCsv";
+import PartnershipGraph from "./PartnershipGraph";
 import { CompanyExportBar } from "./CompanyExportBar";
 import { ProjectSaveControl } from "./ProjectSaveControl";
 import { SaveControl } from "./SavedReports";
@@ -999,6 +1000,20 @@ export default function PartnershipsView({
                 </div>
               );
             })()}
+
+            {/* ── Relationship graph — the company at the center, branching to the
+                real UNC entities resolved above (investigators, shared trials,
+                patents). Renders nothing when no entity supports a node. ───── */}
+            <PartnershipGraph
+              company={resolvedName}
+              investigators={
+                nihPis.length > 0
+                  ? nihPis.map((p) => ({ name: p.name }))
+                  : data.clinical.top_authors.map((name) => ({ name }))
+              }
+              trials={uncTrials.map((t) => ({ label: t.nct_id || t.title }))}
+              patents={(data.unc_patents ?? []).map((p) => ({ label: p.patent_id || p.title }))}
+            />
 
             {/* ── Current relationships — who at UNC, what's active, which schools ─ */}
             {hasSignal && (
