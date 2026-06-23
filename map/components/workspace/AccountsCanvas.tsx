@@ -43,7 +43,7 @@ export default function AccountsCanvas({
   }
 
   return (
-    <CanvasCard title="Database">
+    <CanvasCard title="Companies">
       <InteractiveAccountsTable
         accounts={allAccounts}
         busyExport={busy}

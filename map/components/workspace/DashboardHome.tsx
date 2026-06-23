@@ -76,11 +76,11 @@ function MapFlowDiagram() {
 
       {/* Detail footnotes */}
       <text x={440} y={186} textAnchor="middle" fontSize="12" fill="#86868b">
-        <tspan fontWeight="600" fill="#a1a1a6">SOURCES  </tspan>
+        <tspan fontWeight="500" fill="#a1a1a6">Sources  </tspan>
         SEC EDGAR · ClinicalTrials.gov · NIH RePORTER · PubMed · UNC
       </text>
       <text x={440} y={206} textAnchor="middle" fontSize="12" fill="#86868b">
-        <tspan fontWeight="600" fill="#a1a1a6">EXPORT  </tspan>
+        <tspan fontWeight="500" fill="#a1a1a6">Export  </tspan>
         Word · Excel · PowerPoint · PDF
       </text>
     </svg>
@@ -138,34 +138,21 @@ export default function DashboardHome({
       background: "#ffffff",
     }}>
 
-      {/* Hero headline */}
-      <h1 style={{ fontSize: "clamp(32px,4.5vw,52px)", fontWeight: 800, letterSpacing: "-0.03em", lineHeight: 1.08, marginBottom: 20 }}>
-        <span style={{ color: "#1d1d1f" }}>Map the company, generate the report, </span>
-        <span style={{
-          background: "linear-gradient(135deg, #0a84ff 0%, #5e5ce6 100%)",
-          WebkitBackgroundClip: "text",
-          backgroundClip: "text",
-          color: "transparent",
-        }}>assembled from primary sources.</span>
+      {/* Hero — one idea, flat color */}
+      <h1 style={{ fontSize: "clamp(34px,4.8vw,54px)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.06, color: "#1d1d1f", marginBottom: 16 }}>
+        Research, written for you.
       </h1>
+      <p style={{ fontSize: 18, fontWeight: 400, color: "#6e6e73", lineHeight: 1.55, marginBottom: 32, maxWidth: 540 }}>
+        Type a company or sector. MAP reads the public sources and drafts a sourced brief — every figure traceable, no model in the request path.
+      </p>
 
       {/* Search */}
-      <div style={{ marginBottom: 56 }}>
-        <div style={{
-          display: "inline-flex", padding: "6px 18px", marginBottom: 12,
-          background: "#fff", borderRadius: 999,
-          boxShadow: "0 1px 3px rgba(0,0,0,0.1)",
-        }}>
-          <span style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f" }}>
-            Project
-          </span>
-        </div>
-
+      <div style={{ marginBottom: 64 }}>
         <div style={{
           display: "flex", alignItems: "center", gap: 10,
           background: "#fff", borderRadius: 14,
-          border: `1.5px solid ${focused ? "#007aff" : "#e5e5ea"}`,
-          boxShadow: focused ? "0 0 0 4px rgba(0,122,255,0.1)" : "none",
+          border: `1.5px solid ${focused ? "#0071e3" : "#e5e5ea"}`,
+          boxShadow: focused ? "0 0 0 4px rgba(0,113,227,0.1)" : "none",
           padding: "4px 4px 4px 16px", transition: "all 0.15s",
         }}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
@@ -206,9 +193,9 @@ export default function DashboardHome({
             />
           </div>
           <button onClick={submit} disabled={!query.trim()} style={{
-            padding: "10px 22px", fontSize: 14.5, fontWeight: 600,
+            padding: "10px 22px", fontSize: 14.5, fontWeight: 500,
             border: "none", borderRadius: 11, cursor: query.trim() ? "pointer" : "default",
-            background: query.trim() ? "#007aff" : "#e5e5ea",
+            background: query.trim() ? "#0071e3" : "#e5e5ea",
             color: query.trim() ? "#fff" : "#a0a0a5",
             transition: "background 0.15s", flexShrink: 0,
           }}>
@@ -217,58 +204,12 @@ export default function DashboardHome({
         </div>
       </div>
 
-      {/* Platform positioning */}
-      <div style={{ marginBottom: 48 }}>
-
-        {/* Problem space */}
-        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase", marginBottom: 12 }}>
-          The Problem It Solves
+      {/* How it works — the one explainer the daily view keeps */}
+      <div>
+        <p style={{ fontSize: 13, fontWeight: 500, color: "#86868b", marginBottom: 18 }}>
+          How it works
         </p>
-        <p style={{ fontSize: 15, fontWeight: 400, color: "#3a3a3c", lineHeight: 1.75, marginBottom: 20 }}>
-          Interns spend hours reading and researching before they can write one report on a sector, a company, or a UNC partnership. They check SEC EDGAR, ClinicalTrials.gov, NIH grants, PubMed, and the UNC website one source at a time. That time is expensive. So are the AI tokens when a model reads and writes it all. MAP cuts both. It reads the sources and builds the draft.
-        </p>
-
-        {/* Source traceability */}
-        <p style={{ fontSize: 13, fontWeight: 400, color: "#86868b", lineHeight: 1.65 }}>
-          No LLM in the request path. No API keys. Every number, sentence, and citation traces to a free, keyless public data source: SEC EDGAR, ClinicalTrials.gov, PubMed, NIH RePORTER.
-        </p>
-      </div>
-
-      {/* How MAP works — flow diagram */}
-      <div style={{ marginBottom: 56 }}>
-        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase", marginBottom: 20 }}>
-          How MAP Works
-        </p>
-        <div style={{ maxWidth: 720, margin: "0 auto" }}>
-          <MapFlowDiagram />
-        </div>
-      </div>
-
-      {/* Cost breakdown */}
-      <div style={{ marginBottom: 48 }}>
-        <p style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.12em", color: "#c7c7cc", textTransform: "uppercase", marginBottom: 28 }}>
-          Where the Cost Goes Today
-        </p>
-
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 48px" }}>
-          <div>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", letterSpacing: "0.01em", marginBottom: 8 }}>
-              Time
-            </p>
-            <p style={{ fontSize: 14, fontWeight: 300, color: "#6e6e73", lineHeight: 1.7, margin: 0 }}>
-              Hours per report spent reading filings, trials, grants, and papers by hand. Slow and hard to repeat.
-            </p>
-          </div>
-
-          <div>
-            <p style={{ fontSize: 13, fontWeight: 600, color: "#1d1d1f", letterSpacing: "0.01em", marginBottom: 8 }}>
-              AI tokens
-            </p>
-            <p style={{ fontSize: 14, fontWeight: 300, color: "#6e6e73", lineHeight: 1.7, margin: 0 }}>
-              Every page fed to a model to read or write costs money. It adds up fast across many companies.
-            </p>
-          </div>
-        </div>
+        <MapFlowDiagram />
       </div>
     </div>
   );

@@ -68,7 +68,7 @@ test('All nav tabs still work after a pipeline run', async ({ page }) => {
   await view.getByTestId('run-pipeline').click();
   await expect(view.getByTestId('save-run')).toBeVisible({ timeout: 90000 });
 
-  for (const label of ['Dashboard', 'Company', 'Sector', 'Partnerships', 'Data', 'Projects']) {
+  for (const label of ['Dashboard', 'Company', 'Sector', 'Partnerships', 'Companies', 'Projects']) {
     await clickNav(page, label);
     await page.waitForTimeout(500);
     const body = await page.locator('body').innerText();
