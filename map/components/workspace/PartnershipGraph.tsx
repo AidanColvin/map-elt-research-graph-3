@@ -169,13 +169,19 @@ export default function PartnershipGraph({
         ctx.strokeStyle = "#fff";
         ctx.stroke();
 
-        // Label sits just beyond the node, flipped to the inboard side so it
-        // never runs off the canvas edge.
+        // Label sits just beyond the node, flipped to the inboard side, and is
+        // truncated to the pixel space actually left to the canvas edge so it
+        // never clips — critical at narrow (390px) widths.
         const onRight = Math.cos(n.angle) >= 0;
         ctx.textAlign = onRight ? "left" : "right";
         ctx.fillStyle = INK;
         const lx = x + (onRight ? NODE_RADIUS + 6 : -(NODE_RADIUS + 6));
-        ctx.fillText(trunc(n.label, 20), lx, y);
+        const avail = (onRight ? W - lx : lx) - 4;
+        let label = trunc(n.label, 20);
+        while (label.length > 3 && ctx.measureText(label).width > avail) {
+          label = label.slice(0, -2) + "…";
+        }
+        if (ctx.measureText(label).width <= avail) ctx.fillText(label, lx, y);
       }
 
       // Center company node — auto-fit the label inside the disc so a long name
