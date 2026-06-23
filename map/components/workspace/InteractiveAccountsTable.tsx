@@ -89,25 +89,75 @@ function revNum(s: string): number {
   return v * 1e6;
 }
 
-// Sectors aligned with UNC's research strengths (used by the est. UNC Fit rule).
-const LIFE_SCI = /life scien|biotech|pharma|health|medtech|medical|therapeut|diagnostic|clinical|drug|genomic/i;
-// Sectors with limited overlap with UNC research partnerships.
-const LOW_FIT = /consumer|retail|entertainment|gaming|apparel|food|beverage|hospitality/i;
+/**
+ * UNC Fit (est.) — a deterministic, transparent estimate of how well a company
+ * aligns with UNC's research-partnership strengths. NOT a predictive model: it
+ * sums a few weighted, explainable signals (sector tier weighted by
+ * primary/secondary, NC / Research-Triangle geography, and revenue scale) into
+ * a High / Mid / Low pill, and reports the reasons that drove the score.
+ */
+
+// Core UNC research cluster — life sciences in the broad sense.
+const CORE_SECTOR = /life scien|biotech|pharma|health|medtech|medical|therap|diagnostic|clinical|\bdrug|genomic|biolog|oncolog|immunolog|vaccine/i;
+// Other sectors with real UNC / Research-Triangle research overlap.
+const STRONG_SECTOR = /material|clean energy|renewable|solar|wind power|energy storage|battery|environment|climate|sustainab|agtech|agricultur|agribusiness|artificial intelligence|machine learning|data science|\bai\b|chemical|biomanufactur|nanotech|public health|education/i;
+// Consumer-facing sectors with limited research-partnership overlap.
+const LOW_SECTOR = /consumer|retail|entertainment|gaming|apparel|footwear|food|beverage|hospitality|restaurant|fashion|luxury|advertising/i;
+// Research-Triangle / NC geography mentioned outside the HQ state field.
+const RTP_GEO = /research triangle|\brtp\b|raleigh|durham|chapel hill|\bcary\b|morrisville|north carolina/i;
 
 type Fit = "High" | "Mid" | "Low";
+interface FitResult { level: Fit; score: number; reason: string; }
 
 // takes: one account row plus its parsed revenue in dollars
-// does: applies the deterministic, placeholder UNC-alignment rule — High when a
-//       life-sciences company is NC-based or large ($1B+ revenue); Low for
-//       consumer/retail/entertainment/gaming; Mid for everything else
-// returns: the estimated fit bucket
-function uncFit(a: AccountProfile, rev: number): Fit {
-  const sector = `${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`;
-  const isLifeSci = LIFE_SCI.test(sector);
+// does: scores UNC alignment from weighted, explainable signals — sector
+//       (primary counts above secondary; core > strong > low), geography (NC HQ
+//       > Research-Triangle mention), and revenue scale (which only amplifies
+//       companies that already have sector alignment, so a cash-rich retailer
+//       can't buy its way up). A pure consumer/retail company is floored at Low,
+//       or Mid when it is an NC corporate citizen.
+// returns: the fit level, its raw score, and a short human-readable reason
+function uncFit(a: AccountProfile, rev: number): FitResult {
+  const primary = a.topIndustrySectorProfile || "";
+  const secondary = a.secondaryIndustrySectorProfile || "";
+  const why: string[] = [];
+
+  // Sector signal — the primary sector is weighted above the secondary.
+  let sector = 0;
+  if (CORE_SECTOR.test(primary)) { sector += 3; why.push("life sciences"); }
+  else if (STRONG_SECTOR.test(primary)) { sector += 2; why.push("UNC-aligned sector"); }
+  else if (LOW_SECTOR.test(primary)) { sector -= 3; why.push("consumer/retail"); }
+  if (CORE_SECTOR.test(secondary)) { sector += 2; if (!CORE_SECTOR.test(primary)) why.push("life-sci secondary"); }
+  else if (STRONG_SECTOR.test(secondary)) { sector += 1; }
+  else if (LOW_SECTOR.test(secondary)) { sector -= 1; }
+
+  const aligned =
+    CORE_SECTOR.test(primary) || STRONG_SECTOR.test(primary) ||
+    CORE_SECTOR.test(secondary) || STRONG_SECTOR.test(secondary);
+
+  // Geography — an NC HQ is the strongest local-partnership signal; a
+  // Research-Triangle mention elsewhere earns partial credit.
   const inNC = (a.state || "").trim().toUpperCase() === "NC";
-  if (isLifeSci && (inNC || rev > 1e9)) return "High";
-  if (LOW_FIT.test(sector)) return "Low";
-  return "Mid";
+  const nearNC = !inNC && RTP_GEO.test(`${a.city} ${a.streetAddress} ${a.description}`);
+  let geo = 0;
+  if (inNC) { geo = 2; why.push("NC-based"); }
+  else if (nearNC) { geo = 1; why.push("NC presence"); }
+
+  // Revenue scale — tiered, and only counts for already-aligned companies.
+  let revTier = 0;
+  if (aligned) {
+    if (rev >= 10e9) { revTier = 2; why.push("$10B+"); }
+    else if (rev >= 1e9) { revTier = 1; why.push("$1B+"); }
+  }
+
+  const score = sector + geo + revTier;
+
+  let level: Fit;
+  if (!aligned && LOW_SECTOR.test(primary)) level = inNC ? "Mid" : "Low";
+  else if (score >= 4) level = "High";
+  else level = "Mid";
+
+  return { level, score, reason: why.join(" · ") || "no strong signals" };
 }
 
 const FIT_STYLE: Record<Fit, { bg: string; color: string }> = {
@@ -184,6 +234,7 @@ export default function InteractiveAccountsTable({
         emp: empNum(a.approximateEmployees),
         rev: revNum(a.approximateRevenue),
         fit: uncFit(a, revNum(a.approximateRevenue)),
+        lifeSci: CORE_SECTOR.test(`${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`),
       })),
     [accounts],
   );
@@ -221,7 +272,7 @@ export default function InteractiveAccountsTable({
     const dir = sortDir === "asc" ? 1 : -1;
     const str = (e: typeof enriched[number]): string => {
       switch (sortKey) {
-        case "fit":           return e.fit;
+        case "fit":           return e.fit.level;
         case "exchange":      return e.exchange;
         case "sector":        return e.a.topIndustrySectorProfile;
         case "secondary":     return e.a.secondaryIndustrySectorProfile;
@@ -246,6 +297,7 @@ export default function InteractiveAccountsTable({
       switch (sortKey) {
         case "employees": return (x.emp - y.emp) * dir;
         case "revenue":   return (x.rev - y.rev) * dir;
+        case "fit":       return (x.fit.score - y.fit.score) * dir;
         default:          return str(x).localeCompare(str(y)) * dir;
       }
     });
@@ -256,9 +308,7 @@ export default function InteractiveAccountsTable({
   const stats = useMemo(() => {
     const total = rows.length;
     const nc = rows.filter((e) => (e.a.state || "").trim().toUpperCase() === "NC").length;
-    const lifeSci = rows.filter((e) =>
-      LIFE_SCI.test(`${e.a.topIndustrySectorProfile} ${e.a.secondaryIndustrySectorProfile}`),
-    ).length;
+    const lifeSci = rows.filter((e) => e.lifeSci).length;
     const pub = rows.filter((e) => e.kind === "public").length;
     return { total, nc, lifeSci, pub };
   }, [rows]);
@@ -338,13 +388,13 @@ export default function InteractiveAccountsTable({
     {
       key: "fit", label: "UNC Fit (est.)",
       cell: (e) => {
-        const fs = FIT_STYLE[e.fit];
+        const fs = FIT_STYLE[e.fit.level];
         return (
-          <span style={{
+          <span title={e.fit.reason} style={{
             display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 600,
             borderRadius: 999, background: fs.bg, color: fs.color,
           }}>
-            {e.fit}
+            {e.fit.level}
           </span>
         );
       },
@@ -548,7 +598,7 @@ export default function InteractiveAccountsTable({
         {selected && (() => {
           const sec = secUrlOf(selected);
           const fit = uncFit(selected, revNum(selected.approximateRevenue));
-          const fs = FIT_STYLE[fit];
+          const fs = FIT_STYLE[fit.level];
           const hq = hqOf(selected);
           const Field = ({ label, children }: { label: string; children: ReactNode }) => (
             <div style={{ marginBottom: 18 }}>
@@ -566,12 +616,15 @@ export default function InteractiveAccountsTable({
                   <div style={{ fontSize: 20, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.02em" }}>
                     {selected.account}
                   </div>
-                  <span style={{
+                  <span title={fit.reason} style={{
                     display: "inline-block", marginTop: 8, padding: "2px 10px", fontSize: 12, fontWeight: 600,
                     borderRadius: 999, background: fs.bg, color: fs.color,
                   }}>
-                    UNC Fit (est.): {fit}
+                    UNC Fit (est.): {fit.level}
                   </span>
+                  {fit.reason && (
+                    <div style={{ fontSize: 12, color: "#86868b", marginTop: 6 }}>{fit.reason}</div>
+                  )}
                 </div>
                 <button
                   onClick={() => setSelected(null)}
