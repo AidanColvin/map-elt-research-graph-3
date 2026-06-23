@@ -90,19 +90,28 @@ describe('assembleTalkingPoints', () => {
     expect(points[0].score!).toBeGreaterThan(points[1].score!);
   });
 
-  it('caps the list and falls back when there are no signals', () => {
+  it('always surfaces both an R&D and a talent angle, even with no signals', () => {
     const fallback = assembleTalkingPoints({ company_name: 'Nobody' }, NOW);
-    expect(fallback).toHaveLength(1);
-    expect(fallback[0].strength).toBe('low');
+    expect(fallback.some((p) => p.angle === 'R&D')).toBe(true);
+    expect(fallback.some((p) => p.angle === 'Talent')).toBe(true);
+    // R&D fallback prompt is present, talent pipeline pitch is present.
+    expect(fallback.some((p) => /No existing UNC relationship/.test(p.headline))).toBe(true);
+    expect(fallback.some((p) => /talent pipeline for Nobody/.test(p.headline))).toBe(true);
+  });
 
+  it('keeps a talent point even when many high-strength R&D signals compete', () => {
     const many: TalkingPointsRequest = {
       company_name: 'Acme',
       unc_faculty_leads: Array.from({ length: 12 }, (_, i) => ({
         pi_name: `PI ${i}`,
-        fiscal_year: 2000 + i,
+        department: 'Pharmacology',
+        fiscal_year: 2024,
         award_amount: 1,
       })),
     };
-    expect(assembleTalkingPoints(many, NOW).length).toBeLessThanOrEqual(MAX_TALKING_POINTS);
+    const points = assembleTalkingPoints(many, NOW);
+    expect(points.length).toBeLessThanOrEqual(MAX_TALKING_POINTS);
+    expect(points.some((p) => p.angle === 'Talent')).toBe(true);
+    expect(points.some((p) => p.angle === 'R&D')).toBe(true);
   });
 });

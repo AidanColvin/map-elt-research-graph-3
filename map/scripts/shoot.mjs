@@ -90,6 +90,15 @@ try {
   await page.waitForSelector('[data-testid="talking-point-row"]', { timeout: 30000 }).catch(() => {});
   await page.evaluate(() => document.fonts?.ready);
   await page.screenshot({ path: join(OUT, `partnerships-results.png`), fullPage: true });
+
+  // Readable close-ups of the panels that change most across this work.
+  const closeup = async (testid, name) => {
+    const el = page.locator(`[data-testid="${testid}"]`).first();
+    if (await el.count()) await el.scrollIntoViewIfNeeded().then(() => el.screenshot({ path: join(OUT, name) })).catch(() => {});
+  };
+  await closeup('talking-points-card', 'talking-points.png');
+  await closeup('strategic-overlap', 'strategic-overlap.png');
+  await closeup('partnership-graph', 'partnership-graph.png');
 } catch (e) {
   errors.push(`partnerships results did not render for "${PARTNER_QUERY}": ${e}`);
 }

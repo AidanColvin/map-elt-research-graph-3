@@ -280,6 +280,87 @@ export function buildTalkingPoints(
   return points;
 }
 
+// takes: a company name and the UNC schools/departments present in the signals
+// does: builds the talent-angle pitch — UNC as a recruiting pipeline for the
+//       company, naming the specific units when we hold them (no fabrication:
+//       these are opportunity statements, not claimed facts)
+// returns: up to two talent-angle talking points
+export function buildTalentPoints(
+  body: TalkingPointsRequest,
+  nowYear: number,
+): TalkingPoint[] {
+  const { company_name, unc_faculty_leads = [], unc_patents = [] } = body;
+  const points: TalkingPoint[] = [];
+
+  // Distinct UNC units actually present in this company's signals.
+  const units = Array.from(
+    new Set(
+      [
+        ...unc_faculty_leads.map((l) => l.department),
+        ...unc_patents.map((p) => p.school),
+      ]
+        .map((u) => (u || '').trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const unitList =
+    units.length === 0
+      ? ''
+      : units.length === 1
+        ? units[0]
+        : `${units.slice(0, -1).join(', ')} and ${units[units.length - 1]}`;
+
+  // Company-level pipeline pitch — always present so every company has a
+  // talent angle, enriched with the specific units when we have them.
+  const headline = trunc(
+    units.length
+      ? `UNC's ${unitList} are a talent pipeline for ${company_name}`
+      : `UNC is a talent pipeline for ${company_name}`,
+    120,
+  );
+  const detail = trunc(
+    units.length
+      ? `Recruit graduates, PhDs, and postdocs from ${unitList} into ${company_name}'s research and clinical teams; co-fund fellowships or internships to build the pipeline.`
+      : `Recruit UNC graduates, PhDs, and postdocs into ${company_name}'s research teams; sponsor fellowships or internships to build the pipeline.`,
+    200,
+  );
+  points.push({
+    category: 'Partnership Opportunity',
+    headline,
+    detail,
+    strength: units.length ? 'medium' : 'low',
+    angle: 'Talent',
+    year: null,
+    score: scoreTalkingPoint(units.length ? 'medium' : 'low', null, nowYear),
+  });
+
+  // PI-anchored channel — the most recent faculty lead's lab as a hiring source.
+  const topLead = [...unc_faculty_leads].sort(
+    (a, b) => (Number(b.fiscal_year) || 0) - (Number(a.fiscal_year) || 0),
+  )[0];
+  if (topLead?.pi_name) {
+    const dept = topLead.department ? ` (${topLead.department})` : '';
+    points.push({
+      category: 'Contact',
+      headline: trunc(
+        `${topLead.pi_name}${dept} trains researchers ${company_name} could recruit or advise`,
+        120,
+      ),
+      detail: trunc(
+        `Engage ${topLead.pi_name}'s lab on graduate recruiting, advisory roles, or sponsored traineeships aligned to ${company_name}'s pipeline.`,
+        200,
+      ),
+      strength: 'medium',
+      angle: 'Talent',
+      year: yearOf(topLead.fiscal_year),
+      score: scoreTalkingPoint('medium', yearOf(topLead.fiscal_year), nowYear),
+    });
+  }
+
+  return points;
+}
+
 // takes: the unranked points
 // does: sorts by recency-weighted score (desc), strength as a stable tiebreak,
 //       and caps the list
@@ -296,27 +377,58 @@ export function rankTalkingPoints(points: TalkingPoint[]): TalkingPoint[] {
     .slice(0, MAX_TALKING_POINTS);
 }
 
+// takes: ranked R&D points, ranked talent points, and the cap
+// does: merges both angles by score, capped, but guarantees the top point of
+//       each angle survives so the UI always has both an R&D and a talent pitch
+// returns: the merged, capped, score-sorted points
+export function mergeAngles(
+  rd: TalkingPoint[],
+  talent: TalkingPoint[],
+  cap: number,
+): TalkingPoint[] {
+  const byScore = (a: TalkingPoint, b: TalkingPoint) => (b.score ?? 0) - (a.score ?? 0);
+  const angleOf = (p: TalkingPoint) => (p.angle === 'Talent' ? 'Talent' : 'R&D');
+  let merged = [...rd, ...talent].sort(byScore).slice(0, cap);
+
+  // Guarantee the top point of `want` survives, evicting the weakest point of
+  // the other angle to make room when the cap is already full.
+  const ensure = (group: TalkingPoint[], want: 'R&D' | 'Talent') => {
+    if (!group.length || merged.some((p) => angleOf(p) === want)) return;
+    const evictAt = [...merged]
+      .map((p, i) => ({ p, i }))
+      .filter(({ p }) => angleOf(p) !== want)
+      .sort((a, b) => (a.p.score ?? 0) - (b.p.score ?? 0))[0]?.i;
+    if (evictAt != null) merged.splice(evictAt, 1);
+    merged = [...merged, group[0]].sort(byScore).slice(0, cap);
+  };
+  ensure(rd, 'R&D');
+  ensure(talent, 'Talent');
+  return merged;
+}
+
 // takes: the resolved partnership payload and the current year
-// does: builds, recency-ranks, and caps the talking points; falls back to a
-//       single low-strength outreach prompt when no signals exist
+// does: builds R&D (evidence) and talent angles, recency-ranks each, and merges
+//       them so both angles are represented; falls back to an outreach prompt
+//       plus the talent pitch when no evidence signals exist
 // returns: the final ranked points for the UI
 export function assembleTalkingPoints(
   body: TalkingPointsRequest,
   nowYear: number,
 ): TalkingPoint[] {
-  const points = buildTalkingPoints(body, nowYear);
-  if (points.length === 0) {
-    return [
-      {
-        category: 'Research Overlap',
-        headline: `No existing UNC relationship found in public records for ${body.company_name}`,
-        detail: 'Recommend manual outreach to UNC Office of Technology Commercialization',
-        strength: 'low',
-        angle: 'General',
-        year: null,
-        score: 0,
-      },
-    ];
-  }
-  return rankTalkingPoints(points);
+  const rdRaw = buildTalkingPoints(body, nowYear);
+  const rd = rdRaw.length
+    ? rdRaw
+    : [
+        {
+          category: 'Research Overlap' as const,
+          headline: `No existing UNC relationship found in public records for ${body.company_name}`,
+          detail: 'Recommend manual outreach to UNC Office of Technology Commercialization',
+          strength: 'low' as const,
+          angle: 'R&D' as const,
+          year: null,
+          score: scoreTalkingPoint('low', null, nowYear),
+        },
+      ];
+  const talent = buildTalentPoints(body, nowYear);
+  return mergeAngles(rankTalkingPoints(rd), rankTalkingPoints(talent), MAX_TALKING_POINTS);
 }
