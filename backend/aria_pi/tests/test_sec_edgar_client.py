@@ -12,13 +12,14 @@ import pytest
 from aria_pi.clients import sec_edgar_client as sec_mod
 from aria_pi.clients.sec_edgar_client import (
     SECEdgarClient,
-    _load_tickers,
     _active_cik_titles,
     _filing_url,
     _strip_proxy_html,
     _parse_proxy_for_unc,
     _proxy_unc_degree,
 )
+# Ticker loading + its cache moved to the shared aria_pi.lib.tickers module.
+from aria_pi.lib.tickers import load_tickers
 from aria_pi.tests.conftest import FakeResponse
 
 
@@ -37,9 +38,9 @@ def test_load_tickers_parses_dict_values():
     Does: Loads the ticker map.
     Returns: A list of the inner records.
     """
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.lib.tickers.requests.get",
                return_value=FakeResponse(TICKER_MAP)):
-        tickers = _load_tickers()
+        tickers = load_tickers()
     assert len(tickers) == 3
     assert {t["ticker"] for t in tickers} == {"AAPL", "MSFT", "TSLA"}
 
@@ -50,10 +51,10 @@ def test_load_tickers_caches_after_first_call():
     Does: Loads tickers twice.
     Returns: Only one HTTP request (result cached at module level).
     """
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.lib.tickers.requests.get",
                return_value=FakeResponse(TICKER_MAP)) as mock_get:
-        _load_tickers()
-        _load_tickers()
+        load_tickers()
+        load_tickers()
     assert mock_get.call_count == 1
 
 
@@ -63,9 +64,9 @@ def test_load_tickers_network_error_returns_empty():
     Does: Loads tickers.
     Returns: An empty list (cached) without raising.
     """
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.lib.tickers.requests.get",
                side_effect=RuntimeError("dns")):
-        assert _load_tickers() == []
+        assert load_tickers() == []
 
 
 def test_active_cik_titles_maps_int_cik_to_title():
@@ -74,7 +75,7 @@ def test_active_cik_titles_maps_int_cik_to_title():
     Does: Builds the active CIK->title index.
     Returns: int CIK keys mapping to official titles.
     """
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.lib.tickers.requests.get",
                return_value=FakeResponse(TICKER_MAP)):
         active = _active_cik_titles()
     assert active[320193] == "Apple Inc."
@@ -90,7 +91,7 @@ def test_find_cik_exact_ticker_match():
     Returns: The matching CIK as a string.
     """
     client = SECEdgarClient()
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.lib.tickers.requests.get",
                return_value=FakeResponse(TICKER_MAP)):
         assert client._find_cik("AAPL") == "320193"
 
@@ -102,7 +103,7 @@ def test_find_cik_exact_title_match():
     Returns: The matching CIK.
     """
     client = SECEdgarClient()
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.lib.tickers.requests.get",
                return_value=FakeResponse(TICKER_MAP)):
         assert client._find_cik("Microsoft Corp") == "789019"
 
@@ -119,8 +120,11 @@ def test_find_cik_rejects_weak_substring_then_falls_back_to_search():
     search_resp = FakeResponse({"hits": {"hits": [
         {"_source": {"ciks": ["320193"]}}  # Apple — shares no token with OpenAI
     ]}})
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
-               side_effect=[FakeResponse(TICKER_MAP), search_resp]):
+    # Ticker map loads via lib.tickers; the full-text search hits sec_edgar_client.
+    with patch("aria_pi.lib.tickers.requests.get",
+               return_value=FakeResponse(TICKER_MAP)), \
+         patch("aria_pi.clients.sec_edgar_client.requests.get",
+               return_value=search_resp):
         assert client._find_cik("OpenAI") is None
 
 
@@ -161,7 +165,7 @@ def test_get_company_facts_public_company_parses_submissions():
     }
     with patch.object(client, "_find_cik", return_value="320193"), \
          patch.object(client, "_get_xbrl_facts", return_value={}), \
-         patch("aria_pi.clients.sec_edgar_client.requests.get",
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get",
                return_value=FakeResponse(submissions)):
         facts = client.get_company_facts("Apple")
     assert facts["is_public"] is True
@@ -180,7 +184,7 @@ def test_get_company_facts_submissions_error_returns_minimal():
     """
     client = SECEdgarClient()
     with patch.object(client, "_find_cik", return_value="320193"), \
-         patch("aria_pi.clients.sec_edgar_client.requests.get",
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get",
                side_effect=RuntimeError("503")):
         facts = client.get_company_facts("Apple")
     assert facts["cik"] == "320193"
@@ -210,7 +214,7 @@ def test_get_xbrl_facts_picks_latest_annual_revenue():
              "form": "10-K", "accn": "0000320193-24-000001"},
         ]}},
     }, "dei": {}}}
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.clients.sec_edgar_client.requests.Session.get",
                return_value=FakeResponse(companyfacts)):
         xbrl = client._get_xbrl_facts("320193")
     assert xbrl["revenue"]["value"] == 400      # 2023 beats 2018
@@ -229,7 +233,7 @@ def test_get_xbrl_facts_network_error_returns_empty():
     Returns: An empty dict.
     """
     client = SECEdgarClient()
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    with patch("aria_pi.clients.sec_edgar_client.requests.Session.get",
                side_effect=RuntimeError("nope")):
         assert client._get_xbrl_facts("320193") == {}
 
@@ -255,7 +259,10 @@ def test_discover_companies_ranks_by_frequency():
             return FakeResponse(TICKER_MAP)
         return FakeResponse(hits)
 
-    with patch("aria_pi.clients.sec_edgar_client.requests.get",
+    # Ticker fetch routes through lib.tickers (module requests.get); the efts
+    # search routes through the client's requests.Session.
+    with patch("aria_pi.lib.tickers.requests.get", side_effect=fake_get), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get",
                side_effect=fake_get), \
          patch("aria_pi.clients.sec_edgar_client.time.sleep"):
         names = client.discover_companies("computers", limit=10)
