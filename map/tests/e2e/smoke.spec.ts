@@ -45,15 +45,13 @@ test('dashboard hero renders correctly', async ({ page }) => {
   const view = visibleView(page);
   // Current dashboard headline + value-prop copy.
   await expect(
-    view.getByRole('heading', { name: /map the company, generate the report/i }),
+    view.getByRole('heading', { name: /research, written for you/i }),
   ).toBeVisible({ timeout: 8000 });
   const body = await view.innerText();
-  // Primary-source provenance line names the public datasets.
+  // Primary-source provenance still named (in the how-it-works diagram).
   expect(body).toContain('SEC EDGAR');
-  // The dashboard's three uppercase section eyebrows (CSS text-transform).
-  expect(body).toContain('THE PROBLEM IT SOLVES');
-  expect(body).toContain('HOW MAP WORKS');
-  expect(body).toContain('WHERE THE COST GOES TODAY');
+  // The reduced dashboard keeps only the "How it works" explainer.
+  expect(body).toContain('How it works');
 });
 
 test('dashboard shows the project search and the how-it-works flow', async ({ page }) => {
@@ -61,15 +59,15 @@ test('dashboard shows the project search and the how-it-works flow', async ({ pa
   const view = visibleView(page);
   // The Dashboard leads with a single project search…
   await expect(view.locator('input[placeholder*="project" i]').first()).toBeVisible({ timeout: 8000 });
-  // …and the "How MAP works" four-stage process rail (You type → MAP reads →
-  // MAP drafts → You get); assert the heading plus one distinct diagram step.
-  await expect(view.getByText('HOW MAP WORKS', { exact: false }).first()).toBeVisible();
+  // …and the "How it works" four-stage process rail (You type → MAP reads →
+  // MAP drafts → You get); assert the eyebrow plus one distinct diagram step.
+  await expect(view.getByText('How it works', { exact: false }).first()).toBeVisible();
   await expect(view.getByText('MAP drafts', { exact: false }).first()).toBeVisible();
 });
 
 test('all nav tabs load without a not-found page', async ({ page }) => {
   await signIn(page);
-  for (const label of ['Dashboard', 'Company', 'Sector', 'Data']) {
+  for (const label of ['Dashboard', 'Company', 'Sector', 'Companies']) {
     await clickNav(page, label);
     await page.waitForTimeout(800);
     const body = await page.locator('body').innerText();

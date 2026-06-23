@@ -11,7 +11,7 @@ test.describe('Data tab — interactive database', () => {
   test.beforeEach(async ({ page }) => {
     await mockBackend(page);
     await gotoWorkspace(page);
-    await clickNav(page, 'Data');
+    await clickNav(page, 'Companies');
   });
 
   test('renders summary cards, the fit column, and a live count', async ({ page }) => {
@@ -56,8 +56,8 @@ test.describe('Data tab — interactive database', () => {
     const panel = page.locator('aside[role="dialog"]');
     const deepDive = panel.getByRole('button', { name: /run deep dive/i });
     await expect(deepDive).toBeVisible({ timeout: 8000 });
-    // Panel always shows HQ / Location and Revenue field labels.
-    await expect(panel.getByText('HQ / Location', { exact: true })).toBeVisible();
+    // Panel always shows HQ / location and Revenue field labels.
+    await expect(panel.getByText('HQ / location', { exact: true })).toBeVisible();
 
     await page.keyboard.press('Escape');
     // Panel content unmounts when deselected, so the CTA detaches.

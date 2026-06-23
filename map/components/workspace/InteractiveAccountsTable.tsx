@@ -172,7 +172,7 @@ function secUrlOf(a: AccountProfile): string {
 }
 
 const KIND_STYLE: Record<Kind, { label: string; color: string }> = {
-  public:     { label: "Public",     color: "#007aff" },
+  public:     { label: "Public",     color: "#0071e3" },
   private:    { label: "Private",    color: "#e6428a" },
   nonprofit:  { label: "Nonprofit",  color: "#0a9d6e" },
   government: { label: "Government", color: "#e08317" },
@@ -361,7 +361,7 @@ export default function InteractiveAccountsTable({
   );
   const link = (href: string, label: string): ReactNode =>
     href && /^https?:\/\//.test(href) ? (
-      <a href={href} target="_blank" rel="noreferrer" title={href} onClick={(ev) => ev.stopPropagation()} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 500 }}>
+      <a href={href} target="_blank" rel="noreferrer" title={href} onClick={(ev) => ev.stopPropagation()} style={{ color: "#0071e3", textDecoration: "none", fontWeight: 500 }}>
         {label} ↗
       </a>
     ) : (
@@ -371,12 +371,13 @@ export default function InteractiveAccountsTable({
     try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "Website"; }
   };
 
+  // Five core columns — the full record opens in the slide-out panel on click.
   const cols: { key: SortKey; label: string; align?: "right"; cell: (e: Enr) => ReactNode }[] = [
     {
       key: "account", label: "Company",
       cell: (e) => (
         <>
-          <div style={{ fontWeight: 600, color: "#1d1d1f", fontSize: 14 }}>{e.a.account}</div>
+          <div style={{ fontWeight: 500, color: "#1d1d1f", fontSize: 14 }}>{e.a.account}</div>
           {e.alias && <div style={{ fontSize: 12, color: "#a0a0a5", marginTop: 1 }}>{e.alias}</div>}
         </>
       ),
@@ -387,7 +388,7 @@ export default function InteractiveAccountsTable({
         const fs = FIT_STYLE[e.fit.level];
         return (
           <span title={e.fit.reason} style={{
-            display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 600,
+            display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 500,
             borderRadius: 999, background: fs.bg, color: fs.color,
           }}>
             {e.fit.level}
@@ -395,41 +396,9 @@ export default function InteractiveAccountsTable({
         );
       },
     },
-    {
-      key: "exchange", label: "Ticker",
-      cell: (e) => <span style={{ color: e.exchange ? "#2563eb" : "#c7c7cc", fontWeight: 500 }}>{e.exchange || "—"}</span>,
-    },
-    { key: "sector", label: "Sector", cell: (e) => txt(e.a.topIndustrySectorProfile) },
-    { key: "secondary", label: "Secondary Sector", cell: (e) => txt(e.a.secondaryIndustrySectorProfile, 220) },
-    {
-      key: "structure", label: "Structure",
-      cell: (e) => {
-        const ks = KIND_STYLE[e.kind];
-        return (
-          <span style={{
-            display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 600,
-            borderRadius: 999, border: `1px solid ${ks.color}55`, color: ks.color,
-          }}>
-            {ks.label}
-          </span>
-        );
-      },
-    },
-    { key: "ownership", label: "Ownership", cell: (e) => txt(e.a.ownership, 220) },
-    { key: "parent", label: "Parent Account", cell: (e) => txt(e.a.parentAccount, 180) },
+    { key: "sector", label: "Sector", cell: (e) => txt(e.a.topIndustrySectorProfile, 240) },
     { key: "hq", label: "HQ", cell: (e) => txt(e.hq) },
-    { key: "employees", label: "Employees", align: "right", cell: (e) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.a.approximateEmployees || "—"}</span> },
     { key: "revenue", label: "Revenue", align: "right", cell: (e) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.a.approximateRevenue || "—"}</span> },
-    { key: "founded", label: "Founded", cell: (e) => txt(e.a.founded) },
-    { key: "keyProducts", label: "Key Products", cell: (e) => txt(e.a.keyProducts, 260) },
-    { key: "businessSplit", label: "Business Split", cell: (e) => txt(e.a.businessSplit, 200) },
-    { key: "description", label: "Description", cell: (e) => txt(e.a.description, 340) },
-    { key: "website", label: "Website", cell: (e) => link(e.a.website, host(e.a.website)) },
-    { key: "aliases", label: "Company Aliases", cell: (e) => txt(e.a.companyAliases, 200) },
-    { key: "researchBy", label: "Research by", cell: (e) => txt(e.a.researchBy, 180) },
-    { key: "dateOfResearch", label: "Date of Research", cell: (e) => txt(e.a.dateOfResearch) },
-    { key: "resources", label: "Resources", cell: (e) => txt(e.a.resources, 260) },
-    { key: "report", label: "Link to Report", cell: (e) => link(e.a.linkToReport, "Report") },
   ];
 
   return (
@@ -534,7 +503,7 @@ export default function InteractiveAccountsTable({
                   style={{ textAlign: c.align ?? "left", cursor: "pointer" }}
                 >
                   {c.label}
-                  <span style={{ color: "#007aff", marginLeft: 4, opacity: sortKey === c.key ? 1 : 0 }}>
+                  <span style={{ color: "#0071e3", marginLeft: 4, opacity: sortKey === c.key ? 1 : 0 }}>
                     {sortDir === "asc" ? "↑" : "↓"}
                   </span>
                 </th>
@@ -596,9 +565,11 @@ export default function InteractiveAccountsTable({
           const fit = uncFit(selected, revNum(selected.approximateRevenue));
           const fs = FIT_STYLE[fit.level];
           const hq = hqOf(selected);
+          const exchange = exchangeOf(selected);
+          const kind = classify(selected);
           const Field = ({ label, children }: { label: string; children: ReactNode }) => (
             <div style={{ marginBottom: 18 }}>
-              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#a0a0a5", marginBottom: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "#a0a0a5", marginBottom: 4 }}>
                 {label}
               </div>
               <div style={{ fontSize: 14.5, color: "#1d1d1f", lineHeight: 1.5 }}>{children}</div>
@@ -638,12 +609,25 @@ export default function InteractiveAccountsTable({
               {/* Body */}
               <div style={{ flex: 1, overflow: "auto", padding: "20px 24px 28px" }}>
                 {selected.companyAliases && <Field label="Aliases">{selected.companyAliases}</Field>}
-                {selected.parentAccount && <Field label="Parent Account">{selected.parentAccount}</Field>}
-                <Field label="HQ / Location">{hq || "—"}</Field>
-                <Field label="Revenue">{selected.approximateRevenue || "—"}</Field>
+                {selected.parentAccount && <Field label="Parent account">{selected.parentAccount}</Field>}
+                <Field label="HQ / location">{hq || "—"}</Field>
                 <Field label="Sector">{selected.topIndustrySectorProfile || "—"}</Field>
+                {selected.secondaryIndustrySectorProfile && (
+                  <Field label="Secondary sector">{selected.secondaryIndustrySectorProfile}</Field>
+                )}
+                {/* Compact facts grid for the columns the table no longer shows */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
+                  <Field label="Type">
+                    <span style={{ color: KIND_STYLE[kind].color, fontWeight: 500 }}>{KIND_STYLE[kind].label}</span>
+                  </Field>
+                  <Field label="Ticker">{exchange || "—"}</Field>
+                  <Field label="Revenue">{selected.approximateRevenue || "—"}</Field>
+                  <Field label="Employees">{selected.approximateEmployees || "—"}</Field>
+                  <Field label="Founded">{selected.founded || "—"}</Field>
+                  <Field label="Website">{link(selected.website, host(selected.website))}</Field>
+                </div>
                 {selected.keyProducts && (
-                  <Field label="Key Products">
+                  <Field label="Key products">
                     <span style={{
                       display: "-webkit-box",
                       WebkitLineClamp: showAllProducts ? "unset" : 3,
@@ -655,7 +639,7 @@ export default function InteractiveAccountsTable({
                     {selected.keyProducts.length > 90 && (
                       <button
                         onClick={() => setShowAllProducts((v) => !v)}
-                        style={{ marginTop: 4, border: "none", background: "none", color: "#007aff", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0, fontFamily: FONT }}
+                        style={{ marginTop: 4, border: "none", background: "none", color: "#0071e3", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0, fontFamily: FONT }}
                       >
                         {showAllProducts ? "Show less" : "Show more"}
                       </button>
@@ -665,8 +649,8 @@ export default function InteractiveAccountsTable({
                 {selected.description && <Field label="Description">{selected.description}</Field>}
                 {sec && (
                   <div style={{ marginBottom: 18 }}>
-                    <a href={sec} target="_blank" rel="noreferrer" style={{ color: "#2563eb", fontSize: 14.5, fontWeight: 500, textDecoration: "none" }}>
-                      View SEC Filing →
+                    <a href={sec} target="_blank" rel="noreferrer" style={{ color: "#0071e3", fontSize: 14.5, fontWeight: 500, textDecoration: "none" }}>
+                      View SEC filing →
                     </a>
                   </div>
                 )}
@@ -680,7 +664,7 @@ export default function InteractiveAccountsTable({
                     style={{
                       width: "100%", padding: "12px 18px", fontSize: 15, fontWeight: 600,
                       border: "none", borderRadius: 12, cursor: "pointer",
-                      background: "#007aff", color: "#fff", fontFamily: FONT,
+                      background: "#0071e3", color: "#fff", fontFamily: FONT,
                     }}
                   >
                     Run Deep Dive →

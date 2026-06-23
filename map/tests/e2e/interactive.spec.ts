@@ -103,7 +103,7 @@ test.describe('Map workspace — interactive flows', () => {
     // Dashboard — the hero headline ("Map the company, generate the report…").
     await clickNav(page, 'Dashboard');
     await expect(
-      visibleView(page).getByRole('heading', { name: /map the company, generate the report/i }),
+      visibleView(page).getByRole('heading', { name: /research, written for you/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Company Profile — idle hero headline ("...board-ready in seconds.").
@@ -129,7 +129,7 @@ test.describe('Map workspace — interactive flows', () => {
     // Back to Dashboard to confirm round-trip navigation still works.
     await clickNav(page, 'Dashboard');
     await expect(
-      visibleView(page).getByRole('heading', { name: /map the company, generate the report/i }),
+      visibleView(page).getByRole('heading', { name: /research, written for you/i }),
     ).toBeVisible({ timeout: 8000 });
   });
 
