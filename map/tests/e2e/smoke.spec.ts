@@ -61,9 +61,10 @@ test('dashboard shows the project search and the how-it-works flow', async ({ pa
   const view = visibleView(page);
   // The Dashboard leads with a single project search…
   await expect(view.locator('input[placeholder*="project" i]').first()).toBeVisible({ timeout: 8000 });
-  // …and the "How MAP works" sources → MAP → report flow diagram.
+  // …and the "How MAP works" four-stage process rail (You type → MAP reads →
+  // MAP drafts → You get); assert the heading plus one distinct diagram step.
   await expect(view.getByText('HOW MAP WORKS', { exact: false }).first()).toBeVisible();
-  await expect(view.getByText('Sourced report', { exact: false }).first()).toBeVisible();
+  await expect(view.getByText('MAP drafts', { exact: false }).first()).toBeVisible();
 });
 
 test('all nav tabs load without a not-found page', async ({ page }) => {
