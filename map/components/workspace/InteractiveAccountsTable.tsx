@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AccountProfile } from "./accountProfile";
 import { FONT } from "./ui";
 
@@ -13,7 +13,7 @@ import { FONT } from "./ui";
 
 type Kind = "public" | "private" | "nonprofit" | "government";
 type SortKey =
-  | "account" | "exchange" | "sector" | "secondary" | "structure" | "ownership"
+  | "account" | "fit" | "exchange" | "sector" | "secondary" | "structure" | "ownership"
   | "parent" | "hq" | "employees" | "revenue" | "founded" | "keyProducts"
   | "businessSplit" | "description" | "website" | "aliases" | "researchBy"
   | "dateOfResearch" | "resources" | "report";
@@ -71,16 +71,58 @@ function empNum(s: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// takes: a revenue string like "$716.9B (FY2025)"
-// does: parses the leading value and B/M/K suffix into a comparable number
-// returns: a number in dollars (0 when unparseable)
+// takes: a revenue string (this dataset reports $-millions, e.g. "~$128,700
+//        (FY2025)" = $128.7B, or "~$754 million", or "$94.2 billion")
+// does: parses the first currency value, keeping commas/decimals, and scales by
+//       its unit — bare numbers are millions (the source's convention)
+// returns: a comparable number in dollars (0 when unparseable / not disclosed)
 function revNum(s: string): number {
-  const m = (s || "").match(/([\d.]+)\s*([BMK])?/i);
+  if (!s) return 0;
+  const m = s.toLowerCase().match(/\$?\s*([\d,]+(?:\.\d+)?)\s*(billion|million|b|m|k)?/);
   if (!m) return 0;
-  const v = parseFloat(m[1]);
+  const v = parseFloat(m[1].replace(/,/g, ""));
   if (!Number.isFinite(v)) return 0;
-  const mult = m[2]?.toUpperCase() === "B" ? 1e9 : m[2]?.toUpperCase() === "M" ? 1e6 : m[2]?.toUpperCase() === "K" ? 1e3 : 1;
-  return v * mult;
+  const unit = m[2];
+  if (unit === "billion" || unit === "b") return v * 1e9;
+  if (unit === "k") return v * 1e3;
+  // "million", "m", or no unit at all → $-millions (the dataset's default).
+  return v * 1e6;
+}
+
+// Sectors aligned with UNC's research strengths (used by the est. UNC Fit rule).
+const LIFE_SCI = /life scien|biotech|pharma|health|medtech|medical|therapeut|diagnostic|clinical|drug|genomic/i;
+// Sectors with limited overlap with UNC research partnerships.
+const LOW_FIT = /consumer|retail|entertainment|gaming|apparel|food|beverage|hospitality/i;
+
+type Fit = "High" | "Mid" | "Low";
+
+// takes: one account row plus its parsed revenue in dollars
+// does: applies the deterministic, placeholder UNC-alignment rule — High when a
+//       life-sciences company is NC-based or large ($1B+ revenue); Low for
+//       consumer/retail/entertainment/gaming; Mid for everything else
+// returns: the estimated fit bucket
+function uncFit(a: AccountProfile, rev: number): Fit {
+  const sector = `${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`;
+  const isLifeSci = LIFE_SCI.test(sector);
+  const inNC = (a.state || "").trim().toUpperCase() === "NC";
+  if (isLifeSci && (inNC || rev > 1e9)) return "High";
+  if (LOW_FIT.test(sector)) return "Low";
+  return "Mid";
+}
+
+const FIT_STYLE: Record<Fit, { bg: string; color: string }> = {
+  High: { bg: "#e7f7ee", color: "#0a7d4f" },
+  Mid:  { bg: "#fef3da", color: "#9a6700" },
+  Low:  { bg: "#f0f0f2", color: "#6e6e73" },
+};
+
+// takes: one account row
+// does: extracts the first SEC EDGAR (sec.gov) URL from its resources/report text
+// returns: the URL string, or "" when none is present
+function secUrlOf(a: AccountProfile): string {
+  const hay = `${a.resources} ${a.linkToReport} ${a.ownership}`;
+  const m = hay.match(/https?:\/\/(?:www\.)?sec\.gov\/[^\s)]+/i);
+  return m ? m[0].replace(/[.,)]+$/, "") : "";
 }
 
 const KIND_STYLE: Record<Kind, { label: string; color: string }> = {
@@ -98,23 +140,37 @@ const FILTERS: { key: "all" | Kind; label: string }[] = [
   { key: "government", label: "Government" },
 ];
 
+// Shared native-<select> styling for the filter dropdowns.
+const SELECT_STYLE: React.CSSProperties = {
+  flex: "0 1 auto", maxWidth: 220, border: "1px solid #e5e5ea", borderRadius: 12,
+  padding: "10px 14px", fontSize: 14, outline: "none", fontFamily: FONT,
+  color: "#1d1d1f", background: "#fff", cursor: "pointer",
+};
+
 export default function InteractiveAccountsTable({
   accounts,
   onExportExcel,
   onExportPdf,
   onExportMarkdown,
+  onRunDeepDive,
   busyExport,
 }: {
   accounts: AccountProfile[];
   onExportExcel: (rows: AccountProfile[]) => void;
   onExportPdf: (rows: AccountProfile[]) => void;
   onExportMarkdown: (rows: AccountProfile[]) => void;
+  onRunDeepDive?: (company: string) => void;
   busyExport: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<"all" | Kind>("all");
+  const [sectorFilter, setSectorFilter] = useState("all");
+  const [stateFilter, setStateFilter] = useState("all");
   const [sortKey, setSortKey] = useState<SortKey>("account");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  // The row whose full record is shown in the slide-out panel (null = closed).
+  const [selected, setSelected] = useState<AccountProfile | null>(null);
+  const [showAllProducts, setShowAllProducts] = useState(false);
 
   // Precompute derived fields once so search/sort don't re-derive per keystroke.
   const enriched = useMemo(
@@ -127,7 +183,24 @@ export default function InteractiveAccountsTable({
         hq: hqOf(a),
         emp: empNum(a.approximateEmployees),
         rev: revNum(a.approximateRevenue),
+        fit: uncFit(a, revNum(a.approximateRevenue)),
       })),
+    [accounts],
+  );
+
+  // Filter option lists, derived from the data so they always stay in sync.
+  const sectorOptions = useMemo(
+    () =>
+      Array.from(new Set(accounts.map((a) => a.topIndustrySectorProfile.trim()).filter(Boolean))).sort(
+        (x, y) => x.localeCompare(y),
+      ),
+    [accounts],
+  );
+  const stateOptions = useMemo(
+    () =>
+      Array.from(new Set(accounts.map((a) => (a.state || "").trim()).filter(Boolean))).sort((x, y) =>
+        x.localeCompare(y),
+      ),
     [accounts],
   );
 
@@ -135,6 +208,8 @@ export default function InteractiveAccountsTable({
     const q = query.trim().toLowerCase();
     let list = enriched.filter((e) => {
       if (filter !== "all" && e.kind !== filter) return false;
+      if (sectorFilter !== "all" && e.a.topIndustrySectorProfile.trim() !== sectorFilter) return false;
+      if (stateFilter !== "all" && (e.a.state || "").trim() !== stateFilter) return false;
       if (!q) return true;
       return (
         e.a.account.toLowerCase().includes(q) ||
@@ -146,6 +221,7 @@ export default function InteractiveAccountsTable({
     const dir = sortDir === "asc" ? 1 : -1;
     const str = (e: typeof enriched[number]): string => {
       switch (sortKey) {
+        case "fit":           return e.fit;
         case "exchange":      return e.exchange;
         case "sector":        return e.a.topIndustrySectorProfile;
         case "secondary":     return e.a.secondaryIndustrySectorProfile;
@@ -174,7 +250,27 @@ export default function InteractiveAccountsTable({
       }
     });
     return list;
-  }, [enriched, query, filter, sortKey, sortDir]);
+  }, [enriched, query, filter, sectorFilter, stateFilter, sortKey, sortDir]);
+
+  // Summary metrics reflect the *currently filtered* set, not the full database.
+  const stats = useMemo(() => {
+    const total = rows.length;
+    const nc = rows.filter((e) => (e.a.state || "").trim().toUpperCase() === "NC").length;
+    const lifeSci = rows.filter((e) =>
+      LIFE_SCI.test(`${e.a.topIndustrySectorProfile} ${e.a.secondaryIndustrySectorProfile}`),
+    ).length;
+    const pub = rows.filter((e) => e.kind === "public").length;
+    return { total, nc, lifeSci, pub };
+  }, [rows]);
+
+  // Close the slide-out panel on Escape; reset the "show more" toggle per record.
+  useEffect(() => {
+    if (!selected) return;
+    setShowAllProducts(false);
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setSelected(null); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selected]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -219,7 +315,7 @@ export default function InteractiveAccountsTable({
   );
   const link = (href: string, label: string): ReactNode =>
     href && /^https?:\/\//.test(href) ? (
-      <a href={href} target="_blank" rel="noreferrer" title={href} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 500 }}>
+      <a href={href} target="_blank" rel="noreferrer" title={href} onClick={(ev) => ev.stopPropagation()} style={{ color: "#2563eb", textDecoration: "none", fontWeight: 500 }}>
         {label} ↗
       </a>
     ) : (
@@ -238,6 +334,20 @@ export default function InteractiveAccountsTable({
           {e.alias && <div style={{ fontSize: 12, color: "#a0a0a5", marginTop: 1 }}>{e.alias}</div>}
         </>
       ),
+    },
+    {
+      key: "fit", label: "UNC Fit (est.)",
+      cell: (e) => {
+        const fs = FIT_STYLE[e.fit];
+        return (
+          <span style={{
+            display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 600,
+            borderRadius: 999, background: fs.bg, color: fs.color,
+          }}>
+            {e.fit}
+          </span>
+        );
+      },
     },
     {
       key: "exchange", label: "Ticker",
@@ -279,33 +389,77 @@ export default function InteractiveAccountsTable({
   return (
     <div style={{ fontFamily: FONT, height: "100%", display: "flex", flexDirection: "column" }}>
       {/* Controls */}
-      <div style={{ padding: "16px 20px 12px", display: "flex", flexDirection: "column", gap: 12, borderBottom: "1px solid #f0f0f2" }}>
+      <div style={{ padding: "16px 20px 12px", display: "flex", flexDirection: "column", gap: 14, borderBottom: "1px solid #f0f0f2" }}>
+        {/* Summary metric cards — reflect the currently filtered set */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
+          {[
+            { label: "Total Partners", value: stats.total },
+            { label: "NC-Based", value: stats.nc },
+            { label: "Life Sciences", value: stats.lifeSci },
+            { label: "Public Companies", value: stats.pub },
+          ].map((card) => (
+            <div key={card.label} style={{
+              background: "#fff", border: "1px solid #ececef", borderRadius: 14,
+              padding: "12px 16px",
+            }}>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.02em", fontVariantNumeric: "tabular-nums" }}>
+                {card.value}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 500, color: "#86868b", marginTop: 2 }}>
+                {card.label}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Filter bar — search + three client-side dropdowns */}
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search name, sector, HQ…"
             style={{
-              flex: "1 1 280px", minWidth: 200, border: "1px solid #e5e5ea",
+              flex: "1 1 240px", minWidth: 180, border: "1px solid #e5e5ea",
               borderRadius: 12, padding: "11px 16px", fontSize: 15, outline: "none",
               fontFamily: FONT, color: "#1d1d1f", background: "#fff",
             }}
           />
-          <div style={{ display: "flex", padding: 3, background: "#f0f0f2", borderRadius: 999, gap: 2, maxWidth: "100%", overflowX: "auto" }}>
-            {FILTERS.map((f) => (
-              <button key={f.key} onClick={() => setFilter(f.key)} style={{
-                padding: "6px 14px", fontSize: 13.5, fontWeight: 600, border: "none",
-                borderRadius: 999, cursor: "pointer", flexShrink: 0, whiteSpace: "nowrap",
-                background: filter === f.key ? (f.key === "all" ? "#007aff" : "#fff") : "transparent",
-                color: filter === f.key ? (f.key === "all" ? "#fff" : "#1d1d1f") : "#6e6e73",
-                boxShadow: filter === f.key && f.key !== "all" ? "0 1px 3px rgba(0,0,0,0.1)" : "none",
-                transition: "all 0.12s",
-              }}>
-                {f.label}
-              </button>
+          <select
+            value={sectorFilter}
+            onChange={(e) => setSectorFilter(e.target.value)}
+            style={SELECT_STYLE}
+          >
+            <option value="all">All Sectors</option>
+            {sectorOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
             ))}
-          </div>
+          </select>
+          <select
+            value={stateFilter}
+            onChange={(e) => setStateFilter(e.target.value)}
+            style={SELECT_STYLE}
+          >
+            <option value="all">All States</option>
+            {stateOptions.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <select
+            value={filter}
+            onChange={(e) => setFilter(e.target.value as "all" | Kind)}
+            style={SELECT_STYLE}
+          >
+            {FILTERS.map((f) => (
+              <option key={f.key} value={f.key}>{f.key === "all" ? "All Types" : f.label}</option>
+            ))}
+          </select>
         </div>
+
+        {/* Live count of the filtered set */}
+        <div style={{ fontSize: 13, color: "#86868b" }}>
+          Showing <strong style={{ color: "#1d1d1f" }}>{rows.length}</strong> of {accounts.length} partners
+        </div>
+
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           <button onClick={exportCsv} className="ws-btn" style={{ padding: "8px 16px", fontSize: 13 }}>
             ↓ Export CSV ({rows.length})
@@ -343,7 +497,11 @@ export default function InteractiveAccountsTable({
           </thead>
           <tbody>
             {rows.map((e) => (
-              <tr key={e.a.account}>
+              <tr
+                key={e.a.account}
+                onClick={() => setSelected(e.a)}
+                style={{ cursor: "pointer" }}
+              >
                 {cols.map((c) => (
                   <td key={c.key} style={{ textAlign: c.align ?? "left" }}>
                     {c.cell(e)}
@@ -359,6 +517,131 @@ export default function InteractiveAccountsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Slide-out detail panel — overlay + right-anchored sheet */}
+      <div
+        onClick={() => setSelected(null)}
+        aria-hidden={!selected}
+        style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          background: "rgba(0,0,0,0.3)",
+          opacity: selected ? 1 : 0,
+          pointerEvents: selected ? "auto" : "none",
+          transition: "opacity 0.25s ease",
+        }}
+      />
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={selected ? `${selected.account} details` : undefined}
+        onClick={(ev) => ev.stopPropagation()}
+        style={{
+          position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 201,
+          width: "min(420px, 100vw)",
+          background: "#fff", boxShadow: "-12px 0 48px rgba(0,0,0,0.18)",
+          transform: selected ? "translateX(0)" : "translateX(100%)",
+          transition: "transform 0.28s cubic-bezier(0.32, 0.72, 0, 1)",
+          display: "flex", flexDirection: "column",
+          fontFamily: FONT,
+        }}
+      >
+        {selected && (() => {
+          const sec = secUrlOf(selected);
+          const fit = uncFit(selected, revNum(selected.approximateRevenue));
+          const fs = FIT_STYLE[fit];
+          const hq = hqOf(selected);
+          const Field = ({ label, children }: { label: string; children: ReactNode }) => (
+            <div style={{ marginBottom: 18 }}>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "#a0a0a5", marginBottom: 4 }}>
+                {label}
+              </div>
+              <div style={{ fontSize: 14.5, color: "#1d1d1f", lineHeight: 1.5 }}>{children}</div>
+            </div>
+          );
+          return (
+            <>
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "22px 24px 16px", borderBottom: "1px solid #f0f0f2" }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 20, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.02em" }}>
+                    {selected.account}
+                  </div>
+                  <span style={{
+                    display: "inline-block", marginTop: 8, padding: "2px 10px", fontSize: 12, fontWeight: 600,
+                    borderRadius: 999, background: fs.bg, color: fs.color,
+                  }}>
+                    UNC Fit (est.): {fit}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setSelected(null)}
+                  aria-label="Close"
+                  style={{
+                    flexShrink: 0, width: 32, height: 32, borderRadius: "50%", border: "none",
+                    background: "#f0f0f2", color: "#6e6e73", fontSize: 17, cursor: "pointer",
+                    display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1,
+                  }}
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Body */}
+              <div style={{ flex: 1, overflow: "auto", padding: "20px 24px 28px" }}>
+                {selected.companyAliases && <Field label="Aliases">{selected.companyAliases}</Field>}
+                {selected.parentAccount && <Field label="Parent Account">{selected.parentAccount}</Field>}
+                <Field label="HQ / Location">{hq || "—"}</Field>
+                <Field label="Revenue">{selected.approximateRevenue || "—"}</Field>
+                <Field label="Sector">{selected.topIndustrySectorProfile || "—"}</Field>
+                {selected.keyProducts && (
+                  <Field label="Key Products">
+                    <span style={{
+                      display: "-webkit-box",
+                      WebkitLineClamp: showAllProducts ? "unset" : 3,
+                      WebkitBoxOrient: "vertical",
+                      overflow: showAllProducts ? "visible" : "hidden",
+                    }}>
+                      {selected.keyProducts}
+                    </span>
+                    {selected.keyProducts.length > 90 && (
+                      <button
+                        onClick={() => setShowAllProducts((v) => !v)}
+                        style={{ marginTop: 4, border: "none", background: "none", color: "#007aff", fontSize: 13.5, fontWeight: 500, cursor: "pointer", padding: 0, fontFamily: FONT }}
+                      >
+                        {showAllProducts ? "Show less" : "Show more"}
+                      </button>
+                    )}
+                  </Field>
+                )}
+                {selected.description && <Field label="Description">{selected.description}</Field>}
+                {sec && (
+                  <div style={{ marginBottom: 18 }}>
+                    <a href={sec} target="_blank" rel="noreferrer" style={{ color: "#2563eb", fontSize: 14.5, fontWeight: 500, textDecoration: "none" }}>
+                      View SEC Filing →
+                    </a>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer action */}
+              {onRunDeepDive && (
+                <div style={{ padding: "14px 24px", borderTop: "1px solid #f0f0f2" }}>
+                  <button
+                    onClick={() => { onRunDeepDive(selected.account); setSelected(null); }}
+                    style={{
+                      width: "100%", padding: "12px 18px", fontSize: 15, fontWeight: 600,
+                      border: "none", borderRadius: 12, cursor: "pointer",
+                      background: "#007aff", color: "#fff", fontFamily: FONT,
+                    }}
+                  >
+                    Run Deep Dive →
+                  </button>
+                </div>
+              )}
+            </>
+          );
+        })()}
+      </aside>
     </div>
   );
 }

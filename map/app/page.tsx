@@ -383,7 +383,14 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <AccountsCanvas extraRows={packageRows} />
+          <AccountsCanvas
+            extraRows={packageRows}
+            onRunDeepDive={(name) => {
+              setCompanyDraft(name);
+              dive.run(name);
+              setView("company");
+            }}
+          />
         </div>
 
         {/* Partnerships is an in-app view (not a route), so switching to it
