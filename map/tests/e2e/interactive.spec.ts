@@ -100,10 +100,10 @@ test.describe('Map workspace — interactive flows', () => {
   test('top nav switches between Dashboard, Company, Sector and Account views', async ({ page }) => {
     await gotoWorkspace(page);
 
-    // Dashboard — the hero headline ("Map the partnership landscape").
+    // Dashboard — the hero headline ("Map the company, generate the report…").
     await clickNav(page, 'Dashboard');
     await expect(
-      visibleView(page).getByRole('heading', { name: /board-ready intelligence/i }),
+      visibleView(page).getByRole('heading', { name: /map the company, generate the report/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Company Profile — idle hero headline ("...board-ready in seconds.").
@@ -129,7 +129,7 @@ test.describe('Map workspace — interactive flows', () => {
     // Back to Dashboard to confirm round-trip navigation still works.
     await clickNav(page, 'Dashboard');
     await expect(
-      visibleView(page).getByRole('heading', { name: /board-ready intelligence/i }),
+      visibleView(page).getByRole('heading', { name: /map the company, generate the report/i }),
     ).toBeVisible({ timeout: 8000 });
   });
 

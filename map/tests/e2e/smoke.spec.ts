@@ -44,26 +44,26 @@ test('dashboard hero renders correctly', async ({ page }) => {
   await signIn(page);
   const view = visibleView(page);
   // Current dashboard headline + value-prop copy.
-  await expect(view.getByRole('heading', { name: /board-ready intelligence/i })).toBeVisible({
-    timeout: 8000,
-  });
+  await expect(
+    view.getByRole('heading', { name: /map the company, generate the report/i }),
+  ).toBeVisible({ timeout: 8000 });
   const body = await view.innerText();
+  // Primary-source provenance line names the public datasets.
   expect(body).toContain('SEC EDGAR');
-  // The "Open a canvas" card lists the three workspace canvases. The eyebrow is
-  // upper-cased via CSS text-transform, so innerText reads "OPEN A CANVAS".
-  expect(body).toContain('OPEN A CANVAS');
-  expect(body).toContain('Company Profile');
-  expect(body).toContain('Sector Scan');
+  // The dashboard's three uppercase section eyebrows (CSS text-transform).
+  expect(body).toContain('THE PROBLEM IT SOLVES');
+  expect(body).toContain('HOW MAP WORKS');
+  expect(body).toContain('WHERE THE COST GOES TODAY');
 });
 
-test('dashboard shows the project search and canvas shortcuts', async ({ page }) => {
+test('dashboard shows the project search and the how-it-works flow', async ({ page }) => {
   await signIn(page);
   const view = visibleView(page);
   // The Dashboard leads with a single project search…
   await expect(view.locator('input[placeholder*="project" i]').first()).toBeVisible({ timeout: 8000 });
-  // …and "Open a canvas" shortcuts into the Company and Sector workspaces.
-  await expect(view.getByText('Company Profile', { exact: false }).first()).toBeVisible();
-  await expect(view.getByText('Sector Scan', { exact: false }).first()).toBeVisible();
+  // …and the "How MAP works" sources → MAP → report flow diagram.
+  await expect(view.getByText('HOW MAP WORKS', { exact: false }).first()).toBeVisible();
+  await expect(view.getByText('Sourced report', { exact: false }).first()).toBeVisible();
 });
 
 test('all nav tabs load without a not-found page', async ({ page }) => {
