@@ -90,74 +90,70 @@ function revNum(s: string): number {
 }
 
 /**
- * UNC Fit (est.) — a deterministic, transparent estimate of how well a company
- * aligns with UNC's research-partnership strengths. NOT a predictive model: it
- * sums a few weighted, explainable signals (sector tier weighted by
- * primary/secondary, NC / Research-Triangle geography, and revenue scale) into
- * a High / Mid / Low pill, and reports the reasons that drove the score.
+ * UNC Fit (est.) — a deterministic, multi-variable scoring matrix estimating how
+ * well a company aligns with UNC's research-partnership strengths. NOT a
+ * predictive model: it accumulates explicit weighted points (sector, geography,
+ * revenue scale, and growth-pipeline triggers) into a 0+ score, maps that score
+ * to a High / Mid / Low pill, and reports the triggers that drove it.
  */
 
-// Core UNC research cluster — life sciences in the broad sense.
-const CORE_SECTOR = /life scien|biotech|pharma|health|medtech|medical|therap|diagnostic|clinical|\bdrug|genomic|biolog|oncolog|immunolog|vaccine/i;
-// Other sectors with real UNC / Research-Triangle research overlap.
-const STRONG_SECTOR = /material|clean energy|renewable|solar|wind power|energy storage|battery|environment|climate|sustainab|agtech|agricultur|agribusiness|artificial intelligence|machine learning|data science|\bai\b|chemical|biomanufactur|nanotech|public health|education/i;
-// Consumer-facing sectors with limited research-partnership overlap.
-const LOW_SECTOR = /consumer|retail|entertainment|gaming|apparel|footwear|food|beverage|hospitality|restaurant|fashion|luxury|advertising/i;
+// Primary high-fit sectors (life sciences + health). Includes the spec's terms
+// plus the dataset's actual health vocabulary (Medical Devices, Diagnostics,
+// Therapeutics, etc.) so obvious health companies aren't missed on wording.
+const HIGH_SECTOR = /life scien|biotech|pharma|health|medtech|biomedical|health informatics|pharmacolog|public health|medical|diagnostic|therap|clinical|hospital/i;
+// Cross-domain: an IT/software company integrated with healthcare.
+const TECH_SECTOR = /it services|software/i;
+const HEALTH_KW = /healthcare|clinical|medical/i;
 // Research-Triangle / NC geography mentioned outside the HQ state field.
 const RTP_GEO = /research triangle|\brtp\b|raleigh|durham|chapel hill|\bcary\b|morrisville|north carolina/i;
+// Active non-dilutive federal pipeline or later-stage venture funding.
+const GROWTH = /\bnih\b|national institutes of health|\bseries [b-z]\b/i;
 
 type Fit = "High" | "Mid" | "Low";
 interface FitResult { level: Fit; score: number; reason: string; }
 
 // takes: one account row plus its parsed revenue in dollars
-// does: scores UNC alignment from weighted, explainable signals — sector
-//       (primary counts above secondary; core > strong > low), geography (NC HQ
-//       > Research-Triangle mention), and revenue scale (which only amplifies
-//       companies that already have sector alignment, so a cash-rich retailer
-//       can't buy its way up). A pure consumer/retail company is floored at Low,
-//       or Mid when it is an NC corporate citizen.
-// returns: the fit level, its raw score, and a short human-readable reason
+// does: runs the multi-variable scoring matrix — sector (+40 high-fit / +20
+//       health-tech crossover), geography (+30 NC HQ / +15 NC presence), tiered
+//       revenue (+30 >$10B / +15 >$1B, gated on having any sector alignment),
+//       and growth triggers (+25 for active NIH funding or Series B+). Maps the
+//       total to High (>=55) / Mid (15-54) / Low (<15).
+// returns: the fit level, its raw score, and the joined trigger-tag rationale
 function uncFit(a: AccountProfile, rev: number): FitResult {
   const primary = a.topIndustrySectorProfile || "";
-  const secondary = a.secondaryIndustrySectorProfile || "";
-  const why: string[] = [];
+  // Sector classification keys off the sector strings only; the crossover check
+  // may also consult descriptive text for a healthcare integration signal.
+  const sectorStr = `${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`;
+  const descBlob = `${sectorStr} ${a.description} ${a.keyProducts}`;
+  const tags: string[] = [];
+  let score = 0;
 
-  // Sector signal — the primary sector is weighted above the secondary.
-  let sector = 0;
-  if (CORE_SECTOR.test(primary)) { sector += 3; why.push("life sciences"); }
-  else if (STRONG_SECTOR.test(primary)) { sector += 2; why.push("UNC-aligned sector"); }
-  else if (LOW_SECTOR.test(primary)) { sector -= 3; why.push("consumer/retail"); }
-  if (CORE_SECTOR.test(secondary)) { sector += 2; if (!CORE_SECTOR.test(primary)) why.push("life-sci secondary"); }
-  else if (STRONG_SECTOR.test(secondary)) { sector += 1; }
-  else if (LOW_SECTOR.test(secondary)) { sector -= 1; }
+  // Sector (max +40) — primary high-fit, else health-tech crossover.
+  let sectorScore = 0;
+  if (HIGH_SECTOR.test(sectorStr)) { sectorScore = 40; tags.push("life sciences"); }
+  else if (TECH_SECTOR.test(primary) && HEALTH_KW.test(descBlob)) { sectorScore = 20; tags.push("health-tech crossover"); }
+  score += sectorScore;
 
-  const aligned =
-    CORE_SECTOR.test(primary) || STRONG_SECTOR.test(primary) ||
-    CORE_SECTOR.test(secondary) || STRONG_SECTOR.test(secondary);
-
-  // Geography — an NC HQ is the strongest local-partnership signal; a
-  // Research-Triangle mention elsewhere earns partial credit.
+  // Geography (max +30) — NC HQ, else an NC / RTP operating footprint.
   const inNC = (a.state || "").trim().toUpperCase() === "NC";
   const nearNC = !inNC && RTP_GEO.test(`${a.city} ${a.streetAddress} ${a.description}`);
-  let geo = 0;
-  if (inNC) { geo = 2; why.push("NC-based"); }
-  else if (nearNC) { geo = 1; why.push("NC presence"); }
+  if (inNC) { score += 30; tags.push("NC-based"); }
+  else if (nearNC) { score += 15; tags.push("NC presence"); }
 
-  // Revenue scale — tiered, and only counts for already-aligned companies.
-  let revTier = 0;
-  if (aligned) {
-    if (rev >= 10e9) { revTier = 2; why.push("$10B+"); }
-    else if (rev >= 1e9) { revTier = 1; why.push("$1B+"); }
+  // Revenue (max +30) — tiered, and only amplifies already-aligned companies.
+  if (sectorScore > 0) {
+    if (rev > 10e9) { score += 30; tags.push("$10B+"); }
+    else if (rev > 1e9) { score += 15; tags.push("$1B+"); }
   }
 
-  const score = sector + geo + revTier;
+  // Growth trajectory (+25) — active NIH pipeline or Series B+ funding.
+  if (GROWTH.test(`${a.description} ${a.resources} ${a.ownership} ${a.companyStructure} ${a.businessSplit}`)) {
+    score += 25;
+    tags.push("growth pipeline");
+  }
 
-  let level: Fit;
-  if (!aligned && LOW_SECTOR.test(primary)) level = inNC ? "Mid" : "Low";
-  else if (score >= 4) level = "High";
-  else level = "Mid";
-
-  return { level, score, reason: why.join(" · ") || "no strong signals" };
+  const level: Fit = score >= 55 ? "High" : score >= 15 ? "Mid" : "Low";
+  return { level, score, reason: tags.join(" • ") || "no strong signals" };
 }
 
 const FIT_STYLE: Record<Fit, { bg: string; color: string }> = {
@@ -234,7 +230,7 @@ export default function InteractiveAccountsTable({
         emp: empNum(a.approximateEmployees),
         rev: revNum(a.approximateRevenue),
         fit: uncFit(a, revNum(a.approximateRevenue)),
-        lifeSci: CORE_SECTOR.test(`${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`),
+        lifeSci: HIGH_SECTOR.test(`${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`),
       })),
     [accounts],
   );
