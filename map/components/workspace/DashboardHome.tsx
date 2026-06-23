@@ -4,53 +4,121 @@ import { useState, useRef } from "react";
 import { getCompanySuggestion } from "./companySuggestions";
 
 function MapFlowDiagram() {
-  const boxes = [
-    { x: 40, title: "You type", sub: "company or sector", accent: false },
-    { x: 196, title: "MAP", sub: "reads and drafts", accent: true },
-    { x: 352, title: "Report", sub: "sourced draft", accent: false },
-    { x: 508, title: "You act", sub: "review and send", accent: false },
-  ];
+  const sources = ["SEC EDGAR", "ClinicalTrials.gov", "NIH RePORTER", "PubMed", "UNC website"];
+
+  // Layout constants
+  const BW = 210, BH = 48, BR = 10;
+  const startY = 52, gapY = 63;
+  // Source box centers: 76, 139, 202, 265, 328
+  const sourceCY = sources.map((_, i) => startY + BH / 2 + i * gapY);
+  const mapCY = (sourceCY[0] + sourceCY[sourceCY.length - 1]) / 2; // 202
+
+  const srcX = 10;
+  const mapX = 360, mapY = mapCY - 56, mapW = 195, mapH = 112;
+  const outX = 632, outY = mapCY - 47, outW = 200, outH = 90;
+
   return (
     <svg
       width="100%"
-      viewBox="0 0 680 150"
+      viewBox="0 0 860 400"
       role="img"
       fontFamily="-apple-system, 'SF Pro Text', system-ui, sans-serif"
     >
       <title>How MAP works</title>
-      <desc>You type a company or sector. MAP reads five public sources and drafts the report. You review and act.</desc>
+      <desc>Five public sources feed MAP. MAP reads, matches, and drafts. You receive a sourced, ranked, and cited report.</desc>
+
       <defs>
-        <marker id="map-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <marker id="mfd-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
           <path d="M2 1L8 5L2 9" fill="none" stroke="#86868b" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
         </marker>
       </defs>
-      {boxes.map((b) => (
-        <g key={b.title}>
+
+      {/* PUBLIC SOURCES label */}
+      <text
+        x={srcX + BW / 2} y={26} textAnchor="middle"
+        fontSize="11" fontWeight="600" letterSpacing="0.1em" fill="#a1a1a6"
+        className="dark:fill-[#636366]"
+      >PUBLIC SOURCES</text>
+
+      {/* Source boxes */}
+      {sources.map((name, i) => (
+        <g key={name}>
           <rect
-            x={b.x} y={34} width={130} height={58} rx={12}
-            fill={b.accent ? "#e8f1fd" : "#f5f5f7"}
-            stroke={b.accent ? "#0071e3" : "#d2d2d7"}
-            strokeWidth={0.5}
-            className={b.accent ? "" : "dark:fill-[#1c1c1e] dark:stroke-[#3a3a3c]"}
+            x={srcX} y={sourceCY[i] - BH / 2} width={BW} height={BH} rx={BR}
+            fill="#f5f5f7" stroke="#d2d2d7" strokeWidth={0.75}
+            className="dark:fill-[#1c1c1e] dark:stroke-[#3a3a3c]"
           />
           <text
-            x={b.x + 65} y={58} textAnchor="middle" dominantBaseline="central"
-            fontSize="14" fontWeight="500"
-            fill={b.accent ? "#0071e3" : "#1d1d1f"}
-            className={b.accent ? "" : "dark:fill-[#f5f5f7]"}
-          >{b.title}</text>
-          <text
-            x={b.x + 65} y={76} textAnchor="middle" dominantBaseline="central"
-            fontSize="12" fill="#6e6e73" className="dark:fill-[#a1a1a6]"
-          >{b.sub}</text>
+            x={srcX + BW / 2} y={sourceCY[i]} textAnchor="middle" dominantBaseline="central"
+            fontSize="15" fill="#1d1d1f"
+            className="dark:fill-[#f5f5f7]"
+          >{name}</text>
         </g>
       ))}
-      {[172, 328, 484].map((x1) => (
-        <line key={x1} x1={x1} y1={63} x2={x1 + 21} y2={63} stroke="#86868b" strokeWidth={1} markerEnd="url(#map-arrow)" />
+
+      {/* Convergence curves from each source to MAP left edge */}
+      {sourceCY.map((cy) => (
+        <path
+          key={cy}
+          d={`M${srcX + BW},${cy} C${mapX - 80},${cy} ${mapX - 80},${mapCY} ${mapX},${mapCY}`}
+          fill="none" stroke="#d2d2d7" strokeWidth={1}
+          className="dark:stroke-[#3a3a3c]"
+        />
       ))}
-      <text x={340} y={126} textAnchor="middle" fontSize="12" fill="#6e6e73" className="dark:fill-[#a1a1a6]">
-        Reads: SEC EDGAR · ClinicalTrials.gov · NIH RePORTER · PubMed · UNC website
-      </text>
+
+      {/* MAP center box */}
+      <rect
+        x={mapX} y={mapY} width={mapW} height={mapH} rx={14}
+        fill="#e8f1fd" stroke="#0071e3" strokeWidth={1}
+        className="dark:fill-[#0a2540] dark:stroke-[#0071e3]"
+      />
+      <text
+        x={mapX + mapW / 2} y={mapCY - 16} textAnchor="middle" dominantBaseline="central"
+        fontSize="24" fontWeight="700" fill="#0071e3"
+      >MAP</text>
+      <text
+        x={mapX + mapW / 2} y={mapCY + 16} textAnchor="middle" dominantBaseline="central"
+        fontSize="13" fill="#3a6ea8"
+        className="dark:fill-[#6ba3d6]"
+      >reads · matches · drafts</text>
+
+      {/* Arrow MAP → output */}
+      <line
+        x1={mapX + mapW} y1={mapCY} x2={outX - 4} y2={mapCY}
+        stroke="#86868b" strokeWidth={1} markerEnd="url(#mfd-arrow)"
+        className="dark:stroke-[#636366]"
+      />
+
+      {/* WHAT YOU GET label */}
+      <text
+        x={outX + outW / 2} y={outY - 18} textAnchor="middle"
+        fontSize="11" fontWeight="600" letterSpacing="0.1em" fill="#a1a1a6"
+        className="dark:fill-[#636366]"
+      >WHAT YOU GET</text>
+
+      {/* Output box */}
+      <rect
+        x={outX} y={outY} width={outW} height={outH} rx={BR}
+        fill="#f5f5f7" stroke="#d2d2d7" strokeWidth={0.75}
+        className="dark:fill-[#1c1c1e] dark:stroke-[#3a3a3c]"
+      />
+      <text
+        x={outX + outW / 2} y={mapCY - 12} textAnchor="middle" dominantBaseline="central"
+        fontSize="17" fontWeight="600" fill="#1d1d1f"
+        className="dark:fill-[#f5f5f7]"
+      >Sourced report</text>
+      <text
+        x={outX + outW / 2} y={mapCY + 14} textAnchor="middle" dominantBaseline="central"
+        fontSize="13" fill="#6e6e73"
+        className="dark:fill-[#a1a1a6]"
+      >ranked and cited</text>
+
+      {/* Export formats */}
+      <text
+        x={outX + outW / 2} y={outY + outH + 22} textAnchor="middle"
+        fontSize="12" fill="#a1a1a6"
+        className="dark:fill-[#636366]"
+      >Word · Excel · PowerPoint · PDF</text>
     </svg>
   );
 }
