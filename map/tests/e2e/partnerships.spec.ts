@@ -2,8 +2,8 @@ import { test, expect, Page } from '@playwright/test';
 import { mockBackend, gotoWorkspace } from './helpers';
 
 // NOTE: The Partnerships feature is the "Partnerships" tab in the workspace
-// sub-nav (the live VIEWS are Dashboard / Company / Sector / Partnerships / Data
-// / Projects — see map/app/page.tsx). The PartnershipsView component renders its
+// sub-nav (the live VIEWS are Home / Companies / Sectors / Partnerships /
+// Directory / Projects — see map/app/page.tsx). The PartnershipsView component renders its
 // own "Partnerships" heading and the company/sector toggle inside that view.
 // These specs are CI-safe: mockBackend stubs /api/partnerships, so they never
 // hit a real backend.
@@ -51,7 +51,7 @@ test('Partnerships tab is reachable and renders the three result cards', async (
 test('navigating to Partnerships and back does NOT replay the intro splash', async ({ page }) => {
   await signInGuest(page);
   // Navigate across tabs including the (formerly route-based) Partnerships view.
-  for (const label of ['Partnerships', 'Sector', 'Partnerships', 'Dashboard']) {
+  for (const label of ['Partnerships', 'Sectors', 'Partnerships', 'Home']) {
     await page.locator('nav').getByText(label, { exact: true }).first().click();
     await page.waitForTimeout(600);
     const body = await page.locator('body').innerText();

@@ -267,6 +267,30 @@ export default function SectorCanvas({
               getContent={() => JSON.stringify(scan.data)}
             />
           </div>
+          {scan.stubCompanies.length > 0 && (
+            <div
+              style={{
+                margin: "10px 28px 0",
+                padding: "8px 12px",
+                borderRadius: 8,
+                border: "1px solid rgba(217,119,6,0.35)",
+                background: "rgba(254,243,199,0.65)",
+                color: "#92400e",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "flex-start",
+                gap: 8,
+              }}
+            >
+              <span>⚠</span>
+              <span>
+                {scan.stubCompanies.length} of {scan.completionRate?.total ?? scan.stubCompanies.length}{" "}
+                companies resolved with SEC data only (pipeline timeout):{" "}
+                {scan.stubCompanies.join(", ")}. Verify research data for these companies
+                separately before outreach.
+              </span>
+            </div>
+          )}
           <TickerGrid data={scan.data} onSelect={onSelectCompany} active={activeCompany} />
           {/* The report was designed for a padded standalone page — give it
               matching gutters so nothing runs against the rounded card edge. */}

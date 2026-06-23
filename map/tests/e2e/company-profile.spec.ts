@@ -13,9 +13,10 @@ async function signIn(page: Page) {
   await gotoWorkspace(page);
 }
 
-// The top-nav tab is labelled "Company" in the live build.
+// The top-nav tab for the single-company report generator is labelled
+// "Companies".
 async function goToCompanyProfile(page: Page) {
-  await clickNav(page, 'Company');
+  await clickNav(page, 'Companies');
   await page.waitForTimeout(1000);
 }
 
@@ -107,9 +108,9 @@ test('after viewing a report the report persists when user returns', async ({ pa
     await appleChip.click();
     await page.waitForTimeout(8000);
   }
-  await clickNav(page, 'Dashboard');
+  await clickNav(page, 'Home');
   await page.waitForTimeout(1000);
-  await clickNav(page, 'Company');
+  await clickNav(page, 'Companies');
   await page.waitForTimeout(1500);
   const body = await page.locator('body').innerText();
   expect(body.toLowerCase()).toContain('apple');
@@ -118,16 +119,16 @@ test('after viewing a report the report persists when user returns', async ({ pa
 
 test('other nav tabs still work after company profile changes', async ({ page }) => {
   // NOTE: assert against the actual Next.js not-found page text rather than a
-  // bare "404" substring — the Companies table contains real data (e.g. zip
+  // bare "404" substring — the Directory table contains real data (e.g. zip
   // code 94404) that includes "404" and would false-positive a crude check.
   const NOT_FOUND = 'This page could not be found';
   await signIn(page);
   await goToCompanyProfile(page);
-  await clickNav(page, 'Sector');
+  await clickNav(page, 'Sectors');
   await page.waitForTimeout(2000);
   let body = await page.locator('body').innerText();
   expect(body).not.toContain(NOT_FOUND);
-  await clickNav(page, 'Dashboard');
+  await clickNav(page, 'Home');
   await page.waitForTimeout(2000);
   body = await page.locator('body').innerText();
   expect(body).not.toContain(NOT_FOUND);

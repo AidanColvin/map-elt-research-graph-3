@@ -13,7 +13,8 @@ function acct(p: Partial<AccountProfile>): AccountProfile {
     website: "", companyStructure: "", ownership: "", streetAddress: "", city: "",
     state: "", zipCode: "", country: "", approximateEmployees: "", approximateRevenue: "",
     keyProducts: "", businessSplit: "", researchBy: "", dateOfResearch: "",
-    resources: "", linkToReport: "", ...p,
+    resources: "", linkToReport: "", homepage: "", employees: null,
+    uncPartner: { status: "none" }, uncAngle: "", ...p,
   };
 }
 

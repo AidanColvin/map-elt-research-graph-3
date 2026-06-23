@@ -733,6 +733,9 @@ export default function PartnershipsView({
 
       <Eyebrow style={{ letterSpacing: "0.22em" }}>UNC × Industry</Eyebrow>
       <h1 style={{ fontSize: 36, fontWeight: 700, letterSpacing: "-0.025em", margin: "10px 0 6px" }}>Partnerships</h1>
+      <p style={{ fontSize: 13.5, color: "#6b6b73", margin: "0 0 6px", maxWidth: 560 }}>
+        Companies UNC already works with.
+      </p>
       <p style={{ fontSize: 15, color: "#6b6b73", margin: 0, maxWidth: 560 }}>
         Verifiable UNC links only — every fact below is tied to a primary source (PubMed, NIH RePORTER, ClinicalTrials.gov, SEC filings, unc.edu). No summaries.
       </p>

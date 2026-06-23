@@ -26,17 +26,32 @@ const HEADER_H = 54;
 type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "projects" | "account";
 
 // The sub-nav routes (the "account" view is reached via the Profile button,
-// not the sub-nav, so it's intentionally not listed here). Display text for
-// the accounts route is "Companies"; its view key stays "accounts" so nothing
-// that references the route breaks.
+// not the sub-nav, so it's intentionally not listed here). The "accounts"
+// route shows the big company table and reads "Directory"; the singular
+// "company" route is the one-company report generator and reads "Companies".
+// The view keys stay "accounts" and "company" so nothing that references the
+// routes breaks.
 const VIEWS: { key: View; label: string }[] = [
-  { key: "dashboard", label: "Dashboard" },
-  { key: "company", label: "Company" },
-  { key: "sector", label: "Sector" },
+  { key: "dashboard", label: "Home" },
+  { key: "company", label: "Companies" },   // single-company report generator
+  { key: "sector", label: "Sectors" },
   { key: "partnerships", label: "Partnerships" },
-  { key: "accounts", label: "Companies" },
+  { key: "accounts", label: "Directory" },  // the big company table
   { key: "projects", label: "Projects" },
 ];
+
+// Base document title (mirrors the static metadata in layout.tsx) and the
+// per-view suffix the active tab appends, so the browser tab reflects the page.
+const BASE_TITLE = "Map — Research & Company Intelligence";
+const VIEW_TITLES: Record<View, string> = {
+  dashboard: BASE_TITLE,
+  company: "Companies — Map",
+  sector: "Sectors — Map",
+  partnerships: "Partnerships — Map",
+  accounts: "Directory — Map",
+  projects: "Projects — Map",
+  account: "Account — Map",
+};
 
 // takes: an optional pixel size
 // does: draws the node-graph brand glyph used in the header
@@ -235,6 +250,12 @@ export default function MapHome() {
       setUser({ email: "guest", guest: true, role: "user" });
     }
   }, []);
+
+  // Keep the browser tab title in step with the active view (this is an SPA, so
+  // there is one document; the title is updated client-side per tab).
+  useEffect(() => {
+    document.title = VIEW_TITLES[view];
+  }, [view]);
 
   // takes: a company name selected from a sector ticker card
   // does: triggers a deep dive and mirrors the choice into the draft input;

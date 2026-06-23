@@ -45,7 +45,7 @@ try {
   await check('guest sign-in + nav', signInGuest);
 
   await check('dashboard hero + 5 deep-dive logos load', async () => {
-    await page.locator('text="Dashboard"').first().click();
+    await page.locator('text="Home"').first().click();
     await page.waitForTimeout(2000);
     const b = await page.locator('body').innerText();
     for (const s of ['partnership', 'CURATED DEEP DIVES', 'TRENDING SECTORS']) if (!b.includes(s)) throw new Error(`missing ${s}`);
@@ -58,7 +58,7 @@ try {
   });
 
   await check('nav: all five tabs reachable (incl. Partnerships link)', async () => {
-    for (const label of ['Company Profile', 'Sector Scan', 'Companies', 'Dashboard']) {
+    for (const label of ['Companies', 'Sectors', 'Directory', 'Home']) {
       await page.locator(`text="${label}"`).first().click();
       await page.waitForTimeout(800);
     }
@@ -66,7 +66,7 @@ try {
   });
 
   await check('company deep dive: chip -> report + export buttons + Save to Project', async () => {
-    await page.locator('text="Company Profile"').first().click();
+    await page.locator('text="Companies"').first().click();
     await page.waitForTimeout(1200);
     await view().locator('button:has-text("Apple")').first().click();
     await view().locator('button:has-text("Download PDF")').first().waitFor({ state: 'visible', timeout: 40000 });
@@ -89,7 +89,7 @@ try {
   });
 
   await check('sector scan: Oncology -> report', async () => {
-    await page.locator('text="Sector Scan"').first().click();
+    await page.locator('text="Sectors"').first().click();
     await page.waitForTimeout(800);
     const input = page.locator('input[aria-label="Sector"]:visible').first();
     await input.fill('Oncology');
@@ -97,8 +97,8 @@ try {
     await awaitReport(['PARTNERSHIP INTELLIGENCE REPORT', 'Summary']);
   });
 
-  await check('companies table + downloads', async () => {
-    await page.locator('text="Companies"').first().click();
+  await check('directory table + downloads', async () => {
+    await page.locator('text="Directory"').first().click();
     await page.waitForTimeout(2000);
     await view().locator('table').first().waitFor({ state: 'visible', timeout: 10000 });
     await view().locator('button:has-text("Excel"), button:has-text("PDF"), button:has-text("Download")').first().waitFor({ state: 'visible', timeout: 5000 });

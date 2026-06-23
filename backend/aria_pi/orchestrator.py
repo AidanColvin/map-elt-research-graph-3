@@ -232,15 +232,15 @@ async def run_pipeline_stream(req: PipelineRequest):
 
             # Fetch every company concurrently, emitting a progress frame as
             # each one finishes — this is the genuine, granular signal that
-            # drives the frontend progress bar.
+            # drives the frontend progress bar. Heartbeat events are emitted
+            # every 4 seconds of silence to keep the Vercel edge from timing
+            # out the connection during slow company batches.
             t_start = time.monotonic()
-            # Prefetch SEC facts for all companies so financials survive a later
-            # enrichment-deadline cutoff; the prefetch eats into the budget.
             facts_by_name = _prefetch_facts(seeds, sec,
                                             deadline=t_start + FACTS_PREFETCH_BUDGET)
             out_by_name = {n: _empty_company(n, facts_by_name.get(n)) for n in seeds}
             done = 0
-            stream_timeout = max(1.0, t_start + FETCH_BUDGET_SECONDS - time.monotonic())
+            deadline_ts = t_start + FETCH_BUDGET_SECONDS + 2
             with ThreadPoolExecutor(max_workers=len(seeds)) as pool:
                 fut_to_name = {
                     pool.submit(_fetch_one_company, n, sec=sec, trials=trials,
@@ -248,22 +248,53 @@ async def run_pipeline_stream(req: PipelineRequest):
                                 prefetched_facts=facts_by_name.get(n)): n
                     for n in seeds
                 }
-                try:
-                    for fut in as_completed(fut_to_name,
-                                            timeout=stream_timeout + 2):
-                        name = fut_to_name[fut]
-                        try:
-                            out_by_name[name] = fut.result(timeout=0.1)
-                        except Exception as e:
-                            _log.warning("stream company err %s: %s", name, e)
-                        done += 1
-                        yield _sse({"type": "progress", "done": done,
-                                    "total": total, "company": name})
-                except FuturesTimeout:
-                    # Deadline hit — remaining companies keep their SEC-only stubs.
-                    _log.warning("stream fetch deadline reached")
+                remaining_futs = dict(fut_to_name)
+                while remaining_futs:
+                    if time.monotonic() >= deadline_ts:
+                        _log.warning("stream fetch deadline reached")
+                        break
+                    poll_timeout = min(4.0, deadline_ts - time.monotonic())
+                    if poll_timeout <= 0:
+                        break
+                    completed_this_poll = []
+                    try:
+                        for fut in as_completed(list(remaining_futs),
+                                                timeout=poll_timeout):
+                            completed_this_poll.append(fut)
+                            del remaining_futs[fut]
+                    except FuturesTimeout:
+                        pass
+                    if completed_this_poll:
+                        for fut in completed_this_poll:
+                            name = fut_to_name[fut]
+                            try:
+                                out_by_name[name] = fut.result(timeout=0.1)
+                            except Exception as e:
+                                _log.warning("stream company err %s: %s", name, e)
+                            done += 1
+                            yield _sse({"type": "progress", "done": done,
+                                        "total": total, "company": name})
+                    elif remaining_futs:
+                        yield _sse({"type": "heartbeat",
+                                    "ts": time.monotonic()})
 
             company_data = [out_by_name[n] for n in seeds]
+
+            # Issue 5: classify each company as full or stub for the done payload
+            full_companies = [n for n in seeds
+                              if not out_by_name[n].get('_sec_only_stub')]
+            stub_companies = [n for n in seeds
+                              if out_by_name[n].get('_sec_only_stub')]
+            completion_rate = {
+                "full": len(full_companies),
+                "stub": len(stub_companies),
+                "total": len(seeds),
+                "pct": round(len(full_companies) / max(len(seeds), 1) * 100),
+            }
+            for comp in company_data:
+                comp['_coverage'] = (
+                    'stub' if comp.get('_sec_only_stub') else 'full'
+                )
 
             yield _sse({"type": "stage", "key": "building"})
             report = builder.build(req.sector,
@@ -281,7 +312,10 @@ async def run_pipeline_stream(req: PipelineRequest):
                 "generated_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
             }
 
-            yield _sse({"type": "done", "report": report})
+            yield _sse({"type": "done", "report": report,
+                        "completionRate": completion_rate,
+                        "stub_companies": stub_companies,
+                        "full_companies": full_companies})
         except Exception as e:
             _log.exception("run_pipeline_stream failed: %s", type(e).__name__)
             yield _sse({"type": "error", "message": "Internal error while generating the report."})

@@ -31,7 +31,7 @@ async function signInGuest() {
 
 // Tolerate a one-off cold-start 502 on the heavier scans, like the spec suite.
 async function runScanAwaitReport(sector, sentinels) {
-  await page.locator('text=Sector Scan').first().click();
+  await page.locator('text=Sectors').first().click();
   await page.waitForTimeout(800);
   const input = page.locator('input[aria-label="Sector"]:visible').first();
   await input.fill(sector);
@@ -55,7 +55,7 @@ async function clickProfileChipAndAwait(label) {
   // chips are gone. Reload to reset in-memory dive state, then re-enter as guest
   // (guest mode is in-memory and does not survive a reload).
   await signInGuest();
-  await page.locator('text="Company Profile"').first().click();
+  await page.locator('text="Companies"').first().click();
   await page.waitForTimeout(1200);
   const chip = visibleView().locator(`button:has-text("${label}")`).first();
   await chip.waitFor({ state: 'visible', timeout: 8000 });
@@ -86,7 +86,7 @@ try {
 
   // 3. All nav tabs load without the Next not-found page
   await check('all nav tabs load (no 404 / app error)', async () => {
-    for (const label of ['Dashboard', 'Company Profile', 'Sector Scan', 'Companies']) {
+    for (const label of ['Home', 'Companies', 'Sectors', 'Directory']) {
       await page.locator(`text="${label}"`).first().click();
       await page.waitForTimeout(1200);
       const b = await page.locator('body').innerText();
@@ -97,7 +97,7 @@ try {
 
   // 4. Company Profile idle hero + chips
   await check('company profile idle hero + chips', async () => {
-    await page.locator('text="Company Profile"').first().click();
+    await page.locator('text="Companies"').first().click();
     await page.waitForTimeout(1200);
     const b = await page.locator('body').innerText();
     for (const s of ['board-ready', 'SEC filings', 'Apple', 'NVIDIA', 'Microsoft', 'SAMPLE OUTPUT'])
@@ -109,7 +109,7 @@ try {
   await check('NVIDIA chip → report', () => clickProfileChipAndAwait('NVIDIA'));
   await check('manual search (Microsoft) → report', async () => {
     await signInGuest();
-    await page.locator('text="Company Profile"').first().click();
+    await page.locator('text="Companies"').first().click();
     await page.waitForTimeout(1000);
     const box = visibleView().locator('input[placeholder*="company" i], input[placeholder*="ticker" i], input[placeholder*="search" i]').first();
     await box.click(); await box.fill('Microsoft');
@@ -121,9 +121,9 @@ try {
 
   // 6. Report persists across nav (intended design)
   await check('report persists when returning to Company Profile', async () => {
-    await page.locator('text="Dashboard"').first().click();
+    await page.locator('text="Home"').first().click();
     await page.waitForTimeout(1000);
-    await page.locator('text="Company Profile"').first().click();
+    await page.locator('text="Companies"').first().click();
     await page.waitForTimeout(1500);
     const b = await page.locator('body').innerText();
     if (!b.includes('Executive Summary')) throw new Error('prior report did not persist');
@@ -145,9 +145,9 @@ try {
     console.log(`      Pharmaceutical signals: ${sig.length ? sig.join(', ') : '(none)'}`);
   });
 
-  // 8. Companies table + downloads
-  await check('companies table + download buttons', async () => {
-    await page.locator('text="Companies"').first().click();
+  // 8. Directory table + downloads
+  await check('directory table + download buttons', async () => {
+    await page.locator('text="Directory"').first().click();
     await page.waitForTimeout(2000);
     // Other views stay mounted-but-hidden (incl. report tables), so target the
     // table inside the currently-visible view rather than the first in the DOM.

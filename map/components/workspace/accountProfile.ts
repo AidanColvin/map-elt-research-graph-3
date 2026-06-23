@@ -4,6 +4,12 @@
  * table renders from so headers and cells never drift out of sync.
  */
 
+/** A company's standing in the UNC partnership inventory. */
+export type UncPartner = {
+  status: "current" | "past" | "none";
+  detail?: string;
+};
+
 export interface AccountProfile {
   account: string;
   founded: string;
@@ -28,6 +34,12 @@ export interface AccountProfile {
   dateOfResearch: string;
   resources: string;
   linkToReport: string;
+  // Extended account fields. Kept out of ACCOUNT_COLUMNS (the source-template
+  // export schema) so the load-template exports stay byte-for-byte unchanged.
+  homepage: string; // canonical company website
+  employees: number | null; // SEC 10-K headcount when known, null until added
+  uncPartner: UncPartner; // joined against the UNC partnership inventory
+  uncAngle: string; // stored one-liner: what they would sell UNC, not generated live
 }
 
 export type AccountColumn = {
