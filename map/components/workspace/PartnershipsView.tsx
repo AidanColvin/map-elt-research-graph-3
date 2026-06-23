@@ -55,10 +55,15 @@ export interface UNCPatent {
   school?: string;
 }
 export interface TalkingPoint {
-  category: 'Research Overlap' | 'Existing Relationship' | 'Partnership Opportunity' | 'Contact';
+  category: 'Research Overlap' | 'Existing Relationship' | 'Partnership Opportunity' | 'Contact' | 'Strategic Overlap';
   headline: string;
   detail: string;
   strength: 'high' | 'medium' | 'low';
+  // The outreach angle this point serves — drives the R&D / Talent grouping.
+  angle?: 'R&D' | 'Talent' | 'General';
+  year?: number | null;
+  score?: number;
+  source_url?: string;
 }
 
 export interface FitUnit {
@@ -272,6 +277,58 @@ function SourceLink({ href, label }: { href: string; label: string }) {
 // returns: the normalized quote
 function asQuote(q: Quote | string): Quote {
   return typeof q === "string" ? { text: q } : q;
+}
+
+// takes: one talking point
+// does: renders a single BD talking-point row — category + strength pills, the
+//       headline, and the detail (linkifying any trailing primary-source URL)
+// returns: the row element
+function TalkingPointRow({ tp }: { tp: TalkingPoint }) {
+  const pillBg = tp.strength === "high" ? "#dcfce7" : tp.strength === "medium" ? "#fef9c3" : "#f3f4f6";
+  const pillColor = tp.strength === "high" ? "#15803d" : tp.strength === "medium" ? "#a16207" : "#6b7280";
+  const isUrl = tp.detail.startsWith("http://") || tp.detail.startsWith("https://");
+  const urlMatch = tp.detail.match(/(https?:\/\/\S+)/);
+  return (
+    <li data-testid="talking-point-row" style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9aa2" }}>{tp.category}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 9px", background: pillBg, color: pillColor }}>
+          {tp.strength.charAt(0).toUpperCase() + tp.strength.slice(1)}
+        </span>
+      </div>
+      <p data-testid="tp-headline" style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f", margin: "0 0 4px", lineHeight: 1.4 }}>{tp.headline}</p>
+      <p style={{ fontSize: 12.5, color: "#6b6b73", margin: 0, lineHeight: 1.45 }}>
+        {urlMatch
+          ? <>
+              {tp.detail.slice(0, tp.detail.indexOf(urlMatch[1])).replace(/ — $/, "")}
+              {" "}<a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
+            </>
+          : isUrl
+            ? <a href={tp.detail} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
+            : tp.detail
+        }
+      </p>
+    </li>
+  );
+}
+
+// takes: a group label, a one-line note, and the points in that angle
+// does: renders one labeled talking-point group (R&D vs Talent), or nothing
+//       when the group is empty
+// returns: the group element, or null
+function TalkingPointGroup({ label, note, points }: { label: string; note: string; points: TalkingPoint[] }) {
+  if (!points.length) return null;
+  return (
+    <div data-testid="tp-group" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#1d1d1f", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 12, color: "#9a9aa2", margin: "2px 0 0" }}>{note}</p>
+      </div>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        {points.map((tp, i) => <TalkingPointRow key={i} tp={tp} />)}
+      </ul>
+    </div>
+  );
 }
 
 // takes: an uppercase eyebrow label
@@ -1220,38 +1277,18 @@ export default function PartnershipsView({
                 <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No talking points generated.</p>
               )}
 
-              {tpStatus === "done" && talkingPoints.length > 0 && (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                  {talkingPoints.map((tp, i) => {
-                    const pillBg = tp.strength === "high" ? "#dcfce7" : tp.strength === "medium" ? "#fef9c3" : "#f3f4f6";
-                    const pillColor = tp.strength === "high" ? "#15803d" : tp.strength === "medium" ? "#a16207" : "#6b7280";
-                    const isUrl = tp.detail.startsWith("http://") || tp.detail.startsWith("https://");
-                    const urlMatch = tp.detail.match(/(https?:\/\/\S+)/);
-                    return (
-                      <li key={i} data-testid="talking-point-row" style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9aa2" }}>{tp.category}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 9px", background: pillBg, color: pillColor }}>
-                            {tp.strength.charAt(0).toUpperCase() + tp.strength.slice(1)}
-                          </span>
-                        </div>
-                        <p data-testid="tp-headline" style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f", margin: "0 0 4px", lineHeight: 1.4 }}>{tp.headline}</p>
-                        <p style={{ fontSize: 12.5, color: "#6b6b73", margin: 0, lineHeight: 1.45 }}>
-                          {urlMatch
-                            ? <>
-                                {tp.detail.slice(0, tp.detail.indexOf(urlMatch[1])).replace(/ — $/, "")}
-                                {" "}<a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
-                              </>
-                            : isUrl
-                              ? <a href={tp.detail} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
-                              : tp.detail
-                          }
-                        </p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              {tpStatus === "done" && talkingPoints.length > 0 && (() => {
+                // Split by outreach angle so BD sees an R&D pitch and a talent
+                // pitch separately; ranked order is preserved within each group.
+                const talent = talkingPoints.filter((tp) => tp.angle === "Talent");
+                const rd = talkingPoints.filter((tp) => tp.angle !== "Talent");
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                    <TalkingPointGroup label="R&D & partnership" note="Research overlap, existing ties, and named UNC contacts" points={rd} />
+                    <TalkingPointGroup label="Talent & recruiting" note="UNC as a hiring and training pipeline" points={talent} />
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );
