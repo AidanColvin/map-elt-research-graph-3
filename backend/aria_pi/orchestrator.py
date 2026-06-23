@@ -556,7 +556,8 @@ def _validate_report_sources(report: dict, tagger: SourceTagger) -> dict:
                     valid += 1
                 else:
                     issues.append({"path": path, "sources": srcs,
-                                   "reason": f"Only {len(clean)} valid sources"})
+                                   "reason": f"Only {len(clean)} distinct reputable "
+                                             f"source(s); 2 required"})
             for k, v in node.items():
                 visit(v, f"{path}.{k}")
         elif isinstance(node, list):
@@ -564,8 +565,10 @@ def _validate_report_sources(report: dict, tagger: SourceTagger) -> dict:
                 visit(item, f"{path}[{i}]")
 
     visit(report)
+    # Keep a generous slice of issues (was 20) so analysts see the long tail of
+    # unverified claims rather than a silently-truncated head.
     return {"total_claims": total, "verified": valid,
-            "unverified": total - valid, "issues": issues[:20]}
+            "unverified": total - valid, "issues": issues[:200]}
 
 
 if __name__ == "__main__":
