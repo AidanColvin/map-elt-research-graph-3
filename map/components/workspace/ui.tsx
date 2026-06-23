@@ -56,16 +56,20 @@ export function Loading({ label, detail }: { label: string; detail?: string }) {
   );
 }
 
-// takes: a title string, an optional toolbar node, and the card's children
-// does: renders a canvas module — thin uppercase eyebrow, an optional pinned
-//       command toolbar beneath it, then the scrollable content area
+// takes: a title string, an optional one-line subtitle, an optional toolbar
+//        node, and the card's children
+// does: renders a canvas module — thin uppercase eyebrow, an optional secondary
+//       gray subtitle beneath it, an optional pinned command toolbar, then the
+//       scrollable content area
 // returns: a floating glass card section element
 export function CanvasCard({
   title,
+  subtitle,
   toolbar,
   children,
 }: {
   title: string;
+  subtitle?: string;
   toolbar?: React.ReactNode;
   children: React.ReactNode;
 }) {
@@ -85,6 +89,19 @@ export function CanvasCard({
       >
         {title}
       </div>
+      {subtitle && (
+        <div
+          style={{
+            padding: "4px 24px 0",
+            fontSize: 13.5,
+            color: "#6b6b73",
+            fontFamily: FONT,
+            flexShrink: 0,
+          }}
+        >
+          {subtitle}
+        </div>
+      )}
       {toolbar && <div style={{ flexShrink: 0 }}>{toolbar}</div>}
       <div
         style={{

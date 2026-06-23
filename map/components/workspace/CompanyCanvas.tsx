@@ -422,7 +422,8 @@ export default function CompanyCanvas({
 
   return (
     <CanvasCard
-      title="Company Profile"
+      title="Companies"
+      subtitle="Scan the public sources and draft one company report."
       // In the idle hero the search lives inside the hero itself, so the pinned
       // top toolbar is omitted; every other state keeps it.
       toolbar={

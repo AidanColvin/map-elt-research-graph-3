@@ -15,7 +15,7 @@ await Promise.race([
 if (await guest.isVisible().catch(() => false)) await guest.click();
 await nav.waitFor({ state: 'visible', timeout: 20000 });
 
-await page.locator('text="Dashboard"').first().click();
+await page.locator('text="Home"').first().click();
 await page.waitForTimeout(2500);
 await page.screenshot({ path: 'test-results/live-dashboard.png' });
 

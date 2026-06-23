@@ -14,7 +14,7 @@ async function signIn(page: Page) {
 
 // Run a sector scan from the Sector view and submit via the keyboard.
 async function runSectorScan(page: Page, sector: string) {
-  await clickNav(page, 'Sector');
+  await clickNav(page, 'Sectors');
   await page.waitForTimeout(500);
   const input = visibleView(page).locator('input[aria-label="Sector"]').first();
   await expect(input).toBeVisible({ timeout: 8000 });
@@ -67,7 +67,7 @@ test('dashboard shows the project search and the how-it-works flow', async ({ pa
 
 test('all nav tabs load without a not-found page', async ({ page }) => {
   await signIn(page);
-  for (const label of ['Dashboard', 'Company', 'Sector', 'Companies']) {
+  for (const label of ['Home', 'Companies', 'Sectors', 'Directory']) {
     await clickNav(page, label);
     await page.waitForTimeout(800);
     const body = await page.locator('body').innerText();
@@ -79,7 +79,7 @@ test('all nav tabs load without a not-found page', async ({ page }) => {
 test('Apple deep dive loads and streams a report', async ({ page }) => {
   test.setTimeout(60000);
   await signIn(page);
-  await clickNav(page, 'Company');
+  await clickNav(page, 'Companies');
   await page.waitForTimeout(500);
   const view = visibleView(page);
   const input = view.locator('input[aria-label="Company or ticker"]').first();

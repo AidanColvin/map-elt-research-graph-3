@@ -477,11 +477,19 @@ function extractCustomerFacts(business: string): string[] {
  * Form 4 raw XML carries each reporting owner's name plus their officer title,
  * which is far more reliable than parsing the 10-K's officer table.
  */
+// A departed executive who sold remaining shares > 18 months ago is no longer
+// current. Filter Form 4 filings to only those within this recency window.
+const EIGHTEEN_MONTHS_MS = 18 * 30 * 24 * 60 * 60 * 1000;
+
 export async function fetchExecutives(
   cik: string,
   filings: FilingRef[],
 ): Promise<Executive[]> {
-  const form4 = filings.filter((f) => f.form === "4").slice(0, 10);
+  const cutoff = Date.now() - EIGHTEEN_MONTHS_MS;
+  const form4 = filings
+    .filter((f) => f.form === "4")
+    .filter((f) => !f.date || new Date(f.date).getTime() >= cutoff)
+    .slice(0, 10);
   if (!form4.length) return [];
   const cikInt = parseInt(cik, 10);
 
@@ -652,12 +660,30 @@ function sliceItems(text: string): Record<string, string> {
     const segs = groups[k];
     // The same "Item N" string appears in the table of contents (a short line
     // ending in a page number) and again at the real section. Drop the ToC /
-    // index entries, then take the longest remaining block — the actual body.
+    // index entries, then validate that the chosen block starts with content
+    // anchors for that item type (e.g. "risk" in Item 1A) to avoid returning
+    // a verbose ToC block that slipped past the length filter.
     const body = segs.filter((s) => !isIndexBoilerplate(s));
-    const pick = (body.length ? body : segs).reduce((a, b) => (b.length > a.length ? b : a), "");
-    out[k] = stripIndexLines(pick);
+    out[k] = validateItemBlock(k, body.length ? body : segs);
   }
   return out;
+}
+
+// takes: item key (e.g. "1A") + all candidate blocks for that item
+// does: tries candidates in order of length (longest = most likely real section);
+//       returns the first whose first 300 chars contain an anchor phrase for that
+//       item type — ensuring we pick the actual body, not a verbose ToC block
+// returns: the best block with index boilerplate lines stripped
+function validateItemBlock(itemKey: string, candidates: string[]): string {
+  const anchors = ITEM_ANCHORS[itemKey];
+  const sorted = [...candidates].sort((a, b) => b.length - a.length);
+  if (!anchors) return stripIndexLines(sorted[0] ?? '');
+  for (const candidate of sorted) {
+    const stripped = stripIndexLines(candidate);
+    const preview = stripped.slice(0, 300).toLowerCase();
+    if (anchors.some(a => preview.includes(a))) return stripped;
+  }
+  return stripIndexLines(sorted[0] ?? '');
 }
 
 // takes: a candidate "Item N" segment
@@ -1029,6 +1055,31 @@ function cleanTitle(t: string): string {
     .trim();
 }
 
+// Anchor phrases that must appear in the first 300 chars of the real section body.
+// A Table-of-Contents entry for "Item 1A. Risk Factors.....23" will NOT contain
+// these phrases; the real section will. Used by validateItemBlock() to pick the
+// correct candidate when multiple "Item N" occurrences exist in the document.
+const ITEM_ANCHORS: Record<string, string[]> = {
+  '1':  ['business', 'operations', 'we are a', 'the company', 'founded', 'incorporated', 'we develop', 'we provide'],
+  '1A': ['risk', 'uncertainty', 'may adversely', 'could result in', 'difficult to predict', 'we face'],
+  '7':  ['results of operations', 'revenue', 'fiscal year', "management's discussion", 'overview', 'compared to'],
+  '7A': ['market risk', 'interest rate', 'foreign currency', 'quantitative and qualitative'],
+};
+
+// Keyword fragments (normalized) that identify a concept as a specific financial
+// category. Used by magnitudeFallback() when the priority-concept list returns nothing.
+const CATEGORY_KEYWORDS: Record<string, string[]> = {
+  revenue:     ['revenue', 'sales', 'netrevenue', 'netsales', 'operatingrevenue'],
+  netIncome:   ['netincome', 'netloss', 'netearnings', 'incomeloss'],
+  grossProfit: ['grossprofit', 'grossmargin'],
+  rnd:         ['researchanddevelopment', 'researchdevelopment', 'developmentcosts'],
+  opIncome:    ['operatingincome', 'operatingloss', 'incomefromoperations', 'operatingearnings'],
+  assets:      ['totalassets', 'assets'],
+  liabilities: ['totalliabilities', 'liabilities'],
+  equity:      ['stockholdersequity', 'equity', 'shareholdersequity'],
+  buybacks:    ['repurchase', 'buyback'],
+};
+
 // XBRL concept candidates, in priority order
 // each metric lists candidate concepts in two taxonomies: US GAAP (domestic
 // filers) and IFRS (foreign private issuers filing 20-F under ifrs-full).
@@ -1056,6 +1107,37 @@ const CONCEPTS = {
 };
 
 type Concept = { gaap: string[]; ifrs: string[] };
+
+/**
+ * When the priority-concept list returns an empty series, scan every us-gaap
+ * concept whose normalized key contains a category keyword and return the series
+ * with the highest peak magnitude. Handles mid-cap filers that use non-standard
+ * XBRL tags (SalesRevenueGoodsNet, NetRevenues, OperatingRevenues, etc.).
+ */
+function magnitudeFallback(
+  f: any,
+  currency: string,
+  category: string,
+  instant: boolean,
+): YearValue[] {
+  const keywords = CATEGORY_KEYWORDS[category];
+  if (!keywords) return [];
+  const root = f?.['us-gaap'];
+  if (!root) return [];
+  let bestSeries: YearValue[] = [];
+  let bestMag = 0;
+  for (const [conceptKey, conceptData] of Object.entries(root)) {
+    const normalized = (conceptKey as string).replace(/[^a-zA-Z]/g, '').toLowerCase();
+    if (!keywords.some(kw => normalized.includes(kw))) continue;
+    const units = (conceptData as any)?.units?.[currency];
+    if (!Array.isArray(units)) continue;
+    const series = toAnnual(units, instant);
+    if (!series.length) continue;
+    const mag = Math.max(...series.map(yv => Math.abs(yv.val)));
+    if (mag > bestMag) { bestMag = mag; bestSeries = series; }
+  }
+  return bestSeries;
+}
 
 /**
  * given the facts root, determine the reporting currency: USD if present,
@@ -1156,16 +1238,21 @@ export async function fetchFinancials(cik: string): Promise<Financials | null> {
   if (!facts?.facts) return null;
   const f = facts.facts;
   const currency = detectCurrency(f);
+  // Try priority concepts first; fall back to magnitude scan for non-standard filers.
+  const sf = (concept: Concept, instant: boolean, cat: string) => {
+    const s = seriesFor(f, concept, currency, instant);
+    return s.length ? s : magnitudeFallback(f, currency, cat, instant);
+  };
   return {
     currency,
-    revenue: seriesFor(f, CONCEPTS.revenue, currency, false),
-    netIncome: seriesFor(f, CONCEPTS.netIncome, currency, false),
-    grossProfit: seriesFor(f, CONCEPTS.grossProfit, currency, false),
-    rnd: seriesFor(f, CONCEPTS.rnd, currency, false),
-    opIncome: seriesFor(f, CONCEPTS.opIncome, currency, false),
-    assets: seriesFor(f, CONCEPTS.assets, currency, true),
-    liabilities: seriesFor(f, CONCEPTS.liabilities, currency, true),
-    equity: seriesFor(f, CONCEPTS.equity, currency, true),
-    buybacks: seriesFor(f, CONCEPTS.buybacks, currency, false),
+    revenue:     sf(CONCEPTS.revenue,     false, 'revenue'),
+    netIncome:   sf(CONCEPTS.netIncome,   false, 'netIncome'),
+    grossProfit: sf(CONCEPTS.grossProfit, false, 'grossProfit'),
+    rnd:         sf(CONCEPTS.rnd,         false, 'rnd'),
+    opIncome:    sf(CONCEPTS.opIncome,    false, 'opIncome'),
+    assets:      sf(CONCEPTS.assets,      true,  'assets'),
+    liabilities: sf(CONCEPTS.liabilities, true,  'liabilities'),
+    equity:      sf(CONCEPTS.equity,      true,  'equity'),
+    buybacks:    sf(CONCEPTS.buybacks,    false, 'buybacks'),
   };
 }

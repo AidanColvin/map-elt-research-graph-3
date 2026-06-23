@@ -45,7 +45,7 @@ console.log(JSON.stringify(await auditView(null), null, 0));
 await page.screenshot({ path: 'test-results/audit-dashboard.png' });
 
 console.log('\n=== COMPANY PROFILE example-grid logos ===');
-const cp = await auditView('Company Profile');
+const cp = await auditView('Companies');
 console.log(`total: ${cp.length}, monograms: ${cp.filter((x) => x.mono).length}, broken(img not loaded): ${cp.filter((x) => x.src && !x.loaded).length}`);
 console.log(JSON.stringify(cp, null, 0));
 await page.screenshot({ path: 'test-results/audit-company-profile.png', fullPage: true });
