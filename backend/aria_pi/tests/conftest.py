@@ -51,11 +51,10 @@ def fake_response():
 
 @pytest.fixture(autouse=True)
 def _reset_sec_caches():
-    """Reset SEC module-level caches between tests so a mocked ticker map in
-    one test never leaks into another."""
-    from aria_pi.clients import sec_edgar_client as sec
-    sec._TICKERS_CACHE = None
-    sec._CIK_TITLE_CACHE = None
+    """Reset the shared SEC ticker cache between tests so a mocked ticker map in
+    one test never leaks into another. The ticker list (and its cache) now lives
+    in aria_pi.lib.tickers, shared by sec_edgar_client and name_resolver."""
+    from aria_pi.lib import tickers
+    tickers._CACHE = None
     yield
-    sec._TICKERS_CACHE = None
-    sec._CIK_TITLE_CACHE = None
+    tickers._CACHE = None
