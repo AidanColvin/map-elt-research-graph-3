@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   RECENCY_DECAY_K,
   MAX_TALKING_POINTS,
+  MAILTO_POINT_LIMIT,
   yearOf,
   recencyWeight,
   scoreTalkingPoint,
   assembleTalkingPoints,
+  buildMailtoHref,
   type TalkingPointsRequest,
+  type TalkingPoint,
 } from '@/lib/talkingPoints';
 
 const NOW = 2026;
@@ -97,6 +100,26 @@ describe('assembleTalkingPoints', () => {
     // R&D fallback prompt is present, talent pipeline pitch is present.
     expect(fallback.some((p) => /No existing UNC relationship/.test(p.headline))).toBe(true);
     expect(fallback.some((p) => /talent pipeline for Nobody/.test(p.headline))).toBe(true);
+  });
+
+  it('builds a URL-encoded mailto with subject and the top points in the body', () => {
+    const points: TalkingPoint[] = Array.from({ length: 7 }, (_, i) => ({
+      category: 'Contact',
+      headline: `Point ${i}`,
+      detail: 'detail',
+      strength: 'high',
+      angle: 'R&D',
+      source_url: `https://src/${i}`,
+    }));
+    const href = buildMailtoHref('Acme & Co', points);
+    expect(href.startsWith('mailto:?subject=')).toBe(true);
+    expect(href).toContain('subject=' + encodeURIComponent('UNC x Acme & Co: partnership opportunities'));
+    const body = decodeURIComponent(href.split('&body=')[1]);
+    // Only the top MAILTO_POINT_LIMIT points are included.
+    expect(body).toContain('1. [Contact] Point 0');
+    expect(body).toContain(`${MAILTO_POINT_LIMIT}. [Contact] Point ${MAILTO_POINT_LIMIT - 1}`);
+    expect(body).not.toContain(`Point ${MAILTO_POINT_LIMIT}`);
+    expect(body).toContain('Source: https://src/0');
   });
 
   it('keeps a talent point even when many high-strength R&D signals compete', () => {

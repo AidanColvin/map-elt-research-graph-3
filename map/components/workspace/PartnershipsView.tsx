@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { authFetch } from "@/lib/authFetch";
+import { buildMailtoHref } from "@/lib/talkingPoints";
+import { partnershipCsv } from "@/lib/partnershipCsv";
 import { CompanyExportBar } from "./CompanyExportBar";
 import { ProjectSaveControl } from "./ProjectSaveControl";
 import { SaveControl } from "./SavedReports";
@@ -277,6 +279,21 @@ function SourceLink({ href, label }: { href: string; label: string }) {
 // returns: the normalized quote
 function asQuote(q: Quote | string): Quote {
   return typeof q === "string" ? { text: q } : q;
+}
+
+// takes: a filename, text content, and a MIME type
+// does: triggers a pure client-side file download via a transient blob URL
+// returns: nothing
+function downloadTextFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // takes: one talking point
@@ -1241,28 +1258,62 @@ export default function PartnershipsView({
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                 <div>
                   <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>Talking Points</p>
-                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 0" }}>BD outreach — paste directly into an email</p>
+                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 0" }}>BD outreach — draft an email, export to CRM, or copy</p>
                 </div>
-                <button
-                  onClick={() => {
-                    if (!talkingPoints.length) return;
-                    const text = talkingPoints
-                      .map((tp) => `[${tp.category}] ${tp.headline}\n→ ${tp.detail}`)
-                      .join("\n\n");
-                    navigator.clipboard.writeText(text).then(() => {
-                      setCopyMsg("Copied!");
-                      setTimeout(() => setCopyMsg(""), 2000);
-                    });
-                  }}
-                  disabled={tpStatus !== "done" || talkingPoints.length === 0}
-                  style={{
-                    border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
-                    fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
-                    color: "#1d1d1f", whiteSpace: "nowrap",
-                  }}
-                >
-                  {copyMsg || "Copy all as text"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {/* Primary action — one-click pre-filled outreach email (no backend) */}
+                  <a
+                    data-testid="draft-email"
+                    href={tpStatus === "done" && talkingPoints.length ? buildMailtoHref(resolvedName, talkingPoints) : undefined}
+                    aria-disabled={tpStatus !== "done" || talkingPoints.length === 0}
+                    style={{
+                      border: "none", borderRadius: 999, padding: "8px 18px",
+                      fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", textDecoration: "none",
+                      cursor: talkingPoints.length ? "pointer" : "not-allowed",
+                      background: "#0071e3", color: "#fff",
+                      opacity: tpStatus === "done" && talkingPoints.length ? 1 : 0.45,
+                      pointerEvents: tpStatus === "done" && talkingPoints.length ? "auto" : "none",
+                    }}
+                  >
+                    Draft email
+                  </a>
+                  {/* CRM export — all resolved signals as CSV, pure client-side */}
+                  <button
+                    data-testid="export-csv"
+                    onClick={() => downloadTextFile(
+                      `${resolvedName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}-unc-signals.csv`,
+                      partnershipCsv(data, resolvedName, new Date().getFullYear()),
+                      "text/csv;charset=utf-8",
+                    )}
+                    style={{
+                      border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
+                      fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
+                      color: "#1d1d1f", whiteSpace: "nowrap",
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!talkingPoints.length) return;
+                      const text = talkingPoints
+                        .map((tp) => `[${tp.category}] ${tp.headline}\n→ ${tp.detail}`)
+                        .join("\n\n");
+                      navigator.clipboard.writeText(text).then(() => {
+                        setCopyMsg("Copied!");
+                        setTimeout(() => setCopyMsg(""), 2000);
+                      });
+                    }}
+                    disabled={tpStatus !== "done" || talkingPoints.length === 0}
+                    style={{
+                      border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
+                      fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
+                      color: "#1d1d1f", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {copyMsg || "Copy all as text"}
+                  </button>
+                </div>
               </div>
 
               {tpStatus === "loading" && (

@@ -406,6 +406,37 @@ export function mergeAngles(
   return merged;
 }
 
+// Cap on how many ranked points seed a drafted outreach email.
+export const MAILTO_POINT_LIMIT = 5;
+
+// takes: the company name and the ranked talking points
+// does: builds a URL-encoded mailto: href whose subject and body are pre-filled
+//       from the top-ranked points (no network, no LLM)
+// returns: the mailto: href string
+export function buildMailtoHref(
+  company: string,
+  points: TalkingPoint[],
+  limit: number = MAILTO_POINT_LIMIT,
+): string {
+  const top = points.slice(0, limit);
+  const subject = `UNC x ${company}: partnership opportunities`;
+  const body = [
+    'Hi,',
+    '',
+    `A few UNC and ${company} angles worth a conversation, drawn from public sources:`,
+    '',
+    ...top.map((p, i) => {
+      const src = p.source_url ? `\n   Source: ${p.source_url}` : '';
+      return `${i + 1}. [${p.category}] ${p.headline}\n   ${p.detail}${src}`;
+    }),
+    '',
+    'Assembled with MAP — every point traces to a primary source.',
+    '',
+    'Best,',
+  ].join('\n');
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
+
 // takes: the resolved partnership payload and the current year
 // does: builds R&D (evidence) and talent angles, recency-ranks each, and merges
 //       them so both angles are represented; falls back to an outreach prompt
