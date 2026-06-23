@@ -81,12 +81,24 @@ export interface TalkingPoint {
   source_url?: string;
 }
 
+// A 10-K Item 1A risk-factor overlap with a UNC research title, computed and
+// Pydantic-validated by the backend. Present only on a real lexical match.
+export interface StrategicOverlap {
+  matched_title: string;
+  source_type: 'paper' | 'grant' | 'trial';
+  matched_phrase?: string | null;
+  matched_terms?: string[];
+  risk_excerpt: string;
+  filing_url?: string;
+}
+
 export interface TalkingPointsRequest {
   company_name: string;
   unc_faculty_leads?: UNCFacultyLead[];
   relationship_signals?: RelationshipSignal[];
   unc_trials?: UNCTrial[];
   unc_patents?: UNCPatent[];
+  strategic_overlap?: StrategicOverlap | null;
   company_summary?: string;
 }
 
@@ -160,6 +172,7 @@ export function buildTalkingPoints(
     relationship_signals = [],
     unc_trials = [],
     unc_patents = [],
+    strategic_overlap = null,
   } = body;
 
   const points: TalkingPoint[] = [];
@@ -274,6 +287,33 @@ export function buildTalkingPoints(
       strength: 'medium',
       angle: 'R&D',
       year: yearOf(patent.date),
+    });
+  }
+
+  // 6. Strategic overlap — the company's 10-K risk language meets a UNC research
+  //    title. Surfaced only when the backend returned a real match.
+  if (strategic_overlap?.matched_title && strategic_overlap.risk_excerpt) {
+    const phrase = strategic_overlap.matched_phrase;
+    const terms = strategic_overlap.matched_terms ?? [];
+    const anchor = phrase || terms.slice(0, 3).join(', ');
+    const headline = trunc(
+      `${company_name}'s 10-K risk factors overlap with UNC research on ${anchor}`,
+      120,
+    );
+    const url = strategic_overlap.filing_url || '';
+    const excerpt = trunc(strategic_overlap.risk_excerpt, 150);
+    const titlePart = trunc(strategic_overlap.matched_title, 90);
+    const base = `Risk factor: "${excerpt}" overlaps UNC ${strategic_overlap.source_type} "${titlePart}"`;
+    const detail = url ? `${base} — ${url}` : base;
+    push({
+      category: 'Strategic Overlap',
+      headline,
+      detail: trunc(detail, 220),
+      // A shared multi word phrase is the stronger of the two match paths.
+      strength: phrase ? 'high' : 'medium',
+      angle: 'R&D',
+      year: null,
+      source_url: url || undefined,
     });
   }
 
