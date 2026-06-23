@@ -26,6 +26,7 @@ from aria_pi.clients.nih_reporter_client import NIHReporterClient, unc_pis_from_
 from aria_pi.clients.clinicaltrials_client import ClinicalTrialsClient, fetch_unc_sponsored_trials
 from aria_pi.clients.patents import fetch_unc_patents
 from aria_pi.clients.relationship_detector import fetch_relationship_signals
+from aria_pi.clients.strategic_overlap import find_strategic_overlap
 from aria_pi.clients.openalex_client import search_unc_coauthorship
 from aria_pi.clients.partnership_fit import build_fit, infer_domain_tags
 from aria_pi.sectors import (
@@ -73,20 +74,23 @@ def _extract_unc_sentences(text: str) -> list:
 
 # takes: a company name (str), an SECEdgarClient
 # does: locates the company's CIK, pulls its latest 10-K narrative, and extracts
-#       the verbatim sentences that mention UNC, with the filing URL as source
-# returns: a dict { quotes: [str], filing_url: str, cik: str }
+#       the verbatim UNC sentences; the raw 10-K text is kept internally for
+#       strategic-overlap scoring and is never shipped to the client
+# returns: a dict { quotes, filing_url, cik, tenk_text, tenk_url }
 def resolve_sec_verbatim(company_name: str, sec: SECEdgarClient) -> dict:
     try:
         cik = sec._find_cik(company_name)
         if not cik:
-            return {"quotes": [], "filing_url": "", "cik": ""}
+            return {"quotes": [], "filing_url": "", "cik": "", "tenk_text": "", "tenk_url": ""}
         text = sec.get_tenk_text(cik, {})
         quotes = _extract_unc_sentences(text)
-        filing_url = sec._latest_tenk_url(cik) if quotes else ""
-        return {"quotes": quotes, "filing_url": filing_url, "cik": cik}
+        tenk_url = sec._latest_tenk_url(cik) if text else ""
+        filing_url = tenk_url if quotes else ""
+        return {"quotes": quotes, "filing_url": filing_url, "cik": cik,
+                "tenk_text": text, "tenk_url": tenk_url}
     except Exception as e:
         logger.error("partnership_resolver: SEC verbatim failed for %s: %s", company_name, e)
-        return {"quotes": [], "filing_url": "", "cik": ""}
+        return {"quotes": [], "filing_url": "", "cik": "", "tenk_text": "", "tenk_url": ""}
 
 
 # takes: a company name (str), a PubMedClient
@@ -392,6 +396,10 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     coi = results.get("coi") or {"count": 0, "papers": [], "window_years": _COI_WINDOW_YEARS}
     unc_units = results.get("unc_units") or []
     financial = results.get("financial") or {"quotes": [], "filing_url": "", "cik": ""}
+    # The raw 10-K text and bare 10-K URL are internal scoring inputs — pop them
+    # off so the (large) filing text never serializes to the frontend.
+    tenk_text = financial.pop("tenk_text", "")
+    tenk_url = financial.pop("tenk_url", "")
     ecosystem = results.get("ecosystem") or []
     nih = results.get("nih_grants") or {"grants": [], "pis": []}
     trials = results.get("trials") or {"all_count": 0, "unc_trials": []}
@@ -413,6 +421,16 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
     fit = build_fit(target, sic, unc_units, nih["grants"],
                     clinical["papers"], trials["unc_trials"])
 
+    # Strategic Overlap — match the company's 10-K Item 1A risk language against
+    # the UNC research TITLES we hold (papers, grants, trials). Surfaces only on
+    # a real lexical match, so a weak or absent overlap yields None.
+    research_titles = (
+        [{"title": p.get("title", ""), "source_type": "paper"} for p in clinical["papers"]]
+        + [{"title": g.get("title", ""), "source_type": "grant"} for g in nih["grants"]]
+        + [{"title": t.get("title", ""), "source_type": "trial"} for t in trials["unc_trials"]]
+    )
+    strategic_overlap = find_strategic_overlap(tenk_text, research_titles, tenk_url)
+
     return {
         "query": company_name,
         "resolved_name": target,
@@ -431,6 +449,7 @@ def resolve_company(company_name: str, sec_web_name: str = None) -> dict:
         "unc_patents": unc_patents,
         "unc_joint_trials": unc_joint_trials,
         "relationship_signals": relationship_signals,
+        "strategic_overlap": strategic_overlap,
         "fit": fit,
         "mention_count": clinical["count"] + coi["count"] + len(financial["quotes"]) + len(ecosystem),
     }
