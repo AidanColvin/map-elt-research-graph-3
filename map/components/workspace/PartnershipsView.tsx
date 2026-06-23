@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { authFetch } from "@/lib/authFetch";
+import { buildMailtoHref } from "@/lib/talkingPoints";
+import { partnershipCsv } from "@/lib/partnershipCsv";
+import PartnershipGraph from "./PartnershipGraph";
 import { CompanyExportBar } from "./CompanyExportBar";
 import { ProjectSaveControl } from "./ProjectSaveControl";
 import { SaveControl } from "./SavedReports";
@@ -54,11 +57,24 @@ export interface UNCPatent {
   date?: string;
   school?: string;
 }
+export interface StrategicOverlap {
+  matched_title: string;
+  source_type: 'paper' | 'grant' | 'trial';
+  matched_phrase?: string | null;
+  matched_terms?: string[];
+  risk_excerpt: string;
+  filing_url?: string;
+}
 export interface TalkingPoint {
-  category: 'Research Overlap' | 'Existing Relationship' | 'Partnership Opportunity' | 'Contact';
+  category: 'Research Overlap' | 'Existing Relationship' | 'Partnership Opportunity' | 'Contact' | 'Strategic Overlap';
   headline: string;
   detail: string;
   strength: 'high' | 'medium' | 'low';
+  // The outreach angle this point serves — drives the R&D / Talent grouping.
+  angle?: 'R&D' | 'Talent' | 'General';
+  year?: number | null;
+  score?: number;
+  source_url?: string;
 }
 
 export interface FitUnit {
@@ -98,6 +114,7 @@ export interface PartnerData {
   relationship_signals?: RelationshipSignal[];
   unc_joint_trials?: UNCTrial[];
   unc_patents?: UNCPatent[];
+  strategic_overlap?: StrategicOverlap | null;
 }
 
 // Static UNC partnership assets — copied VERBATIM from the backend
@@ -272,6 +289,76 @@ function SourceLink({ href, label }: { href: string; label: string }) {
 // returns: the normalized quote
 function asQuote(q: Quote | string): Quote {
   return typeof q === "string" ? { text: q } : q;
+}
+
+// takes: a filename, text content, and a MIME type
+// does: triggers a pure client-side file download via a transient blob URL
+// returns: nothing
+function downloadTextFile(filename: string, content: string, mime: string) {
+  const blob = new Blob([content], { type: mime });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+// takes: one talking point
+// does: renders a single BD talking-point row — category + strength pills, the
+//       headline, and the detail (linkifying any trailing primary-source URL)
+// returns: the row element
+function TalkingPointRow({ tp }: { tp: TalkingPoint }) {
+  const pillBg = tp.strength === "high" ? "#dcfce7" : tp.strength === "medium" ? "#fef9c3" : "#f3f4f6";
+  const pillColor = tp.strength === "high" ? "#15803d" : tp.strength === "medium" ? "#a16207" : "#6b7280";
+  const isUrl = tp.detail.startsWith("http://") || tp.detail.startsWith("https://");
+  const urlMatch = tp.detail.match(/(https?:\/\/\S+)/);
+  // The strategic-overlap row carries its own testid so the shoot harness can
+  // capture it as a close-up; every other row stays "talking-point-row".
+  const rowTestId = tp.category === "Strategic Overlap" ? "strategic-overlap" : "talking-point-row";
+  return (
+    <li data-testid={rowTestId} style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+        <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9aa2" }}>{tp.category}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 9px", background: pillBg, color: pillColor }}>
+          {tp.strength.charAt(0).toUpperCase() + tp.strength.slice(1)}
+        </span>
+      </div>
+      <p data-testid="tp-headline" style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f", margin: "0 0 4px", lineHeight: 1.4 }}>{tp.headline}</p>
+      <p style={{ fontSize: 12.5, color: "#6b6b73", margin: 0, lineHeight: 1.45 }}>
+        {urlMatch
+          ? <>
+              {tp.detail.slice(0, tp.detail.indexOf(urlMatch[1])).replace(/ — $/, "")}
+              {" "}<a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
+            </>
+          : isUrl
+            ? <a href={tp.detail} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
+            : tp.detail
+        }
+      </p>
+    </li>
+  );
+}
+
+// takes: a group label, a one-line note, and the points in that angle
+// does: renders one labeled talking-point group (R&D vs Talent), or nothing
+//       when the group is empty
+// returns: the group element, or null
+function TalkingPointGroup({ label, note, points }: { label: string; note: string; points: TalkingPoint[] }) {
+  if (!points.length) return null;
+  return (
+    <div data-testid="tp-group" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div>
+        <p style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "#1d1d1f", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: 12, color: "#9a9aa2", margin: "2px 0 0" }}>{note}</p>
+      </div>
+      <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        {points.map((tp, i) => <TalkingPointRow key={i} tp={tp} />)}
+      </ul>
+    </div>
+  );
 }
 
 // takes: an uppercase eyebrow label
@@ -605,6 +692,7 @@ export default function PartnershipsView({
           relationship_signals: pd.relationship_signals ?? [],
           unc_trials: pd.unc_joint_trials ?? [],
           unc_patents: pd.unc_patents ?? [],
+          strategic_overlap: pd.strategic_overlap ?? null,
           company_summary: "",
         }),
       });
@@ -913,6 +1001,20 @@ export default function PartnershipsView({
               );
             })()}
 
+            {/* ── Relationship graph — the company at the center, branching to the
+                real UNC entities resolved above (investigators, shared trials,
+                patents). Renders nothing when no entity supports a node. ───── */}
+            <PartnershipGraph
+              company={resolvedName}
+              investigators={
+                nihPis.length > 0
+                  ? nihPis.map((p) => ({ name: p.name }))
+                  : data.clinical.top_authors.map((name) => ({ name }))
+              }
+              trials={uncTrials.map((t) => ({ label: t.nct_id || t.title }))}
+              patents={(data.unc_patents ?? []).map((p) => ({ label: p.patent_id || p.title }))}
+            />
+
             {/* ── Current relationships — who at UNC, what's active, which schools ─ */}
             {hasSignal && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1184,28 +1286,62 @@ export default function PartnershipsView({
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 14 }}>
                 <div>
                   <p style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.16em", textTransform: "uppercase", color: "#9a9aa2", margin: 0 }}>Talking Points</p>
-                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 0" }}>BD outreach — paste directly into an email</p>
+                  <p style={{ fontSize: 13, color: "#6b6b73", margin: "4px 0 0" }}>BD outreach — draft an email, export to CRM, or copy</p>
                 </div>
-                <button
-                  onClick={() => {
-                    if (!talkingPoints.length) return;
-                    const text = talkingPoints
-                      .map((tp) => `[${tp.category}] ${tp.headline}\n→ ${tp.detail}`)
-                      .join("\n\n");
-                    navigator.clipboard.writeText(text).then(() => {
-                      setCopyMsg("Copied!");
-                      setTimeout(() => setCopyMsg(""), 2000);
-                    });
-                  }}
-                  disabled={tpStatus !== "done" || talkingPoints.length === 0}
-                  style={{
-                    border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
-                    fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
-                    color: "#1d1d1f", whiteSpace: "nowrap",
-                  }}
-                >
-                  {copyMsg || "Copy all as text"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {/* Primary action — one-click pre-filled outreach email (no backend) */}
+                  <a
+                    data-testid="draft-email"
+                    href={tpStatus === "done" && talkingPoints.length ? buildMailtoHref(resolvedName, talkingPoints) : undefined}
+                    aria-disabled={tpStatus !== "done" || talkingPoints.length === 0}
+                    style={{
+                      border: "none", borderRadius: 999, padding: "8px 18px",
+                      fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", textDecoration: "none",
+                      cursor: talkingPoints.length ? "pointer" : "not-allowed",
+                      background: "#0071e3", color: "#fff",
+                      opacity: tpStatus === "done" && talkingPoints.length ? 1 : 0.45,
+                      pointerEvents: tpStatus === "done" && talkingPoints.length ? "auto" : "none",
+                    }}
+                  >
+                    Draft email
+                  </a>
+                  {/* CRM export — all resolved signals as CSV, pure client-side */}
+                  <button
+                    data-testid="export-csv"
+                    onClick={() => downloadTextFile(
+                      `${resolvedName.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "")}-unc-signals.csv`,
+                      partnershipCsv(data, resolvedName, new Date().getFullYear()),
+                      "text/csv;charset=utf-8",
+                    )}
+                    style={{
+                      border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
+                      fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
+                      color: "#1d1d1f", whiteSpace: "nowrap",
+                    }}
+                  >
+                    Export CSV
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (!talkingPoints.length) return;
+                      const text = talkingPoints
+                        .map((tp) => `[${tp.category}] ${tp.headline}\n→ ${tp.detail}`)
+                        .join("\n\n");
+                      navigator.clipboard.writeText(text).then(() => {
+                        setCopyMsg("Copied!");
+                        setTimeout(() => setCopyMsg(""), 2000);
+                      });
+                    }}
+                    disabled={tpStatus !== "done" || talkingPoints.length === 0}
+                    style={{
+                      border: "1px solid rgba(0,0,0,0.1)", borderRadius: 999, padding: "7px 16px",
+                      fontSize: 12.5, fontWeight: 500, cursor: "pointer", background: "#fff",
+                      color: "#1d1d1f", whiteSpace: "nowrap",
+                    }}
+                  >
+                    {copyMsg || "Copy all as text"}
+                  </button>
+                </div>
               </div>
 
               {tpStatus === "loading" && (
@@ -1220,38 +1356,18 @@ export default function PartnershipsView({
                 <p style={{ fontSize: 13, color: "#9a9aa2", margin: 0 }}>No talking points generated.</p>
               )}
 
-              {tpStatus === "done" && talkingPoints.length > 0 && (
-                <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 12 }}>
-                  {talkingPoints.map((tp, i) => {
-                    const pillBg = tp.strength === "high" ? "#dcfce7" : tp.strength === "medium" ? "#fef9c3" : "#f3f4f6";
-                    const pillColor = tp.strength === "high" ? "#15803d" : tp.strength === "medium" ? "#a16207" : "#6b7280";
-                    const isUrl = tp.detail.startsWith("http://") || tp.detail.startsWith("https://");
-                    const urlMatch = tp.detail.match(/(https?:\/\/\S+)/);
-                    return (
-                      <li key={i} data-testid="talking-point-row" style={{ background: "#fafaf9", borderRadius: 10, padding: "12px 14px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9a9aa2" }}>{tp.category}</span>
-                          <span style={{ fontSize: 11, fontWeight: 600, borderRadius: 999, padding: "2px 9px", background: pillBg, color: pillColor }}>
-                            {tp.strength.charAt(0).toUpperCase() + tp.strength.slice(1)}
-                          </span>
-                        </div>
-                        <p data-testid="tp-headline" style={{ fontSize: 13.5, fontWeight: 600, color: "#1d1d1f", margin: "0 0 4px", lineHeight: 1.4 }}>{tp.headline}</p>
-                        <p style={{ fontSize: 12.5, color: "#6b6b73", margin: 0, lineHeight: 1.45 }}>
-                          {urlMatch
-                            ? <>
-                                {tp.detail.slice(0, tp.detail.indexOf(urlMatch[1])).replace(/ — $/, "")}
-                                {" "}<a href={urlMatch[1]} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
-                              </>
-                            : isUrl
-                              ? <a href={tp.detail} target="_blank" rel="noopener noreferrer" style={{ color: "#5b6cff", textDecoration: "none" }}>View source →</a>
-                              : tp.detail
-                          }
-                        </p>
-                      </li>
-                    );
-                  })}
-                </ul>
-              )}
+              {tpStatus === "done" && talkingPoints.length > 0 && (() => {
+                // Split by outreach angle so BD sees an R&D pitch and a talent
+                // pitch separately; ranked order is preserved within each group.
+                const talent = talkingPoints.filter((tp) => tp.angle === "Talent");
+                const rd = talkingPoints.filter((tp) => tp.angle !== "Talent");
+                return (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                    <TalkingPointGroup label="R&D & partnership" note="Research overlap, existing ties, and named UNC contacts" points={rd} />
+                    <TalkingPointGroup label="Talent & recruiting" note="UNC as a hiring and training pipeline" points={talent} />
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );
