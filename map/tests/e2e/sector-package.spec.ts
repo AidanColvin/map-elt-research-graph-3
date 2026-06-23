@@ -35,7 +35,7 @@ test.beforeEach(async ({ page }) => {
 
 async function runScanAndWait(page: Page, sector = 'Oncology') {
   await gotoWorkspace(page);
-  await clickNav(page, 'Sector');
+  await clickNav(page, 'Sectors');
   const input = visibleView(page).locator('input[aria-label="Sector"]').first();
   await expect(input).toBeVisible({ timeout: 8000 });
   await input.fill(sector);
@@ -61,7 +61,7 @@ test('Package button appears after sector scan completes', async ({ page }) => {
 test('Package button is NOT visible before a scan runs', async ({ page }) => {
   test.setTimeout(30000);
   await gotoWorkspace(page);
-  await clickNav(page, 'Sector');
+  await clickNav(page, 'Sectors');
   await page.waitForTimeout(1500);
   await expect(page.getByTestId('package-btn')).not.toBeVisible();
 });
@@ -105,7 +105,7 @@ test('All nav tabs still work after Package completes', async ({ page }) => {
   await page.getByTestId('package-btn').click();
   await expect(page.getByTestId('package-done')).toBeVisible({ timeout: 60000 });
 
-  for (const label of ['Dashboard', 'Company', 'Sector', 'Partnerships', 'Companies']) {
+  for (const label of ['Home', 'Companies', 'Sectors', 'Partnerships', 'Directory']) {
     await clickNav(page, label);
     await page.waitForTimeout(600);
     const body = await page.locator('body').innerText();
@@ -119,7 +119,7 @@ test('Data tab loads without crash after Package', async ({ page }) => {
   await runScanAndWait(page);
   await page.getByTestId('package-btn').click();
   await expect(page.getByTestId('package-done')).toBeVisible({ timeout: 60000 });
-  await clickNav(page, 'Companies');
+  await clickNav(page, 'Directory');
   await page.waitForTimeout(1000);
   const body = await page.locator('body').innerText();
   expect(body).not.toContain('This page could not be found');
@@ -131,7 +131,7 @@ test('Company tab search still works after Package', async ({ page }) => {
   await runScanAndWait(page);
   await page.getByTestId('package-btn').click();
   await expect(page.getByTestId('package-done')).toBeVisible({ timeout: 60000 });
-  await clickNav(page, 'Company');
+  await clickNav(page, 'Companies');
   await page.waitForTimeout(600);
   const view = visibleView(page);
   const chip = view.locator('button:has-text("Apple")').first();

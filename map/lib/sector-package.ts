@@ -14,6 +14,7 @@ import type { ReportData } from "@/components/Report";
 import type { AccountProfile } from "@/components/workspace/accountProfile";
 import { ACCOUNT_COLUMNS } from "@/components/workspace/accountProfile";
 import { ACCOUNTS, getUniqueAccounts } from "@/components/workspace/accountsData";
+import { deriveEmployees } from "@/components/workspace/accountEnrich";
 import { markdownToPdfBytes, sectorReportToPdfBytes } from "@/lib/report-export";
 
 type SectorProfile = ReportData["section4_profiles"][number];
@@ -146,6 +147,10 @@ export function sectorProfileToAccountRow(
     dateOfResearch: date,
     resources: (profile.overview?.sources || []).join(" · "),
     linkToReport: "",
+    homepage: fact("website"),
+    employees: deriveEmployees(fact("employees")),
+    uncPartner: { status: "none" },
+    uncAngle: "",
   };
 }
 

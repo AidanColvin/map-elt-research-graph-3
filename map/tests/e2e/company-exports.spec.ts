@@ -13,7 +13,7 @@ async function signInGuest(page: Page) {
 }
 
 async function openAppleReport(page: Page) {
-  await clickNav(page, 'Company');
+  await clickNav(page, 'Companies');
   await page.waitForTimeout(1200);
   const chip = visibleView(page).locator('button:has-text("Apple")').first();
   await expect(chip).toBeVisible({ timeout: 8000 });
