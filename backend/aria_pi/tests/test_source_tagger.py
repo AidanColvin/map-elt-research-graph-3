@@ -25,6 +25,59 @@ def test_validate_claim_failure_due_to_blocklist():
     assert is_valid is False
     assert len(clean) == 1
 
+def test_duplicate_url_is_not_two_sources():
+    """
+    Takes: The same reputable URL listed twice.
+    Does: Validates it.
+    Returns: is_valid=False — a duplicate is one source, not two.
+    """
+    tagger = SourceTagger()
+    is_valid, clean = tagger.validate_claim(
+        "x", ["https://www.sec.gov", "https://www.sec.gov"])
+    assert is_valid is False
+    assert len(clean) == 1
+
+
+def test_non_reputable_sources_rejected():
+    """
+    Takes: Two well-formed URLs that are neither .gov/.edu nor allowlisted orgs.
+    Does: Validates them.
+    Returns: is_valid=False — random domains are not reputable primary sources.
+    """
+    tagger = SourceTagger()
+    is_valid, clean = tagger.validate_claim(
+        "x", ["https://someblog.com/a", "https://medium.com/b"])
+    assert is_valid is False
+    assert clean == []
+
+
+def test_malformed_sources_rejected():
+    """
+    Takes: A bare host with no scheme and a non-http scheme.
+    Does: Validates them.
+    Returns: is_valid=False — neither is a usable http(s) URL.
+    """
+    tagger = SourceTagger()
+    is_valid, clean = tagger.validate_claim(
+        "x", ["sec.gov", "javascript:alert(1)"])
+    assert is_valid is False
+    assert clean == []
+
+
+def test_company_website_counts_when_supplied():
+    """
+    Takes: A government source plus the subject company's own website.
+    Does: Validates with the company domain passed in.
+    Returns: is_valid=True — the company site counts as a reputable source.
+    """
+    tagger = SourceTagger()
+    is_valid, clean = tagger.validate_claim(
+        "x", ["https://www.sec.gov/filing", "https://www.modernatx.com/about"],
+        company_domains=("modernatx.com",))
+    assert is_valid is True
+    assert len(clean) == 2
+
+
 def test_tag_or_flag_applies_unverified_flag():
     """
     Takes: A claim with insufficient sources.

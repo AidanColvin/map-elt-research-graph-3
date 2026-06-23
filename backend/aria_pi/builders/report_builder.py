@@ -530,7 +530,10 @@ class ReportBuilder:
                                f"from these companies in the past few months "
                                f"(most recent {latest_8k_dates[0]}) indicate active "
                                "disclosure-worthy activity."),
-                    "sources": ["https://www.sec.gov", "https://www.sec.gov"],
+                    # Single primary source — SEC EDGAR. Honestly left as one
+                    # source so the validator flags it for analyst corroboration
+                    # rather than padding the list with a duplicate sec.gov link.
+                    "sources": ["https://www.sec.gov"],
                 })
             if total_grants:
                 why_now.append({
@@ -1346,7 +1349,9 @@ def _know_company(facts: dict, rev: dict, edgar_url: str) -> dict:
         # Honest: no CIK means it is not a current SEC filer (private company).
         bits.append("is privately held with no SEC filings on record; "
                     "public-source coverage is limited")
-    return {"text": " ".join(bits) + ".", "sources": [edgar_url, edgar_url]}
+    # One genuine source only (EDGAR). Not duplicated to fake a second source —
+    # the validator will flag this for analyst review, which is the honest state.
+    return {"text": " ".join(bits) + ".", "sources": [edgar_url]}
 
 
 def _know_pipeline(name: str, trials: list, edgar_url: str) -> dict:
@@ -1373,7 +1378,8 @@ def _know_moves(name: str, latest_8k: dict | None, edgar_url: str) -> dict:
         }
     return {
         "text": f"No recent 8-K filings on file for {name}; recent activity in 10-Q.",
-        "sources": [edgar_url, edgar_url],
+        # Single EDGAR source — not duplicated; validator flags for corroboration.
+        "sources": [edgar_url],
     }
 
 

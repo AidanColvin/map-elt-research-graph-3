@@ -5,11 +5,14 @@ reliably on Vercel Python serverless. Searches both AFFILIATION and TEXT
 to catch UNC↔industry co-authored publications, which are the primary
 public signal of an existing research relationship.
 """
+import logging
 import requests
 import time
 import threading
 from typing import List
 import xml.etree.ElementTree as ET
+
+logger = logging.getLogger(__name__)
 
 from aria_pi.utils.affiliation import (
     is_unc_affiliation, company_affiliation_regex, company_query_clause,
@@ -159,7 +162,7 @@ class PubMedClient:
             r.raise_for_status()
             ids = (r.json().get("esearchresult") or {}).get("idlist") or []
         except Exception as e:
-            print(f"PubMed esearch error: {e}")
+            logger.warning("PubMed esearch error: %s", e)
             return []
 
         if not ids:
@@ -182,7 +185,7 @@ class PubMedClient:
             r.raise_for_status()
             result = r.json().get("result") or {}
         except Exception as e:
-            print(f"PubMed esummary error: {e}")
+            logger.warning("PubMed esummary error: %s", e)
             return []
 
         papers = []
@@ -225,7 +228,7 @@ class PubMedClient:
             r.raise_for_status()
             root = ET.fromstring(r.content)
         except Exception as e:
-            print(f"PubMed efetch error: {e}")
+            logger.warning("PubMed efetch error: %s", e)
             return None
 
         out = {}

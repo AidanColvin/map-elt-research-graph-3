@@ -66,9 +66,9 @@ def test_verification_flags_unverified_and_banned_phrases():
         what_unc_offers=[],
     )
     log = stage.run([profile])
-    assert log["status"] == "PASSED"
-    assert any("Unverified" in f for f in log["soft_flags"])
-    assert any("Banned Phrase" in f for f in log["soft_flags"])
+    assert log["status"] == "WARNING"  # soft flags only, no hard stop
+    assert any(f["type"] == "unverified_claim" for f in log["soft_flags"])
+    assert any(f["type"] == "banned_phrase" for f in log["soft_flags"])
 
 
 def test_verification_hard_stop_on_missing_legal_name():
@@ -86,6 +86,26 @@ def test_verification_hard_stop_on_missing_legal_name():
     log = stage.run([profile])
     assert log["status"] == "BLOCKED"
     assert log["hard_stops"]
+
+
+def test_verification_private_company_not_blocked():
+    """
+    Takes: A profile for an explicitly private company (is_public False) with no
+           SEC legal_name.
+    Does: Runs verification.
+    Returns: A soft flag (not a hard stop) — private companies legitimately have
+             no SEC data, so the report is WARNING, not BLOCKED.
+    """
+    stage = VerificationStage()
+    profile = CompanyProfile(
+        company_name="OpenAI", facts={"legal_name": "", "is_public": False},
+        pipeline=[], partnering_history=[], unc_alignment=[],
+        what_unc_offers=[],
+    )
+    log = stage.run([profile])
+    assert log["status"] == "WARNING"
+    assert log["hard_stops"] == []
+    assert any(f["type"] == "private_no_sec" for f in log["soft_flags"])
 
 
 def test_verification_clean_profile_passes():
