@@ -11,7 +11,7 @@ test.describe('Data tab — interactive database', () => {
   test.beforeEach(async ({ page }) => {
     await mockBackend(page);
     await gotoWorkspace(page);
-    await clickNav(page, 'Companies');
+    await clickNav(page, 'Directory');
   });
 
   test('renders summary cards, the fit column, and a live count', async ({ page }) => {

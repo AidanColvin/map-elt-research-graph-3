@@ -1,8 +1,58 @@
 "use client";
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import type { AccountProfile } from "./accountProfile";
+import type { AccountProfile, UncPartner } from "./accountProfile";
 import { FONT } from "./ui";
+
+// takes: a headcount (or null)
+// does: formats it with grouped thousands and tabular figures, em dash on null
+// returns: the display string for the Employees cell
+function fmtEmployees(n: number | null): string {
+  return n == null ? "—" : n.toLocaleString("en-US");
+}
+
+// UNC partnership pill palette — green for a current partner, amber for a past
+// one. "none" renders a quiet gray dash instead of a pill.
+const UNC_STYLE: Record<"current" | "past", { label: string; bg: string; color: string }> = {
+  current: { label: "Current", bg: "#e7f7ee", color: "#0a7d4f" },
+  past: { label: "Past", bg: "#fef3da", color: "#9a6700" },
+};
+
+// Sort rank for the UNC column: current partners first, then past, then none.
+const UNC_RANK: Record<UncPartner["status"], number> = { current: 2, past: 1, none: 0 };
+
+// takes: a partnership standing
+// does: renders the subtle status pill, or a quiet gray dash when not a partner
+// returns: the UNC cell node
+function UncPill({ unc }: { unc: UncPartner }) {
+  if (unc.status === "none") return <span style={{ color: "#c7c7cc" }}>—</span>;
+  const s = UNC_STYLE[unc.status];
+  return (
+    <span
+      title={unc.detail || `${s.label} UNC partner`}
+      style={{
+        display: "inline-block", padding: "2px 10px", fontSize: 12, fontWeight: 500,
+        borderRadius: 999, background: s.bg, color: s.color,
+      }}
+    >
+      {s.label}
+    </span>
+  );
+}
+
+// takes: a size in px
+// does: draws the small "open in new tab" glyph used by the homepage action
+// returns: an inline SVG element
+function ExternalLinkIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+      <polyline points="15 3 21 3 21 9" />
+      <line x1="10" y1="14" x2="21" y2="3" />
+    </svg>
+  );
+}
 
 /**
  * Interactive Database table: live search, type filter pills (Public / Private /
@@ -13,7 +63,7 @@ import { FONT } from "./ui";
 
 type Kind = "public" | "private" | "nonprofit" | "government";
 type SortKey =
-  | "account" | "fit" | "exchange" | "sector" | "secondary" | "structure" | "ownership"
+  | "account" | "fit" | "unc" | "exchange" | "sector" | "secondary" | "structure" | "ownership"
   | "parent" | "hq" | "employees" | "revenue" | "founded" | "keyProducts"
   | "businessSplit" | "description" | "website" | "aliases" | "researchBy"
   | "dateOfResearch" | "resources" | "report";
@@ -61,14 +111,6 @@ function aliasSub(a: AccountProfile): string {
 function hqOf(a: AccountProfile): string {
   const cs = [a.city, a.state].filter(Boolean).join(", ");
   return cs || a.country || "";
-}
-
-// takes: an employees string like "183,000"
-// does: parses the leading integer for numeric sorting
-// returns: a number (0 when unparseable)
-function empNum(s: string): number {
-  const n = parseInt((s || "").replace(/[^0-9]/g, ""), 10);
-  return Number.isFinite(n) ? n : 0;
 }
 
 // takes: a revenue string (this dataset reports $-millions, e.g. "~$128,700
@@ -227,7 +269,7 @@ export default function InteractiveAccountsTable({
         exchange: exchangeOf(a),
         alias: aliasSub(a),
         hq: hqOf(a),
-        emp: empNum(a.approximateEmployees),
+        emp: a.employees,
         rev: revNum(a.approximateRevenue),
         fit: uncFit(a, revNum(a.approximateRevenue)),
         lifeSci: HIGH_SECTOR.test(`${a.topIndustrySectorProfile} ${a.secondaryIndustrySectorProfile}`),
@@ -291,9 +333,11 @@ export default function InteractiveAccountsTable({
     };
     list = [...list].sort((x, y) => {
       switch (sortKey) {
-        case "employees": return (x.emp - y.emp) * dir;
+        // Unknown headcounts (null) always sort to the bottom of the list.
+        case "employees": return ((x.emp ?? -1) - (y.emp ?? -1)) * dir;
         case "revenue":   return (x.rev - y.rev) * dir;
         case "fit":       return (x.fit.score - y.fit.score) * dir;
+        case "unc":       return (UNC_RANK[x.a.uncPartner.status] - UNC_RANK[y.a.uncPartner.status]) * dir;
         default:          return str(x).localeCompare(str(y)) * dir;
       }
     });
@@ -367,14 +411,17 @@ export default function InteractiveAccountsTable({
     ) : (
       <span style={{ color: "#c7c7cc" }}>{href || "—"}</span>
     );
+  // Normalizes a website value (which may omit the scheme) into a full URL.
+  const toHref = (url: string): string => (url && !/^https?:\/\//i.test(url) ? `https://${url}` : url);
   const host = (url: string): string => {
-    try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return "Website"; }
+    try { return new URL(toHref(url)).hostname.replace(/^www\./, ""); } catch { return "Website"; }
   };
 
-  // Five core columns — the full record opens in the slide-out panel on click.
-  const cols: { key: SortKey; label: string; align?: "right"; cell: (e: Enr) => ReactNode }[] = [
+  // The scannable column set — HQ and the rest of the record open in the
+  // slide-out panel on row click. A column with no `sort` key is not sortable.
+  const cols: { id: string; sort?: SortKey; label: string; align?: "right"; cell: (e: Enr) => ReactNode }[] = [
     {
-      key: "account", label: "Company",
+      id: "account", sort: "account", label: "Company",
       cell: (e) => (
         <>
           <div style={{ fontWeight: 500, color: "#1d1d1f", fontSize: 14 }}>{e.a.account}</div>
@@ -383,7 +430,16 @@ export default function InteractiveAccountsTable({
       ),
     },
     {
-      key: "fit", label: "UNC Fit (est.)",
+      id: "employees", sort: "employees", label: "Employees", align: "right",
+      cell: (e) => (
+        <span style={{ fontVariantNumeric: "tabular-nums", color: e.emp == null ? "#c7c7cc" : "#4b4b51" }}>
+          {fmtEmployees(e.emp)}
+        </span>
+      ),
+    },
+    { id: "unc", sort: "unc", label: "UNC", cell: (e) => <UncPill unc={e.a.uncPartner} /> },
+    {
+      id: "fit", sort: "fit", label: "Fit",
       cell: (e) => {
         const fs = FIT_STYLE[e.fit.level];
         return (
@@ -396,9 +452,43 @@ export default function InteractiveAccountsTable({
         );
       },
     },
-    { key: "sector", label: "Sector", cell: (e) => txt(e.a.topIndustrySectorProfile, 240) },
-    { key: "hq", label: "HQ", cell: (e) => txt(e.hq) },
-    { key: "revenue", label: "Revenue", align: "right", cell: (e) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.a.approximateRevenue || "—"}</span> },
+    { id: "sector", sort: "sector", label: "Sector", cell: (e) => txt(e.a.topIndustrySectorProfile, 240) },
+    { id: "revenue", sort: "revenue", label: "Revenue", align: "right", cell: (e) => <span style={{ fontVariantNumeric: "tabular-nums" }}>{e.a.approximateRevenue || "—"}</span> },
+    {
+      id: "actions", label: "Actions",
+      cell: (e) => (
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }} onClick={(ev) => ev.stopPropagation()}>
+          {e.a.homepage && (
+            <a
+              href={toHref(e.a.homepage)}
+              target="_blank" rel="noopener noreferrer"
+              title={`Open ${host(e.a.homepage)}`}
+              aria-label={`Open ${host(e.a.homepage)} in a new tab`}
+              style={{
+                display: "inline-flex", alignItems: "center", justifyContent: "center",
+                width: 30, height: 30, borderRadius: 8, color: "#6e6e73",
+                border: "1px solid #e8e8ed", background: "#fff",
+              }}
+            >
+              <ExternalLinkIcon />
+            </a>
+          )}
+          {onRunDeepDive && (
+            <button
+              onClick={() => onRunDeepDive(e.a.account)}
+              title={`Generate a profile report for ${e.a.account}`}
+              style={{
+                padding: "6px 12px", fontSize: 13, fontWeight: 500, borderRadius: 8,
+                border: "1px solid #e8e8ed", background: "#fff", color: "#0071e3",
+                cursor: "pointer", fontFamily: FONT, whiteSpace: "nowrap",
+              }}
+            >
+              Profile
+            </button>
+          )}
+        </div>
+      ),
+    },
   ];
 
   return (
@@ -498,14 +588,16 @@ export default function InteractiveAccountsTable({
             <tr>
               {cols.map((c) => (
                 <th
-                  key={c.key}
-                  onClick={() => toggleSort(c.key)}
-                  style={{ textAlign: c.align ?? "left", cursor: "pointer" }}
+                  key={c.id}
+                  onClick={c.sort ? () => toggleSort(c.sort!) : undefined}
+                  style={{ textAlign: c.align ?? "left", cursor: c.sort ? "pointer" : "default" }}
                 >
                   {c.label}
-                  <span style={{ color: "#0071e3", marginLeft: 4, opacity: sortKey === c.key ? 1 : 0 }}>
-                    {sortDir === "asc" ? "↑" : "↓"}
-                  </span>
+                  {c.sort && (
+                    <span style={{ color: "#0071e3", marginLeft: 4, opacity: sortKey === c.sort ? 1 : 0 }}>
+                      {sortDir === "asc" ? "↑" : "↓"}
+                    </span>
+                  )}
                 </th>
               ))}
             </tr>
@@ -518,7 +610,7 @@ export default function InteractiveAccountsTable({
                 style={{ cursor: "pointer" }}
               >
                 {cols.map((c) => (
-                  <td key={c.key} style={{ textAlign: c.align ?? "left" }}>
+                  <td key={c.id} style={{ textAlign: c.align ?? "left" }}>
                     {c.cell(e)}
                   </td>
                 ))}
@@ -575,14 +667,25 @@ export default function InteractiveAccountsTable({
               <div style={{ fontSize: 14.5, color: "#1d1d1f", lineHeight: 1.5 }}>{children}</div>
             </div>
           );
+          // A single quick-stat tile: a value over a thin provenance line.
+          const Stat = ({ label, value, source }: { label: string; value: string; source?: string }) => (
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 600, letterSpacing: "0.06em", textTransform: "uppercase", color: "#a0a0a5" }}>{label}</div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: "#1d1d1f", marginTop: 3, fontVariantNumeric: "tabular-nums" }}>{value}</div>
+              {source && <div style={{ fontSize: 11, color: "#86868b", marginTop: 2 }}>{source}</div>}
+            </div>
+          );
           return (
             <>
-              {/* Header */}
+              {/* Header — name, ticker, fit pill, close */}
               <div style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "22px 24px 16px", borderBottom: "1px solid #f0f0f2" }}>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 20, fontWeight: 700, color: "#1d1d1f", letterSpacing: "-0.02em" }}>
                     {selected.account}
                   </div>
+                  {exchange && (
+                    <div style={{ fontSize: 12.5, color: "#86868b", marginTop: 2, fontWeight: 500 }}>{exchange}</div>
+                  )}
                   <span title={fit.reason} style={{
                     display: "inline-block", marginTop: 8, padding: "2px 10px", fontSize: 12, fontWeight: 600,
                     borderRadius: 999, background: fs.bg, color: fs.color,
@@ -608,23 +711,45 @@ export default function InteractiveAccountsTable({
 
               {/* Body */}
               <div style={{ flex: 1, overflow: "auto", padding: "20px 24px 28px" }}>
+                {/* Quick stats — Employees, Revenue, HQ, each with a source line */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12,
+                  padding: "14px 16px", marginBottom: 20,
+                  background: "#f5f5f7", borderRadius: 14,
+                }}>
+                  <Stat label="Employees" value={fmtEmployees(selected.employees)} source={selected.employees == null ? undefined : "SEC 10-K"} />
+                  <Stat label="Revenue" value={selected.approximateRevenue || "—"} source={selected.approximateRevenue ? "SEC EDGAR" : undefined} />
+                  <Stat label="HQ" value={hq || "—"} />
+                </div>
+
+                {/* UNC partnership — inventory standing plus its detail string */}
+                <Field label="UNC partnership">
+                  <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <UncPill unc={selected.uncPartner} />
+                    <span style={{ color: selected.uncPartner.detail ? "#1d1d1f" : "#86868b" }}>
+                      {selected.uncPartner.detail || (selected.uncPartner.status === "none" ? "No recorded UNC partnership." : "")}
+                    </span>
+                  </div>
+                </Field>
+
+                {/* The stored selling angle — never generated live */}
+                <Field label="What they would sell to UNC">
+                  {selected.uncAngle || <span style={{ color: "#86868b" }}>Not yet documented.</span>}
+                </Field>
+
                 {selected.companyAliases && <Field label="Aliases">{selected.companyAliases}</Field>}
                 {selected.parentAccount && <Field label="Parent account">{selected.parentAccount}</Field>}
-                <Field label="HQ / location">{hq || "—"}</Field>
                 <Field label="Sector">{selected.topIndustrySectorProfile || "—"}</Field>
                 {selected.secondaryIndustrySectorProfile && (
                   <Field label="Secondary sector">{selected.secondaryIndustrySectorProfile}</Field>
                 )}
-                {/* Compact facts grid for the columns the table no longer shows */}
+                {/* Compact facts grid for the remaining record fields */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 16px" }}>
                   <Field label="Type">
                     <span style={{ color: KIND_STYLE[kind].color, fontWeight: 500 }}>{KIND_STYLE[kind].label}</span>
                   </Field>
-                  <Field label="Ticker">{exchange || "—"}</Field>
-                  <Field label="Revenue">{selected.approximateRevenue || "—"}</Field>
-                  <Field label="Employees">{selected.approximateEmployees || "—"}</Field>
                   <Field label="Founded">{selected.founded || "—"}</Field>
-                  <Field label="Website">{link(selected.website, host(selected.website))}</Field>
+                  <Field label="Website">{link(toHref(selected.homepage || selected.website), host(selected.homepage || selected.website))}</Field>
                 </div>
                 {selected.keyProducts && (
                   <Field label="Key products">
@@ -656,21 +781,33 @@ export default function InteractiveAccountsTable({
                 )}
               </div>
 
-              {/* Footer action */}
-              {onRunDeepDive && (
-                <div style={{ padding: "14px 24px", borderTop: "1px solid #f0f0f2" }}>
+              {/* Footer — homepage link left, profile-report action right */}
+              <div style={{
+                padding: "14px 24px", borderTop: "1px solid #f0f0f2",
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+              }}>
+                {selected.homepage ? (
+                  <a
+                    href={toHref(selected.homepage)}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#0071e3", fontSize: 14, fontWeight: 500, textDecoration: "none" }}
+                  >
+                    <ExternalLinkIcon size={14} /> {host(selected.homepage)}
+                  </a>
+                ) : <span />}
+                {onRunDeepDive && (
                   <button
                     onClick={() => { onRunDeepDive(selected.account); setSelected(null); }}
                     style={{
-                      width: "100%", padding: "12px 18px", fontSize: 15, fontWeight: 600,
+                      padding: "11px 18px", fontSize: 15, fontWeight: 600,
                       border: "none", borderRadius: 12, cursor: "pointer",
-                      background: "#0071e3", color: "#fff", fontFamily: FONT,
+                      background: "#0071e3", color: "#fff", fontFamily: FONT, whiteSpace: "nowrap",
                     }}
                   >
-                    Run Deep Dive →
+                    Generate profile report →
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </>
           );
         })()}

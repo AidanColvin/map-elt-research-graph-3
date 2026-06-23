@@ -433,8 +433,8 @@ export function visibleView(page: Page) {
 }
 
 /**
- * Click a top-nav tab by its visible label (e.g. "Dashboard",
- * "Company Profile", "Sector Scan"). The tabs are buttons inside the
+ * Click a top-nav tab by its visible label (e.g. "Home", "Companies",
+ * "Sectors", "Directory"). The tabs are buttons inside the
  * "Workspace views" <nav>.
  */
 export async function clickNav(page: Page, label: string): Promise<void> {

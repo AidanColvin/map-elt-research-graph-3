@@ -34,7 +34,7 @@ test.describe('Map workspace — interactive flows', () => {
    */
   test('typing in the company search bar updates the input value', async ({ page }) => {
     await gotoWorkspace(page);
-    await clickNav(page, 'Company');
+    await clickNav(page, 'Companies');
 
     const view = visibleView(page);
     const search = view
@@ -90,30 +90,29 @@ test.describe('Map workspace — interactive flows', () => {
   });
 
   /**
-   * 3. The top nav switches between Dashboard, Company Profile and Sector Scan,
-   *    and the Profile button opens the Account ("Accounts") view. After each
-   *    click we assert the correct heading/landmark for that view is visible.
+   * 3. The top nav switches between Home, Companies and Sectors, and the Profile
+   *    button opens the Account view. After each click we assert the correct
+   *    heading/landmark for that view is visible.
    *
-   *    (Note: "Companies"/"Partnerships" tabs are deactivated in the live build;
-   *    the Account view is reached via the Profile button, not a nav tab.)
+   *    (Note: the Account view is reached via the Profile button, not a nav tab.)
    */
-  test('top nav switches between Dashboard, Company, Sector and Account views', async ({ page }) => {
+  test('top nav switches between Home, Companies, Sectors and Account views', async ({ page }) => {
     await gotoWorkspace(page);
 
     // Dashboard — the hero headline ("Map the company, generate the report…").
-    await clickNav(page, 'Dashboard');
+    await clickNav(page, 'Home');
     await expect(
       visibleView(page).getByRole('heading', { name: /research, written for you/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Company Profile — idle hero headline ("...board-ready in seconds.").
-    await clickNav(page, 'Company');
+    await clickNav(page, 'Companies');
     await expect(
       visibleView(page).getByRole('heading', { name: /board-ready/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Sector Scan — idle hero headline ("Scan an entire sector...").
-    await clickNav(page, 'Sector');
+    await clickNav(page, 'Sectors');
     await expect(
       visibleView(page).getByRole('heading', { name: /scan an entire sector/i }),
     ).toBeVisible({ timeout: 8000 });
@@ -127,7 +126,7 @@ test.describe('Map workspace — interactive flows', () => {
     await expect(visibleView(page).getByText('Guest').first()).toBeVisible();
 
     // Back to Dashboard to confirm round-trip navigation still works.
-    await clickNav(page, 'Dashboard');
+    await clickNav(page, 'Home');
     await expect(
       visibleView(page).getByRole('heading', { name: /research, written for you/i }),
     ).toBeVisible({ timeout: 8000 });
@@ -149,7 +148,7 @@ test.describe('Map workspace — interactive flows', () => {
     await expect(page.getByRole('button', { name: /map home/i })).toBeVisible();
 
     // Walk the offline views; none should error.
-    for (const label of ['Company', 'Sector', 'Dashboard']) {
+    for (const label of ['Companies', 'Sectors', 'Home']) {
       await clickNav(page, label);
       await page.waitForTimeout(400);
     }
@@ -176,7 +175,7 @@ test.describe('Map workspace — interactive flows', () => {
   test('clicking a sector ticker cross-loads that company into the Company view', async ({ page }) => {
     test.setTimeout(60000);
     await gotoWorkspace(page);
-    await clickNav(page, 'Sector');
+    await clickNav(page, 'Sectors');
 
     const sectorView = visibleView(page);
     const input = sectorView.locator('input[aria-label="Sector"]').first();

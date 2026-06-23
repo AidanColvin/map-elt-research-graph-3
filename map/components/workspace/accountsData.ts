@@ -1,4 +1,5 @@
 import type { AccountProfile } from "./accountProfile";
+import { deriveEmployees } from "./accountEnrich";
 
 /**
  * Accounts parsed from the UNC "Database load template — Industry company
@@ -52,7 +53,25 @@ function row(p: Partial<AccountProfile>): AccountProfile {
     dateOfResearch: "",
     resources: "",
     linkToReport: "",
+    homepage: "",
+    employees: null,
+    uncPartner: { status: "none" },
+    uncAngle: "",
     ...p,
+  };
+}
+
+// takes: one account row
+// does: fills the extended fields that mirror existing source data — the
+//       canonical homepage from the website field, and a numeric headcount
+//       parsed from the SEC-sourced employees string — without overwriting any
+//       value a row set explicitly
+// returns: the same row with homepage and employees backfilled
+function enrich(a: AccountProfile): AccountProfile {
+  return {
+    ...a,
+    homepage: a.homepage || a.website,
+    employees: a.employees ?? deriveEmployees(a.approximateEmployees),
   };
 }
 
@@ -6828,4 +6847,4 @@ export const ACCOUNTS: AccountProfile[] = getUniqueAccounts(CORE_ACCOUNTS, [
   ...EXCEL_ACCOUNTS,
   ...NEW_ACCOUNTS,
   ...EXPANDED_ACCOUNTS,
-]);
+]).map(enrich);
