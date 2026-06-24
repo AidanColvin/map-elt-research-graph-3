@@ -11,6 +11,7 @@ import type { ReportData, CitationIndex } from '@/components/Report';
 import { normalize, buildCitationIndex, parseMoney, fmtUsd } from '@/components/Report';
 import { PdfDoc, wrapText, textWidth } from '@/lib/pdf-writer';
 import type { SectorReportModel } from '@/lib/sectorReport';
+import type { CompanyCardData } from '@/lib/companyCard';
 import { isHealthSector, visiblePipeline, cleanAlignment } from '@/lib/domain';
 
 // ── Block intermediate representation ──────────────────────────────────────
@@ -26,7 +27,18 @@ export type Block =
   | { t: 'refs'; items: { id: number; text: string; url: string }[] }
   | { t: 'pagebreak' }
   | { t: 'statgrid'; cells: { n: string; l: string }[] }
-  | { t: 'chart'; chartKind: 'bars' | 'donut'; title: string; subtitle?: string; series: ChartSeries[]; money?: boolean; solid?: boolean; barColor?: [number, number, number] };
+  | { t: 'chart'; chartKind: 'bars' | 'donut'; title: string; subtitle?: string; series: ChartSeries[]; money?: boolean; solid?: boolean; barColor?: [number, number, number] }
+  // ── Rich blocks that mirror the on-screen Partnership Report cards ──
+  | { t: 'eyebrow'; text: string }                                        // tiny uppercase muted line
+  | { t: 'compheader'; name: string; meta?: string }                     // big company name + meta line
+  | { t: 'pills'; items: { text: string; tone: PillTone }[] }            // rounded status badges
+  | { t: 'callout'; tone: 'amber' | 'red'; text: string }                // tinted notice box
+  | { t: 'sectionlabel'; text: string }                                  // small uppercase section label
+  | { t: 'linkrow'; items: { label: string; url: string }[] }            // row of source links
+  | { t: 'talking'; items: { bold: string; rest: string }[] }            // talking points (bold lead + body)
+  | { t: 'assetcards'; items: { title: string; desc: string; why?: string; heldBy?: string }[] };
+
+type PillTone = 'tier' | 'active' | 'prior' | 'none' | 'signal';
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -414,8 +426,135 @@ function renderBlocksToPdf(doc: PdfDoc, blocks: Block[], titleOverride?: string,
       }
       case 'table': renderPdfTable(doc, b, margin, contentW, () => y, (v) => { y = v; }, ensure, baseline); break;
       case 'chart': renderPdfChart(doc, b, margin, contentW, () => y, (v) => { y = v; }, ensure, baseline); break;
+      case 'eyebrow':
+        writeText(b.text.toUpperCase(), 8, true, 6, [0.58, 0.58, 0.62]);
+        break;
+      case 'compheader':
+        y += 6;
+        writeText(b.name, 22, true, b.meta ? 3 : 8, [0.11, 0.11, 0.12]);
+        if (b.meta) writeText(b.meta, 9.5, false, 10, [0.54, 0.54, 0.57]);
+        break;
+      case 'sectionlabel':
+        y += 8;
+        writeText(b.text.toUpperCase(), 9, true, 5, [0.54, 0.54, 0.57]);
+        break;
+      case 'pills': {
+        // A wrapping row of rounded status badges, matching the on-screen Pills.
+        const padX = 9, h = 17, gapX = 6, gapY = 6, size = 9;
+        ensure(h + 6);
+        let px = margin, top = y;
+        for (const p of b.items) {
+          const w = textWidth(p.text, size) + padX * 2;
+          if (px + w > margin + contentW) { px = margin; top += h + gapY; ensure(h); }
+          drawPill(doc, px, top, w, h, p.text, p.tone, baseline);
+          px += w + gapX;
+        }
+        y = top + h + 12;
+        break;
+      }
+      case 'callout': {
+        // A tinted notice box with a colored left accent bar.
+        const tone = b.tone === 'amber'
+          ? { bg: [0.999, 0.984, 0.92] as [number, number, number], bar: [0.96, 0.62, 0.07] as [number, number, number], fg: [0.57, 0.25, 0.05] as [number, number, number] }
+          : { bg: [0.992, 0.925, 0.92] as [number, number, number], bar: [0.7, 0.15, 0.12] as [number, number, number], fg: [0.7, 0.15, 0.12] as [number, number, number] };
+        const size = 9.5, lh = size + 4, padX = 12, padY = 9;
+        const lines = wrapText(b.text, size, contentW - padX * 2 - 4);
+        const boxH = lines.length * lh + padY * 2;
+        ensure(boxH + 8);
+        const top = y;
+        doc.rect(margin, doc.height - top - boxH, contentW, boxH, tone.bg);
+        doc.rect(margin, doc.height - top - boxH, 3, boxH, tone.bar);
+        for (let i = 0; i < lines.length; i++) {
+          doc.text(lines[i], margin + padX, baseline(top + padY + i * lh, size), { size, color: tone.fg });
+        }
+        y = top + boxH + 12;
+        break;
+      }
+      case 'linkrow': {
+        // A wrapping row of "› label" source links in blue.
+        const size = 9, gapX = 16, blue: [number, number, number] = [0.15, 0.39, 0.92];
+        ensure(size + 8);
+        let px = margin, top = y;
+        for (const l of b.items) {
+          const label = `› ${l.label}`;
+          const w = textWidth(label, size);
+          if (px + w > margin + contentW && px > margin) { px = margin; top += size + 6; ensure(size + 4); }
+          doc.text(label, px, baseline(top, size), { size, color: blue });
+          px += w + gapX;
+        }
+        y = top + size + 12;
+        break;
+      }
+      case 'talking': {
+        // Bulleted talking points: a dot, a bold lead line, then the body.
+        for (const tp of b.items) {
+          const dotTop = y + 3;
+          doc.sector(margin + 3, doc.height - (dotTop + 3), 2.2, 0, Math.PI * 2, [0.11, 0.11, 0.12]);
+          writeText(tp.bold, 10.5, true, tp.rest ? 1 : 6, [0.13, 0.13, 0.13], 14);
+          if (tp.rest) writeText(tp.rest, 10, false, 7, [0.45, 0.45, 0.48], 14);
+        }
+        y += 4;
+        break;
+      }
+      case 'assetcards': {
+        // Bordered cards stacked full-width (the on-screen 3-up grid, linearized).
+        for (const card of b.items) {
+          const size = 10, lh = size + 3.5, padX = 13, padY = 11;
+          const innerW = contentW - padX * 2;
+          const titleLines = wrapText(card.title, 11.5, innerW);
+          const descLines = wrapText(card.desc, size, innerW);
+          const whyLines = card.why ? wrapText(`Why it fits: ${card.why}`, size, innerW) : [];
+          const heldLines = card.heldBy ? wrapText(`Held by ${card.heldBy}`, 8.5, innerW) : [];
+          const boxH = padY * 2 + titleLines.length * 16 + 4 + descLines.length * lh
+            + (whyLines.length ? 5 + whyLines.length * lh : 0)
+            + (heldLines.length ? 6 + heldLines.length * 12 : 0);
+          ensure(boxH + 8);
+          const top = y;
+          // Card surface + 1pt border (border = slightly darker rect behind).
+          doc.rect(margin, doc.height - top - boxH, contentW, boxH, [0.9, 0.9, 0.92]);
+          doc.rect(margin + 0.8, doc.height - top - boxH + 0.8, contentW - 1.6, boxH - 1.6, [1, 1, 1]);
+          let cy = top + padY;
+          for (const ln of titleLines) { doc.text(ln, margin + padX, baseline(cy, 11.5), { size: 11.5, bold: true, color: [0.15, 0.39, 0.92] }); cy += 16; }
+          cy += 4;
+          for (const ln of descLines) { doc.text(ln, margin + padX, baseline(cy, size), { size, color: [0.2, 0.2, 0.22] }); cy += lh; }
+          if (whyLines.length) {
+            cy += 5;
+            for (const ln of whyLines) { doc.text(ln, margin + padX, baseline(cy, size), { size, color: [0.45, 0.45, 0.48] }); cy += lh; }
+          }
+          if (heldLines.length) {
+            cy += 6;
+            for (const ln of heldLines) { doc.text(ln, margin + padX, baseline(cy, 8.5), { size: 8.5, color: [0.6, 0.6, 0.63] }); cy += 12; }
+          }
+          y = top + boxH + 10;
+        }
+        break;
+      }
     }
   }
+}
+
+// Tone palette for status pills, mirroring CompanyReportCard's <Pill>.
+const PILL_TONES: Record<PillTone, { bg: [number, number, number]; fg: [number, number, number] }> = {
+  tier: { bg: [0.933, 0.929, 0.996], fg: [0.235, 0.204, 0.537] },
+  active: { bg: [0.882, 0.961, 0.933], fg: [0.031, 0.314, 0.255] },
+  prior: { bg: [0.902, 0.945, 0.984], fg: [0.122, 0.365, 0.6] },
+  none: { bg: [0.949, 0.949, 0.969], fg: [0.541, 0.541, 0.573] },
+  signal: { bg: [0.949, 0.949, 0.969], fg: [0.353, 0.353, 0.384] },
+};
+
+// Draw a single rounded pill (rect body + two semicircular caps) with centered text.
+function drawPill(
+  doc: PdfDoc, x: number, top: number, w: number, h: number,
+  text: string, tone: PillTone, baseline: (topY: number, size: number) => number,
+): void {
+  const c = PILL_TONES[tone] || PILL_TONES.signal;
+  const r = h / 2;
+  const yb = doc.height - top - h; // bottom of pill in PDF coords
+  const cy = yb + r;
+  doc.rect(x + r, yb, w - h, h, c.bg);            // central body
+  doc.sector(x + r, cy, r, Math.PI / 2, Math.PI * 1.5, c.bg);   // left cap
+  doc.sector(x + w - r, cy, r, -Math.PI / 2, Math.PI / 2, c.bg); // right cap
+  doc.text(text, x + r, baseline(top + (h - 9) / 2 + 0.5, 9), { size: 9, bold: true, color: c.fg });
 }
 
 // Render a table block with a filled header row, wrapped cell text, and row
@@ -528,7 +667,8 @@ function renderPdfChart(
     const trackY = doc.height - (y + rowH / 2 + 4);
     doc.rect(barX, trackY, barMax, 8, [0.93, 0.93, 0.93]);
     const w = Math.max(2, (d.value / max) * barMax);
-    doc.rect(barX, trackY, w, 8, b.barColor ?? [0.04, 0.04, 0.04]);
+    const barColor = d.color ? hexRgb(d.color) : (b.barColor ?? [0.04, 0.04, 0.04]);
+    doc.rect(barX, trackY, w, 8, barColor);
     // Value.
     doc.text(fmtVal(d.value), barX + barMax + 6, baseline(midTop, 8.5), { size: 8.5, bold: true });
     setY(y + rowH);
@@ -839,7 +979,7 @@ const RD_BAR: [number, number, number] = [0.62, 0.847, 0.749];
 // returns: a Block[] ready for renderBlocksToPdf
 export function sectorModelToBlocks(m: SectorReportModel): Block[] {
   const b: Block[] = [];
-  b.push({ t: 'p', text: `UNC PARTNERSHIP INTELLIGENCE · ${m.sector} · ${m.date} · ALL CLAIMS DOUBLE-SOURCED` });
+  b.push({ t: 'eyebrow', text: `UNC PARTNERSHIP INTELLIGENCE · ${m.sector} · ${m.date} · ALL CLAIMS DOUBLE-SOURCED` });
   b.push({ t: 'h1', text: m.sector });
   b.push({ t: 'p', text: `${m.companiesReviewed} companies reviewed · SEC EDGAR · NIH RePORTER · PubMed · ClinicalTrials.gov` });
 
@@ -856,12 +996,12 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
 
   // Engagement routing — route through OSP first; no named contacts.
   if (m.ospCompanies.length) {
-    b.push({ t: 'p', text: `Route initial outreach through UNC OSP (research.unc.edu/osp): ${m.ospCompanies.length} compan${m.ospCompanies.length === 1 ? 'y has' : 'ies have'} active NIH grants — verify before contacting any investigator.` });
+    b.push({ t: 'callout', tone: 'amber', text: `${m.ospCompanies.length} compan${m.ospCompanies.length === 1 ? 'y has' : 'ies have'} active NIH grants — route initial outreach through UNC OSP (research.unc.edu/osp) before contacting any investigator.` });
   }
 
   // Sector snapshot — colored revenue + R&D bars (valueB is in $B; scale to
   // raw dollars so the money formatter renders "$716.9B" like the page).
-  b.push({ t: 'h2', text: 'Sector snapshot' });
+  b.push({ t: 'sectionlabel', text: 'Sector snapshot' });
   if (m.revenuePeers.length) b.push({
     t: 'chart', chartKind: 'bars', title: 'Revenue (SEC XBRL · latest FY)',
     series: m.revenuePeers.map((p) => ({ label: p.name, value: p.valueB * 1e9 })),
@@ -874,30 +1014,133 @@ export function sectorModelToBlocks(m: SectorReportModel): Block[] {
   });
 
   if (m.dataAssets.length) {
-    b.push({ t: 'h2', text: 'UNC data assets available to partners' });
-    b.push({ t: 'list', items: m.dataAssets.map((a) => `${a.name} — ${a.description} Why it fits: ${a.relevance} (held by ${a.heldBy})`) });
+    b.push({ t: 'sectionlabel', text: 'UNC data assets available to partners' });
+    b.push({ t: 'assetcards', items: m.dataAssets.map((a) => ({
+      title: a.name, desc: a.description, why: a.relevance, heldBy: a.heldBy,
+    })) });
   }
 
   return b;
 }
 
-// takes: the SectorReportModel, per-company report markdown, and a title
+// Per-company R&D peer bar colors — subject highlighted, peers muted (matches
+// the on-screen RdChart in CompanyReportCard).
+const PEER_SUBJECT = '#60a5fa';
+const PEER_OTHER = '#bfdbfe';
+
+// takes: one CompanyCardData (the model behind the on-screen CompanyReportCard)
+// does: builds the rich Block IR for that card — header, status pills, stat
+//       strip, source links, OSP callout, the Company/Problem/Goal/Solution
+//       sections, the UNC data-asset table, the R&D-vs-peers bar chart, and
+//       talking points — so the PDF matches the page instead of flat markdown
+// returns: a Block[] for one company
+export function companyCardToBlocks(c: CompanyCardData): Block[] {
+  const b: Block[] = [];
+
+  if (c.secOnlyStub) {
+    b.push({ t: 'callout', tone: 'amber', text: 'Partial data — this company hit the fetch deadline. Only SEC EDGAR facts are shown; PubMed, NIH grants, clinical trials, and patents may be missing.' });
+  }
+
+  b.push({ t: 'compheader', name: c.name, meta: c.metaLine });
+
+  // Status pills — tier + UNC status + extra signals (mirrors the card filter).
+  const pills: { text: string; tone: PillTone }[] = [
+    { text: c.tier, tone: 'tier' },
+    {
+      text: c.uncStatus === 'active' ? 'Active UNC overlap' : c.uncStatus === 'prior' ? 'Prior UNC tie' : 'No UNC tie confirmed',
+      tone: c.uncStatus,
+    },
+  ];
+  c.pills
+    .filter((p) => !p.startsWith('Active NIH') && !p.startsWith('UNC research'))
+    .forEach((p) => pills.push({ text: p, tone: 'signal' }));
+  b.push({ t: 'pills', items: pills });
+
+  if (c.stats.length) b.push({ t: 'statgrid', cells: c.stats.map((s) => ({ n: s.value, l: s.label })) });
+  if (c.links.length) b.push({ t: 'linkrow', items: c.links });
+
+  if (c.ospFlag) {
+    b.push({ t: 'callout', tone: 'red', text: `Route initial outreach through UNC OSP (research.unc.edu/osp) — ${c.ospGrantCount} active NIH grant${c.ospGrantCount === 1 ? '' : 's'} to verify first.` });
+  }
+
+  const section = (label: string, bullets: { text: string }[]) => {
+    if (!bullets.length) return;
+    b.push({ t: 'sectionlabel', text: label });
+    b.push({ t: 'list', items: bullets.map((x) => x.text) });
+  };
+  section('Company', c.company);
+  section('Problem', c.problem);
+  section('Goal', c.goal);
+  section('Solution', c.solution);
+
+  if (c.assets.length) {
+    b.push({ t: 'sectionlabel', text: 'UNC Data Assets' });
+    b.push({ t: 'table', headers: ['Asset', 'Relevance'], rows: c.assets.map((a) => [a.name, a.relevance]) });
+  }
+
+  if (c.rdPeers.length) {
+    b.push({ t: 'sectionlabel', text: 'R&D vs sector peers' });
+    b.push({
+      t: 'chart', chartKind: 'bars', title: 'R&D expense', subtitle: 'Latest reported, SEC XBRL',
+      series: c.rdPeers.map((p) => ({ label: p.name, value: p.valueB * 1e9, color: p.isSubject ? PEER_SUBJECT : PEER_OTHER })),
+      money: true,
+    });
+  }
+
+  if (c.talkingPoints.length) {
+    b.push({ t: 'sectionlabel', text: 'Talking Points' });
+    b.push({ t: 'talking', items: c.talkingPoints.map((t) => ({ bold: t.bold, rest: t.rest })) });
+  }
+
+  return b;
+}
+
+// takes: the SectorReportModel, the per-company card models, and a title
 // does: renders a rich PDF that mirrors the on-screen Partnership Report —
-//       colored stat strip, charts, priority matrix, then one section per
-//       company — so the download reflects the page instead of flat text
+//       eyebrow + colored stat strip + charts + asset cards for the sector,
+//       then one richly-laid-out card per company (pills, stat tiles, OSP
+//       callout, sections, R&D chart, talking points) — so the download
+//       reflects the page instead of flat text
 // returns: nothing (saves "<title>.pdf")
 export async function downloadPartnershipPdf(
-  m: SectorReportModel, cardMarkdowns: string[], title: string,
+  m: SectorReportModel, cards: CompanyCardData[], title: string,
 ) {
   const blocks: Block[] = sectorModelToBlocks(m);
-  for (const md of cardMarkdowns) {
-    if (!md) continue;
+  for (const c of cards) {
     blocks.push({ t: 'pagebreak' });
-    blocks.push(...parseMarkdownBlocks(md));
+    blocks.push(...companyCardToBlocks(c));
   }
   const doc = new PdfDoc();
   renderBlocksToPdf(doc, blocks, title);
   saveBlob(doc.save(), `${markdownExportName(title)}.pdf`);
+}
+
+// takes: a single CompanyCardData and a display title
+// does: renders that one company's card to the same rich PDF layout used in the
+//       Partnership Report (the per-card "↓ PDF" button), instead of flat text
+// returns: nothing (saves "<title>.pdf")
+export async function downloadCompanyCardPdf(c: CompanyCardData, title: string) {
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, companyCardToBlocks(c), title);
+  saveBlob(doc.save(), `${markdownExportName(title)}.pdf`);
+}
+
+// takes: the SectorReportModel, the per-company card models, and a title
+// does: renders the rich Partnership Report to PDF bytes via the same pipeline
+//       as downloadPartnershipPdf, but WITHOUT triggering a browser download —
+//       for ZIP bundling and headless rendering/tests
+// returns: the PDF file bytes
+export function partnershipReportToPdfBytes(
+  m: SectorReportModel, cards: CompanyCardData[], title: string,
+): Uint8Array {
+  const blocks: Block[] = sectorModelToBlocks(m);
+  for (const c of cards) {
+    blocks.push({ t: 'pagebreak' });
+    blocks.push(...companyCardToBlocks(c));
+  }
+  const doc = new PdfDoc();
+  renderBlocksToPdf(doc, blocks, title);
+  return doc.saveBytes();
 }
 
 // takes: a Markdown string, a display title, and optional filename override
