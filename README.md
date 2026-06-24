@@ -40,16 +40,46 @@ The one rule behind every choice: **the app must be free to run.**
 
 The app has three surfaces.
 
-**The workspace at `/`** sits behind a login. It shows six views in one top nav:
+**The workspace at `/`** sits behind a login. It shows six views in one top nav (the labels are `Home · Companies · Sectors · Partnerships · Directory · Projects`):
 
-| View | What it shows |
-|---|---|
-| Dashboard | The home screen. One search box and a 3D orbit. Type a name, press enter, and it opens a Project that runs the full pipeline. |
-| Company | A Company Profile card. Search any public company. The report streams in. |
-| Sector | A Sector Scan card. Live progress ("N of M companies"), a ticker grid, and the full report. Click a ticker to load that company in the Company view. |
-| Partnerships | UNC Partnership Intelligence. Toggle company or sector. Shows real UNC signals plus a Talking Points card. |
-| Companies | The company database as a live table. Search, filter, sort, and export to CSV / Excel / PDF / Markdown. |
-| Projects | Saves one full pipeline run as a project. See [Projects canvas](#projects-canvas). |
+| Tab | View key | What it shows |
+|---|---|---|
+| Home | `dashboard` | The home screen. One search box and a 3D orbit. Type a name, press enter, and it opens a Project that runs the full pipeline. |
+| Companies | `company` | A Company Profile card — the single-company report generator. Search any public company. The report streams in. |
+| Sectors | `sector` | A Sector Scan card. Live progress ("N of M companies"), a ticker grid, and the full report. Click a ticker to load that company in the Companies view. |
+| Partnerships | `partnerships` | UNC Partnership Intelligence. Toggle company or sector. Shows real UNC signals plus a Talking Points card. |
+| Directory | `accounts` | The company database as a live table. Search, filter, sort, and export to CSV / Excel / PDF / Markdown. |
+| Projects | `projects` | Saves one full pipeline run as a project. See [Projects canvas](#projects-canvas). |
+
+A seventh view, **Account** (`account`), is reached from the Profile button in the header, not the nav.
+
+### How the views connect
+
+The six tabs are not islands. A ticker clicked in **Sectors** loads it in **Companies**; **Projects** can drive any of the three engines and rehydrate every panel from one saved run.
+
+```mermaid
+flowchart LR
+    LOGIN["AuthGate<br/>(Firebase login)"] --> HOME
+
+    subgraph NAV["One top nav · 6 views"]
+        HOME["🏠 Home<br/>search + 3D orbit"]
+        CO["🏢 Companies<br/>Company Profile"]
+        SE["🗂️ Sectors<br/>Sector Scan"]
+        PA["🤝 Partnerships<br/>UNC intelligence"]
+        DI["📇 Directory<br/>309-company table"]
+        PR["📁 Projects<br/>saved runs"]
+    end
+
+    HOME -->|"enter a query"| PR
+    SE -->|"click a ticker"| CO
+    DI -->|"open source report"| CO
+    CO -.->|"same company"| PA
+    PR -->|"Company mode"| CO & PA
+    PR -->|"Sector mode"| SE & DI
+
+    classDef hub fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b;
+    class HOME,PR hub;
+```
 
 **The standalone pages** hold the two original apps in full:
 
@@ -165,7 +195,7 @@ flowchart TD
     A --> OUT["stream to client"]
 ```
 
-The report holds: Executive Summary, Company Overview, Strategic Direction (10-K Business), Business Model and Financials (tables and charts), Competitive Positioning, Key Risks, Recent SEC Filings, Research Signals, Outlook (MD&A), Leadership (org chart), and Sources.
+The report holds, in order: a fact banner (ticker, exchange, SIC, HQ) and a staleness note, then Executive Summary, Company Overview, Products & Services, Corporate Structure, Strategic Direction (10-K Business), Business Model & Financial Performance (tables and charts), Competitive Positioning, Customers, Key Risks, Recent SEC Filings, Research & Innovation Signals, Outlook (MD&A), Leadership (org chart), Partnership Intelligence Analysis, a Source Verification manifest, and a Sources footer.
 
 ### 10-K narrative extraction
 
@@ -181,20 +211,34 @@ Leadership for live companies comes from SEC Form 4 filings. Their raw XML lists
 
 ### The chart system
 
-Charts have no dependencies. They are hand-built SVG (line, bar, pie, donut) and HTML (org chart). They ride *inside the Markdown* as fenced `chart` code blocks that carry a JSON spec, caught at render time.
+Charts have no dependencies. They are hand-built SVG and HTML, and ride *inside the Markdown* as fenced `chart` code blocks that carry a JSON spec, caught at render time. The `Chart` component (`map/app/components/Charts.tsx`) switches on a `type` field and renders **six** shapes:
+
+| `type` | Shape | Used for |
+|---|---|---|
+| `line` | SVG multi-series line | revenue / R&D / net-income paths over years |
+| `bar` | SVG grouped bar | year-over-year financial comparisons |
+| `pie` | SVG pie | share / split breakdowns |
+| `donut` | SVG donut | share / split breakdowns (ring) |
+| `hierarchy` | HTML org chart (root + flat leaders) | leadership / executive team |
+| `tree` | HTML multi-level tree | subsidiaries, product lines, structure |
 
 ```mermaid
 flowchart LR
-    SRC["lib/generate.ts\nor curated .md"] -->|"chart block (JSON)"| MD["Markdown stream"]
+    SRC["lib/generate.ts<br/>or curated .md"] -->|"```chart block (JSON)"| MD["Markdown stream"]
     MD --> RM["react-markdown"]
-    RM -->|"code.language-chart"| INT["MarkdownArticle\ninterceptor"]
-    INT -->|"JSON.parse"| CH["Chart component"]
-    CH --> A["SVG line / bar / donut"]
-    CH --> B["HTML org chart"]
-    INT -->|"parse fails\n(still streaming)"| PH["placeholder"]
+    RM -->|"code.language-chart"| INT["MarkdownArticle<br/>interceptor"]
+    INT -->|"JSON.parse OK"| CH{"spec.type"}
+    CH -->|line / bar| SV1["SVG axes chart"]
+    CH -->|pie / donut| SV2["SVG circular chart"]
+    CH -->|hierarchy| H1["HTML org chart"]
+    CH -->|tree| H2["HTML nested tree"]
+    INT -->|"parse fails<br/>(still streaming)"| PH["sized placeholder<br/>(reserves aspect ratio)"]
+
+    classDef miss fill:#fef3c7,stroke:#f59e0b,color:#78350f;
+    class PH miss;
 ```
 
-While a chart block is still streaming (the JSON is not done), the interceptor shows a placeholder. Once the closing fence lands, it parses and draws.
+While a chart block is still streaming (the JSON is not done), the interceptor sniffs the partial `type` and shows a **placeholder sized to the final chart's aspect ratio**, so nothing jumps when it lands. Once the closing fence arrives, it parses and draws.
 
 ## Engine 2: Sector Scan
 
@@ -214,23 +258,57 @@ sequenceDiagram
 
     UI->>PX: POST { sector }
     PX->>OR: forward request
-    OR->>OR: resolve sector to company set
-    OR-->>UI: stage: resolved (total N)
-    par one worker per company (up to 22)
+    OR->>OR: resolve sector to company set (≤ 22)
+    OR-->>UI: event: stage · key="resolved" (total N)
+    OR->>API: SEC facts prefetch (≤ 8 workers, 15 s budget)
+    par one worker per company · 44 s total budget
         OR->>API: SEC EDGAR (facts, XBRL, filings)
         OR->>API: ClinicalTrials.gov (pipeline)
         OR->>API: PubMed (UNC co-authorship)
         OR->>API: NIH RePORTER (grants)
     end
-    OR-->>UI: progress (k of N, company name)
-    OR-->>UI: stage: building
-    OR->>OR: ReportBuilder assembles 7 sections
-    OR-->>UI: stage: verifying
-    OR->>OR: SourceTagger validates every claim
-    OR-->>UI: done (full report JSON)
+    loop as each company resolves
+        OR-->>UI: event: progress (k of N, company name)
+    end
+    Note over OR,UI: event: heartbeat every ~4 s of silence (keep-alive)
+    OR-->>UI: event: stage · key="building"
+    OR->>OR: ReportBuilder assembles 7 sections + references
+    OR-->>UI: event: stage · key="verifying"
+    OR->>OR: SourceTagger validates every claim (2-source rule)
+    alt success
+        OR-->>UI: event: done (full report JSON + completion stats)
+    else failure
+        OR-->>UI: event: error (message)
+    end
 ```
 
-If streaming is not available, the frontend falls back to a plain `/run-pipeline` request with a cosmetic progress bar.
+The seven event types the stream emits are `resolved`, `progress`, `heartbeat`, `building`, `verifying`, `done`, and `error`. The seven event types the stream emits are `resolved`, `progress`, `heartbeat`, `building`, `verifying`, `done`, and `error`. If streaming is not available, the frontend falls back to a plain `/run-pipeline` request with a cosmetic progress bar.
+
+### Sector resolution
+
+Before any fetch, the orchestrator turns a free-text sector into a concrete company set. It tries three paths, in order, and never returns empty.
+
+```mermaid
+flowchart TD
+    IN["sector query<br/>(free text)"] --> CANON["canonicalize<br/>(lowercase, alias map)"]
+    CANON --> Q{"matches one of<br/>39 curated sectors?"}
+    Q -->|"yes"| SEEDS["use curated SECTOR_SEEDS<br/>+ NC regional seeds<br/>(SAS, Red Hat, IQVIA, Labcorp…)"]
+    Q -->|"no"| DISC["SEC EDGAR full-text discovery<br/>10-Ks, last 4 yrs · limit 15<br/>filtered to active CIKs"]
+    DISC --> D2{"any companies<br/>found?"}
+    D2 -->|"yes"| LIVE["use discovered set"]
+    D2 -->|"no"| DEF["DEFAULT_SEEDS fallback<br/>Apple · Microsoft · Amazon<br/>Alphabet · JPMorgan Chase"]
+    SEEDS --> CAP["cap at 22 companies"]
+    LIVE --> CAP
+    DEF --> CAP
+    CAP --> OUT["company set → parallel fetch"]
+
+    classDef curated fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    classDef live fill:#dbeafe,stroke:#2563eb,color:#1e3a8a;
+    classDef fall fill:#fef3c7,stroke:#f59e0b,color:#78350f;
+    class SEEDS curated;
+    class DISC,LIVE live;
+    class DEF fall;
+```
 
 ### Report structure
 
@@ -661,6 +739,27 @@ Set `BACKEND_API_URL` on the frontend project to the backend's URL. Curated Mark
 * **Export size.** PDF and Word capture the rendered page as paginated images, so big sector reports can run 70–95 pages and take ~20 seconds. Markdown, Excel, and PowerPoint come from data and stay small.
 * **Mobile.** The UI is responsive. Image-based PDF/Word capture is memory-heavy. On mobile, prefer Markdown / Excel / PowerPoint.
 
+A sector scan lives inside a hard time box so it never trips Vercel's 60-second function cap. The SEC facts prefetch is given its own 15-second slice, the parallel per-company fetch shares a 44-second budget, then assembly and verification run in the remaining headroom.
+
+```mermaid
+gantt
+    title Sector scan · time budget (seconds, within Vercel's 60 s cap)
+    dateFormat X
+    axisFormat %S
+    section Resolve
+    Sector to company set (max 22)  :r, 0, 2
+    section Fetch
+    SEC facts prefetch (8 workers)  :prefetch, 2, 17
+    Per-company fetch (1 per co)    :crit, fetch, 2, 46
+    section Assemble
+    ReportBuilder 7 sections        :build, 46, 52
+    SourceTagger 2-source verify    :verify, 52, 56
+    section Limit
+    Vercel function cap (60 s)      :milestone, cap, 60, 0
+```
+
+Worker pools by stage: SEC facts prefetch up to **8** workers, streaming fetch **1 worker per company**, per-company enrichment up to **5**, and PubMed COI lookups run **sequentially** to respect the NCBI rate limit.
+
 ## Data integrity rules
 
 * **Two-source rule.** Every sector scan claim needs at least two independent citable URLs, or it is flagged for review.
@@ -668,6 +767,33 @@ Set `BACKEND_API_URL` on the frontend project to the backend's URL. Curated Mark
 * **Sponsor matching.** Clinical trials are matched on sponsor and collaborator fields, not free text. Unrelated trials are never tied to a company.
 * **Own words only.** Company profile narrative comes from the company's filings, not generated prose.
 * **Talking points are deterministic.** The assembler emits only what the evidence supports. It never invents headlines or details.
+
+### How the two-source rule is enforced
+
+`SourceTagger` (`backend/aria_pi/utils/source_tagger.py`) runs every claim's URLs through four gates. A claim is **verified** only if **two or more distinct, reputable URLs** survive — otherwise it is flagged for analyst review.
+
+```mermaid
+flowchart TD
+    C["claim with N source URLs"] --> EACH["for each URL"]
+    EACH --> WF{"well-formed?<br/>scheme ∈ http/https<br/>+ has hostname"}
+    WF -->|"no"| DROP["drop"]
+    WF -->|"yes"| BL{"on blocklist?<br/>wikipedia · crunchbase<br/>zoominfo · linkedin<br/>glassdoor · indeed"}
+    BL -->|"yes"| DROP
+    BL -->|"no"| REP{"reputable?<br/>.gov / .edu<br/>· vetted NC orgs<br/>· company's own site"}
+    REP -->|"no"| DROP
+    REP -->|"yes"| KEEP["keep"]
+    KEEP --> DEDUP["dedupe by<br/>canonical URL"]
+    DEDUP --> CNT{"≥ 2 distinct<br/>sources remain?"}
+    CNT -->|"yes"| OK["✅ verified"]
+    CNT -->|"no"| FLAG["⚠️ flagged for review"]
+
+    classDef good fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    classDef bad fill:#fee2e2,stroke:#dc2626,color:#7f1d1d;
+    classDef warn fill:#fef3c7,stroke:#f59e0b,color:#78350f;
+    class OK good;
+    class DROP bad;
+    class FLAG warn;
+```
 
 ## Limitations
 
