@@ -164,6 +164,98 @@ SECTOR_SEEDS = {
     "real estate": ["Prologis", "American Tower", "Equinix", "Welltower", "Public Storage",
                     "Simon Property Group", "Digital Realty Trust", "Realty Income", "CBRE Group", "Crown Castle",
                     "Extra Space Storage", "AvalonBay Communities", "VICI Properties", "Iron Mountain", "CoStar Group"],
+    # ── NAICS supersectors (the 2-digit industry taxonomy the Projects UI uses) ──
+    # Curated so each broad NAICS sector resolves to real, recognizable, SEC-filing
+    # public companies in that sector instead of falling through to live full-text
+    # discovery (which returns frequency-ranked OTC shells / blank-check SPACs).
+    "real estate and rental and leasing": [
+        "Prologis", "American Tower", "Equinix", "Simon Property Group", "Welltower",
+        "Public Storage", "Realty Income", "Digital Realty Trust", "CBRE Group", "Crown Castle",
+        "United Rentals", "Ryder System", "Avis Budget Group", "WillScot Mobile Mini", "AerCap Holdings"],
+    "finance and insurance": [
+        "JPMorgan Chase", "Bank of America", "Wells Fargo", "Citigroup", "Goldman Sachs",
+        "Morgan Stanley", "American Express", "Berkshire Hathaway", "BlackRock", "Chubb",
+        "Progressive", "MetLife", "Prudential Financial", "Marsh & McLennan", "Travelers"],
+    "professional and technical services": [
+        "Accenture", "Booz Allen Hamilton", "Gartner", "Jacobs Solutions", "AECOM",
+        "Leidos Holdings", "Science Applications International", "ICF International", "CACI International", "Parsons",
+        "Verisk Analytics", "FTI Consulting", "Robert Half", "ManpowerGroup", "Omnicom Group"],
+    "durable goods manufacturing": [
+        "Caterpillar", "Deere & Company", "General Electric", "Boeing", "Honeywell International",
+        "3M", "Lockheed Martin", "Ford Motor", "General Motors", "Illinois Tool Works",
+        "Emerson Electric", "Parker Hannifin", "Cummins", "Stanley Black & Decker", "Whirlpool"],
+    "nondurable goods manufacturing": [
+        "Procter & Gamble", "Coca-Cola", "PepsiCo", "Philip Morris International", "Mondelez International",
+        "Kraft Heinz", "General Mills", "Colgate-Palmolive", "Kimberly-Clark", "Archer-Daniels-Midland",
+        "Tyson Foods", "Kellanova", "Hershey", "Clorox", "International Paper"],
+    "wholesale trade": [
+        "McKesson", "Cencora", "Cardinal Health", "Sysco", "US Foods",
+        "W.W. Grainger", "Genuine Parts", "WESCO International", "Fastenal", "Performance Food Group",
+        "LKQ Corporation", "Watsco", "Avnet", "Arrow Electronics", "Core & Main"],
+    "information": [
+        "Alphabet", "Meta Platforms", "Microsoft", "Netflix", "Comcast",
+        "Walt Disney", "Verizon", "AT&T", "Charter Communications", "Warner Bros Discovery",
+        "Paramount Global", "Fox Corporation", "Thomson Reuters", "News Corp", "T-Mobile US"],
+    "construction": [
+        "D.R. Horton", "Lennar", "PulteGroup", "NVR", "Toll Brothers",
+        "Fluor", "Jacobs Solutions", "AECOM", "KBR", "Quanta Services",
+        "MasTec", "EMCOR Group", "Comfort Systems USA", "Granite Construction", "Sterling Infrastructure"],
+    "transportation and warehousing": [
+        "Union Pacific", "CSX", "Norfolk Southern", "FedEx", "United Parcel Service",
+        "Delta Air Lines", "United Airlines Holdings", "Southwest Airlines", "J.B. Hunt Transport Services", "Old Dominion Freight Line",
+        "C.H. Robinson Worldwide", "Knight-Swift Transportation", "XPO", "Expeditors International", "Ryder System"],
+    "administrative and waste management services": [
+        "Waste Management", "Republic Services", "Waste Connections", "GFL Environmental", "Clean Harbors",
+        "Cintas", "Rollins", "ABM Industries", "Aramark", "ManpowerGroup",
+        "Robert Half", "Casella Waste Systems", "UniFirst", "Healthcare Services Group", "Brink's"],
+    "accommodation and food services": [
+        "McDonald's", "Starbucks", "Chipotle Mexican Grill", "Yum! Brands", "Darden Restaurants",
+        "Marriott International", "Hilton Worldwide", "Hyatt Hotels", "Wendy's", "Domino's Pizza",
+        "Texas Roadhouse", "Las Vegas Sands", "MGM Resorts International", "Booking Holdings", "Airbnb"],
+    "mining and oil extraction": [
+        "Exxon Mobil", "Chevron", "ConocoPhillips", "EOG Resources", "Occidental Petroleum",
+        "Devon Energy", "Diamondback Energy", "Coterra Energy", "Hess", "Marathon Oil",
+        "Freeport-McMoRan", "Newmont", "Schlumberger", "Halliburton", "Baker Hughes"],
+    "agriculture and forestry": [
+        "Deere & Company", "Archer-Daniels-Midland", "Bunge Global", "Corteva", "Nutrien",
+        "Tyson Foods", "CF Industries", "Mosaic", "Weyerhaeuser", "Rayonier",
+        "PotlatchDeltic", "Fresh Del Monte Produce", "Andersons", "Tractor Supply", "Adecoagro"],
+    "arts and entertainment": [
+        "Walt Disney", "Netflix", "Warner Bros Discovery", "Live Nation Entertainment", "TKO Group Holdings",
+        "Madison Square Garden Entertainment", "Endeavor Group", "Cinemark Holdings", "Paramount Global", "Comcast",
+        "Electronic Arts", "Take-Two Interactive", "Roblox", "Sphere Entertainment", "AMC Entertainment"],
+    # Hospitals — pure hospital / facility / care-delivery operators (NOT the broad
+    # "healthcare" umbrella of payers + pharma). Most large US hospital systems are
+    # nonprofit and don't file with the SEC; this is the recognizable public set.
+    "hospitals": [
+        "HCA Healthcare", "Tenet Healthcare", "Universal Health Services", "Community Health Systems", "Encompass Health",
+        "Acadia Healthcare", "Select Medical Holdings", "Surgery Partners", "Ensign Group", "DaVita",
+        "Option Care Health", "Pediatrix Medical Group", "US Physical Therapy", "Brookdale Senior Living", "Addus HomeCare"],
+    # Educational Services — sector is mostly nonprofit/public, so SEC discovery is
+    # structurally weak. Curated set of the real public education companies.
+    "educational services": [
+        "Grand Canyon Education", "Adtalem Global Education", "Strategic Education", "Perdoceo Education", "Laureate Education",
+        "Stride", "Chegg", "Coursera", "Duolingo", "Graham Holdings",
+        "American Public Education", "Lincoln Educational Services", "Universal Technical Institute", "Nerdy", "Docebo"],
+    # Management of Companies (NAICS 55) — holding companies & diversified
+    # conglomerates that own/manage operating subsidiaries.
+    "management of companies": [
+        "Berkshire Hathaway", "Icahn Enterprises", "Loews Corporation", "Brookfield Corporation", "Markel Group",
+        "Jefferies Financial Group", "Compass Diversified", "Honeywell International", "Danaher", "Roper Technologies",
+        "Illinois Tool Works", "Dover Corporation", "3M", "Emerson Electric", "Parker Hannifin"],
+    # State & Local Government — almost entirely public/nonprofit, so SEC discovery
+    # cannot surface it. Curated set of the recognizable govtech vendors and
+    # government-services contractors that serve state & local governments.
+    "state and local government": [
+        "Tyler Technologies", "Maximus", "Conduent", "Verra Mobility", "Booz Allen Hamilton",
+        "Leidos Holdings", "Science Applications International", "ICF International", "CACI International", "Parsons",
+        "Unisys", "DXC Technology", "Accenture", "NV5 Global", "Jacobs Solutions"],
+    # Federal Government — the recognizable public federal contractors (defense +
+    # IT/services), the entities a partnership team would actually engage.
+    "federal government": [
+        "Lockheed Martin", "RTX", "Northrop Grumman", "General Dynamics", "Boeing",
+        "L3Harris Technologies", "Leidos Holdings", "Booz Allen Hamilton", "Science Applications International", "CACI International",
+        "Parsons", "Palantir Technologies", "ICF International", "V2X", "Maximus"],
 }
 
 # NC-based companies added on top of the global seeds for each sector.
@@ -228,11 +320,56 @@ SECTOR_DOMAIN = {
     "consumer discretionary": "business", "consumer staples": "business",
     "communication services": "tech", "real estate": "business",
     "utilities": "energy", "materials": "energy",
+    # NAICS supersectors — only "hospitals" is health (its clinical content is
+    # legitimate); every other NAICS bucket is non-health so clinical-trial
+    # content stays gated off.
+    "real estate and rental and leasing": "business",
+    "finance and insurance": "business",
+    "professional and technical services": "business",
+    "durable goods manufacturing": "business",
+    "nondurable goods manufacturing": "business",
+    "wholesale trade": "business", "information": "tech",
+    "construction": "business", "transportation and warehousing": "business",
+    "administrative and waste management services": "business",
+    "accommodation and food services": "business",
+    "mining and oil extraction": "energy", "agriculture and forestry": "business",
+    "arts and entertainment": "tech", "hospitals": "health",
+    "educational services": "general", "management of companies": "business",
+    "state and local government": "general", "federal government": "general",
 }
 
 # Keyword → canonical sector key. Lets free-text / misspelled searches route to
 # a sensible curated sector. Order matters: earlier, more-specific rules win.
 _KEYWORD_ROUTES = [
+    # ── NAICS supersector routes (checked first; specific multi-word phrases) ──
+    # Order matters within this block: "nondurable" before "durable" (substring),
+    # "federal" before generic "government", "waste" before "management".
+    (("nondurable", "non-durable", "non durable"), "nondurable goods manufacturing"),
+    (("durable goods", "durable manufactur"), "durable goods manufacturing"),
+    (("federal government", "federal agenc", "federal contract"), "federal government"),
+    (("state and local", "local government", "state government", "municipal",
+      "public sector", "govt", "government"), "state and local government"),
+    (("waste management", "waste services", "administrative and waste",
+      "waste collection"), "administrative and waste management services"),
+    (("management of compan", "holding compan", "conglomerate"), "management of companies"),
+    (("wholesale", "distributor"), "wholesale trade"),
+    (("transportation and warehous", "warehousing", "freight", "trucking",
+      "railroad", "logistics"), "transportation and warehousing"),
+    (("construction", "homebuild", "home build", "civil engineering"), "construction"),
+    (("accommodation", "food service", "hospitality", "lodging"), "accommodation and food services"),
+    (("mining and oil", "oil and gas extraction", "oil extraction", "oil & gas",
+      "upstream oil", "drilling"), "mining and oil extraction"),
+    (("agricultur", "forestry", "farming", "timber"), "agriculture and forestry"),
+    (("educational service", "education service", "higher education", "edtech",
+      "ed tech", "e-learning", "online learning"), "educational services"),
+    (("arts and entertainment", "entertainment", "performing arts", "amusement",
+      "recreation"), "arts and entertainment"),
+    (("hospital",), "hospitals"),
+    (("professional and technical", "professional service", "technical service",
+      "management consult"), "professional and technical services"),
+    (("finance and insurance",), "finance and insurance"),
+    (("real estate and rental", "rental and leasing", "rental and lease"), "real estate and rental and leasing"),
+    (("information services", "information sector"), "information"),
     (("oncolog", "cancer", "tumor"), "oncology"),
     (("pharma", "drug", "therapeut", "medicine"), "pharmaceutical"),
     (("biotech", "biolog", "genom", "gene therap", "mrna"), "biotech"),
@@ -413,6 +550,67 @@ _EXACT_ALIASES = {
     "real estate": "real estate",
     "reit": "real estate",
     "reits": "real estate",
+    # ── NAICS supersector exact aliases (the Projects UI's full sector names
+    # plus common shorthands) ──
+    "real estate and rental and leasing": "real estate and rental and leasing",
+    "finance and insurance": "finance and insurance",
+    "professional and technical services": "professional and technical services",
+    "professional services": "professional and technical services",
+    "technical services": "professional and technical services",
+    "consulting": "professional and technical services",
+    "durable goods manufacturing": "durable goods manufacturing",
+    "durable goods": "durable goods manufacturing",
+    "durable manufacturing": "durable goods manufacturing",
+    "nondurable goods manufacturing": "nondurable goods manufacturing",
+    "non-durable goods manufacturing": "nondurable goods manufacturing",
+    "nondurable goods": "nondurable goods manufacturing",
+    "wholesale trade": "wholesale trade",
+    "wholesale": "wholesale trade",
+    "retail trade": "retail",
+    "information": "information",
+    "construction": "construction",
+    "transportation and warehousing": "transportation and warehousing",
+    "transportation": "transportation and warehousing",
+    "warehousing": "transportation and warehousing",
+    "logistics": "transportation and warehousing",
+    "administrative and waste management services": "administrative and waste management services",
+    "administrative and waste management": "administrative and waste management services",
+    "waste management": "administrative and waste management services",
+    "accommodation and food services": "accommodation and food services",
+    "accommodation": "accommodation and food services",
+    "food services": "accommodation and food services",
+    "hospitality": "accommodation and food services",
+    "mining and oil extraction": "mining and oil extraction",
+    "mining and oil": "mining and oil extraction",
+    "oil and gas": "mining and oil extraction",
+    "oil & gas": "mining and oil extraction",
+    "oil extraction": "mining and oil extraction",
+    "agriculture and forestry": "agriculture and forestry",
+    "agriculture": "agriculture and forestry",
+    "forestry": "agriculture and forestry",
+    "educational services": "educational services",
+    "education": "educational services",
+    "edtech": "educational services",
+    "ed tech": "educational services",
+    "management of companies": "management of companies",
+    "holding companies": "management of companies",
+    "conglomerate": "management of companies",
+    "conglomerates": "management of companies",
+    "arts and entertainment": "arts and entertainment",
+    "entertainment": "arts and entertainment",
+    "arts": "arts and entertainment",
+    "hospitals": "hospitals",
+    "hospital": "hospitals",
+    "commercial banking": "finance",
+    "state and local government": "state and local government",
+    "state and local": "state and local government",
+    "local government": "state and local government",
+    "state government": "state and local government",
+    "government": "state and local government",
+    "govt": "state and local government",
+    "public sector": "state and local government",
+    "federal government": "federal government",
+    "federal": "federal government",
 }
 
 
@@ -430,6 +628,16 @@ _FUZZY_SYNONYMS = {
     "telecommunications": "telecom", "telecommunication": "telecom",
     "healthcare": "healthcare", "industrials": "industrial",
     "healthtech": "digital health", "ehealth": "digital health",
+    # NAICS supersectors — single-word handles so misspellings still route.
+    "hospital": "hospitals", "hospitals": "hospitals",
+    "agriculture": "agriculture and forestry", "agricultural": "agriculture and forestry",
+    "forestry": "agriculture and forestry",
+    "education": "educational services", "educational": "educational services",
+    "government": "state and local government", "governmental": "state and local government",
+    "construction": "construction",
+    "transportation": "transportation and warehousing",
+    "wholesale": "wholesale trade",
+    "entertainment": "arts and entertainment",
 }
 
 # Build candidate vocabulary: canonical keys + synonyms. Each entry maps a
