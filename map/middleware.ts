@@ -38,6 +38,7 @@ const PUBLIC_API = [
   '/api/talking-points',
   '/api/run-pipeline',        // also covers /api/run-pipeline-stream (prefix)
   '/api/freshness',
+  '/api/resolve-kind',        // keyless sector-vs-company classifier (guests included)
 ];
 
 export function middleware(request: NextRequest) {
