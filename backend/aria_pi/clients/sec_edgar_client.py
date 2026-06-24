@@ -76,6 +76,27 @@ _CORP_SUFFIX_TOKENS = {
 }
 
 
+# Blank-check SPACs and acquisition shells repeat partnership/merger language in
+# their 10-Ks, so they rank high on frequency yet are never real sector players
+# (e.g. "Keen Vision Acquisition Corp", "Athena Technology Acquisition Corp. II").
+# Drop them from discovery results by name.
+_SPAC_RE = re.compile(
+    r"\bblank check\b|\bacquisition\s+(?:corp|corporation|company|co|holdings?|partners)\b",
+    re.I,
+)
+
+# Ubiquitous filler tokens that must never be used as a standalone relaxed
+# discovery query: each matches thousands of unrelated filers (and the noisy
+# OTC shells among them). A multi-word search relaxes only to its *specific*
+# words, so "health tech" never degrades to a bare "tech"/"health" sweep.
+_GENERIC_QUERY_TOKENS = frozenset({
+    "tech", "technology", "technologies", "health", "healthcare", "data",
+    "system", "systems", "group", "holding", "holdings", "service", "services",
+    "solution", "solutions", "company", "global", "international", "digital",
+    "online", "smart", "platform", "platforms", "network", "networks", "media",
+})
+
+
 def _norm_name(s: str) -> str:
     """Normalize a company name for matching: drop apostrophes/periods, turn all
     other punctuation into spaces, lowercase, collapse whitespace. So "McDonald's",
@@ -162,10 +183,13 @@ class SECEdgarClient:
             attempts.append(f'"{term}"')   # exact phrase — highest precision
             attempts.append(term)          # all words, any position
             tokens = [t for t in re.split(r"[^A-Za-z0-9]+", term) if len(t) > 2]
-            if tokens:
-                attempts.append(tokens[-1])           # head noun ("beer")
-                longest = max(tokens, key=len)
-                attempts.append(longest)              # most distinctive token
+            # Single-token relaxations rescue niche phrases ("craft beer" →
+            # "beer"), but must skip ubiquitous filler ("tech", "health",
+            # "systems") that matches thousands of unrelated filers and shells.
+            specific = [t for t in tokens if t.lower() not in _GENERIC_QUERY_TOKENS]
+            if specific:
+                attempts.append(specific[-1])             # head noun ("beer")
+                attempts.append(max(specific, key=len))   # most distinctive token
         else:
             attempts.append(term)
         seen: set = set()
@@ -221,10 +245,20 @@ class SECEdgarClient:
                 break
             ingest(hits)
 
-        # Rank by match frequency (desc), then first-appearance (SEC relevance).
+        # Rank by match frequency (desc), then first-appearance (SEC relevance),
+        # dropping blank-check SPACs / acquisition shells (high-frequency noise
+        # that is never a real sector player).
         first_seen = {ci: i for i, ci in enumerate(order)}
         ranked = sorted(order, key=lambda ci: (-freq[ci], first_seen[ci]))
-        return [active[ci] for ci in ranked[:limit]]
+        out: List[str] = []
+        for ci in ranked:
+            title = active[ci]
+            if not title or _SPAC_RE.search(title):
+                continue
+            out.append(title)
+            if len(out) >= limit:
+                break
+        return out
 
     def sic_for_cik(self, cik: str) -> str:
         """Lightweight SIC-description lookup for a known CIK (no XBRL/filings).

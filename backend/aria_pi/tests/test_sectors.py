@@ -43,6 +43,21 @@ ROUTING_CASES = [
     # Multi-word exact sector keys.
     ("rural health", "rural health"),
     ("quantum computing", "quantum computing"),
+    # Digital health / "health tech" — used to fall through to junk discovery
+    # (OTC shells). Must resolve to the curated digital-health set.
+    ("Health Tech", "digital health"),
+    ("health tech", "digital health"),
+    ("healthtech", "digital health"),
+    ("Health Technology", "digital health"),
+    ("digital health", "digital health"),
+    ("ehealth", "digital health"),
+    ("connected health", "digital health"),
+    # Other "-tech" compounds → correct curated sector, never the generic
+    # technology bucket or live discovery.
+    ("med tech", "medtech"),
+    ("cleantech", "climate tech"),
+    ("green tech", "climate tech"),
+    ("agtech", "ag-bio"),
 ]
 
 
@@ -89,3 +104,31 @@ def test_discovery_queries_single_word():
 def test_discovery_queries_dedupes():
     qs = SECEdgarClient._discovery_queries("solar solar")
     assert len(qs) == len(set(qs))
+
+
+def test_discovery_queries_skip_generic_relaxation():
+    """A multi-word term must not relax to a ubiquitous filler token
+    ("tech"/"health"), which would sweep thousands of unrelated filers."""
+    qs = SECEdgarClient._discovery_queries("fintech health")
+    assert "health" not in qs          # generic — never a standalone query
+    assert "fintech" in qs             # specific token is kept
+    # Niche head nouns are still preserved (regression guard).
+    assert "beer" in SECEdgarClient._discovery_queries("craft beer")
+
+
+def test_spac_and_shell_names_dropped():
+    from aria_pi.clients.sec_edgar_client import _SPAC_RE
+    assert _SPAC_RE.search("Keen Vision Acquisition Corp.")
+    assert _SPAC_RE.search("Athena Technology Acquisition Corp. II")
+    assert _SPAC_RE.search("Generic Blank Check Co")
+    # Real operating companies are kept.
+    assert not _SPAC_RE.search("Apple Inc.")
+    assert not _SPAC_RE.search("DexCom, Inc.")
+    assert not _SPAC_RE.search("Teladoc Health, Inc.")
+
+
+def test_digital_health_seeds_are_real_names():
+    seeds = SECTOR_SEEDS["digital health"]
+    assert "Apple" in seeds
+    assert "Teladoc Health" in seeds
+    assert len(seeds) == 15
