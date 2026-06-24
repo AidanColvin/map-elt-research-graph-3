@@ -40,6 +40,14 @@ SECTOR_SEEDS = {
     "health it": ["Oracle", "Veeva Systems", "Doximity", "Health Catalyst", "Evolent Health",
                   "Phreesia", "Definitive Healthcare", "Computer Programs and Systems", "Teladoc Health", "Premier",
                   "Inovalon Holdings", "Consensus Cloud Solutions", "Alignment Healthcare", "Accolade", "Privia Health"],
+    # Digital health / "health tech" — wearables, telehealth, remote patient
+    # monitoring, connected devices, and consumer health platforms. This is the
+    # set a user means when they search "health tech": Apple (Health/Watch),
+    # Alphabet (Fitbit/Verily), and the public device + telehealth pure-plays —
+    # NOT the random OTC shells a live "health tech" full-text search returns.
+    "digital health": ["Apple", "Alphabet", "DexCom", "Teladoc Health", "Hims & Hers Health",
+                       "GE HealthCare", "Masimo", "iRhythm Technologies", "Garmin", "ResMed",
+                       "Doximity", "Phreesia", "Health Catalyst", "Insulet Corporation", "Abbott Laboratories"],
     # ── Technology ────────────────────────────────────────────────────────
     # FAANG + major public tech: Meta (Facebook), Apple, Amazon, Netflix,
     # Alphabet (Google) plus Microsoft, NVIDIA, and top hardware/enterprise players.
@@ -205,7 +213,7 @@ SECTOR_NC_SEEDS = {
 SECTOR_DOMAIN = {
     "oncology": "health", "biotech": "health", "pharmaceutical": "health",
     "ag-bio": "health", "medtech": "health", "rural health": "health",
-    "health it": "health", "healthcare": "health",
+    "health it": "health", "healthcare": "health", "digital health": "health",
     "technology": "tech", "software": "tech", "artificial intelligence": "tech",
     "semiconductors": "tech", "cybersecurity": "tech", "cloud computing": "tech",
     "quantum computing": "tech", "robotics": "tech", "telecom": "tech",
@@ -232,6 +240,13 @@ _KEYWORD_ROUTES = [
     (("ehr", "electronic health record", "electronic medical record", "emr ",
       "epic", "cerner", "meditech", "health it", "health information",
       "clinical software"), "health it"),
+    # Digital health / health tech — must precede the generic "tech" route so
+    # "health tech" lands here (real wearable/telehealth firms) instead of the
+    # broad "technology" bucket or live discovery (which returns OTC shells).
+    (("digital health", "health tech", "healthtech", "ehealth", "e-health",
+      "mhealth", "m-health", "connected health", "remote patient monitor",
+      "remote monitoring", "wearable health", "health wearable",
+      "digital medicine", "digital therapeutic"), "digital health"),
     (("rural", "telehealth", "telemedicine"), "rural health"),
     (("hospital", "managed care", "health system", "healthcare", "health care",
       "payer", "health plan"), "healthcare"),
@@ -298,6 +313,31 @@ _EXACT_ALIASES = {
     "ehr": "health it",
     "emr": "health it",
     "health it": "health it",
+    # Digital health / health tech (the search that used to return OTC shells).
+    "health tech": "digital health",
+    "healthtech": "digital health",
+    "health technology": "digital health",
+    "digital health": "digital health",
+    "digital medicine": "digital health",
+    "digital therapeutics": "digital health",
+    "ehealth": "digital health",
+    "e-health": "digital health",
+    "mhealth": "digital health",
+    "m-health": "digital health",
+    "connected health": "digital health",
+    "wearables health": "digital health",
+    # Other common "-tech" compounds → their correct curated sector, so they
+    # never fall through to junk discovery or the broad "technology" bucket.
+    "med tech": "medtech",
+    "medtech": "medtech",
+    "cleantech": "climate tech",
+    "clean tech": "climate tech",
+    "greentech": "climate tech",
+    "green tech": "climate tech",
+    "climatetech": "climate tech",
+    "agtech": "ag-bio",
+    "ag tech": "ag-bio",
+    "agritech": "ag-bio",
     "big tech": "technology",
     "social media": "social media",
     "social network": "social media",
@@ -389,6 +429,7 @@ _FUZZY_SYNONYMS = {
     "oncology": "oncology", "cybersecurity": "cybersecurity",
     "telecommunications": "telecom", "telecommunication": "telecom",
     "healthcare": "healthcare", "industrials": "industrial",
+    "healthtech": "digital health", "ehealth": "digital health",
 }
 
 # Build candidate vocabulary: canonical keys + synonyms. Each entry maps a
