@@ -331,17 +331,19 @@ async def run_pipeline_stream(req: PipelineRequest):
     )
 
 
-# Wall-clock budget for the entire data-collection phase. Vercel Hobby caps
-# serverless functions at 60s; we reserve the remainder for report assembly +
-# cold-start margin. Whatever data has returned by the deadline is used as-is —
-# the ReportBuilder derives a complete, sector-specific report from partial
-# data (SEC EDGAR is the fast, reliable backbone; PubMed/NIH/Trials enrich it).
-FETCH_BUDGET_SECONDS = 44
+# Wall-clock budget for the entire data-collection phase. The Vercel function
+# (Pro plan) caps execution at 300s; we reserve the remainder for report
+# assembly + cold-start margin. Whatever data has returned by the deadline is
+# used as-is — the ReportBuilder derives a complete, sector-specific report from
+# partial data (SEC EDGAR is the fast, reliable backbone; PubMed/NIH/Trials
+# enrich it). A larger budget means more companies finish full enrichment and
+# more claims clear the 2-source verification bar instead of being dropped.
+FETCH_BUDGET_SECONDS = 270
 
 # The SEC-facts prefetch runs first and eats into (not on top of) the overall
-# FETCH_BUDGET_SECONDS data-phase budget, so the total stays within the 60s
+# FETCH_BUDGET_SECONDS data-phase budget, so the total stays within the 300s
 # Vercel function limit with margin for report assembly.
-FACTS_PREFETCH_BUDGET = 15
+FACTS_PREFETCH_BUDGET = 40
 
 
 def _resolve_seeds(sector: str, override, sec) -> tuple[List[str], str]:

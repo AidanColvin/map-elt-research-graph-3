@@ -2,8 +2,8 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "functions": {
-    "app/api/run-pipeline/route.ts": { "maxDuration": 60 },
-    "app/api/run-pipeline-stream/route.ts": { "maxDuration": 60 },
+    "app/api/run-pipeline/route.ts": { "maxDuration": 300 },
+    "app/api/run-pipeline-stream/route.ts": { "maxDuration": 300 },
     "app/api/generate/route.ts": { "maxDuration": 60 }
   }
 }
