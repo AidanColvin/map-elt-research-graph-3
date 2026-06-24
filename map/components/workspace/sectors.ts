@@ -114,6 +114,34 @@ export function detectSubjectKind(text: string): "company" | "sector" {
   return "company";
 }
 
+// takes: a free-text subject typed into the unified Projects search
+// does: returns the AUTHORITATIVE company-vs-sector kind. The synchronous
+//       detectSubjectKind heuristic is a fast first pass; when it reads
+//       "company" we confirm against the backend's curated sector resolver
+//       (the same canonical_sector the Sectors page uses), which recognizes the
+//       24 NAICS supersectors ("Hospitals", "Federal Government", …), their
+//       abbreviations, and misspellings the client keyword list can't know.
+//       We only ever UPGRADE company → sector: a query the heuristic already
+//       reads as a sector stays a sector, and a backend outage falls back to
+//       the heuristic, so a single-company lookup is never wrongly forced.
+// returns: "sector" or "company"
+export async function resolveSubjectKind(text: string): Promise<"company" | "sector"> {
+  const heuristic = detectSubjectKind(text);
+  if (heuristic === "sector") return "sector";
+  const q = (text || "").trim();
+  if (!q) return "company";
+  try {
+    const res = await fetch(`/api/resolve-kind?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+    if (res.ok) {
+      const json = await res.json().catch(() => null);
+      if (json?.is_sector) return "sector";
+    }
+  } catch {
+    /* backend unreachable — fall back to the heuristic's "company" verdict */
+  }
+  return "company";
+}
+
 // takes: the text currently typed into a sector input
 // does: finds the first sector (by list order) that begins with what was
 //       typed (case-insensitive), ignoring an already-complete exact match

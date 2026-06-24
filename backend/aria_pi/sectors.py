@@ -3,6 +3,7 @@ orchestrator (which picks seed companies) and the report builder (which picks
 curated sector context). Keeping these aligned ensures a search resolves to the
 SAME sector for company selection and for definition / NC context / UNC units.
 """
+import re
 from typing import List, Optional
 
 # Canonical sector key → top-15 companies per sector.
@@ -611,6 +612,14 @@ _EXACT_ALIASES = {
     "public sector": "state and local government",
     "federal government": "federal government",
     "federal": "federal government",
+    # Broadcasting & Telecommunications NAICS supersector. The "telecom" keyword
+    # route already resolves the long forms, but an exact alias makes the full
+    # display name a recognized sector NAME for the company-vs-sector classifier
+    # (its needle "telecom" is only a prefix of "telecommunications", so the
+    # word-boundary check alone would miss it).
+    "broadcasting and telecommunications": "telecom",
+    "telecommunications": "telecom",
+    "broadcasting": "telecom",
 }
 
 
@@ -789,3 +798,59 @@ def domain_for(sector: str) -> str:
     """Broad domain (health / tech / business / energy) for a raw sector."""
     canon = canonical_sector(sector)
     return SECTOR_DOMAIN.get(canon, "general") if canon else "general"
+
+
+def _word_match(needle: str, text: str) -> bool:
+    """True only when `needle` appears in `text` on word boundaries.
+
+    So 'tech' matches the token 'tech' but 'app' never matches inside 'apple'.
+    This is the difference between a sector NAME and a company name that merely
+    contains a sector substring.
+    """
+    return re.search(r"(?<![a-z0-9])" + re.escape(needle) + r"(?![a-z0-9])", text) is not None
+
+
+def is_sector_query(sector: str) -> bool:
+    """Conservative 'is this a recognized SECTOR NAME?' classifier.
+
+    Used for the company-vs-sector routing decision behind the home-page search
+    and the Projects "auto" mode. It is deliberately STRICTER than
+    canonical_sector: that resolver is built for the Sectors page, where the
+    input is already known to be a sector, so it loosely matches any substring
+    ('Apple' contains 'app' → software). For routing we must NOT mistake a
+    company name for a sector, so here:
+
+      • exact keys and exact aliases count (Hospitals, AI, Govt, the NAICS names);
+      • keyword routes count only on a WORD BOUNDARY ('Tech' → technology, but
+        'Apple' does not match the 'app' needle);
+      • whole-string fuzzy counts (misspellings: 'hosptials', 'tecnology');
+      • loose single-token containment is EXCLUDED (its partial matches are the
+        very thing that misclassifies company names).
+
+    Returns False for company names and niche terms, which then keep the client
+    heuristic's verdict (a single-company lookup, or a discovery sector scan).
+    """
+    key = (sector or "").lower().strip()
+    if not key:
+        return False
+    if key in SECTOR_SEEDS or key in _EXACT_ALIASES:
+        return True
+    single_token = " " not in key
+    for needles, target in _KEYWORD_ROUTES:
+        broad = target in _BROAD_TARGETS
+        for n in needles:
+            nn = n.strip()
+            # Broad catch-alls only fire on a bare single-word input — mirrors
+            # canonical_sector so 'consumer electronics' stays discovery.
+            if broad and not single_token:
+                continue
+            if _word_match(nn, key):
+                return True
+    # Whole-string fuzzy only: tolerate misspellings of a full sector name
+    # without the per-token fuzzing that could fire on a company name's words.
+    for cand, target in _FUZZY_VOCAB.items():
+        if " " in cand and single_token:
+            continue  # multi-word candidate compared only to multi-word input
+        if _close(key, cand):
+            return True
+    return False

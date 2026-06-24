@@ -39,6 +39,7 @@ from aria_pi.utils.source_tagger import SourceTagger
 from aria_pi.sectors import (
     seeds_for as _seeds_for,
     canonical_sector,
+    is_sector_query,
     SECTOR_SEEDS,
     SECTOR_NC_SEEDS,
     DEFAULT_SEEDS,
@@ -192,6 +193,32 @@ async def partnerships(req: PartnershipRequest):
     except Exception as e:
         _log.exception("partnerships failed: %s", type(e).__name__)
         raise HTTPException(status_code=500, detail="Internal error while generating the report.")
+
+
+@app.get("/resolve-kind")
+async def resolve_kind(q: str = ""):
+    """Classify a free-text subject as a recognized sector or not.
+
+    Uses `canonical_sector` — the SAME curated resolver the Sectors page relies
+    on — so the home-page search and the Projects "auto" mode can route a
+    recognized sector name to a multi-company sector scan instead of a single-
+    company lookup. This covers the 24 NAICS supersectors ("Hospitals",
+    "Federal Government", "Finance and Insurance", …), their abbreviations, and
+    common misspellings ("hosptials", "govt"), which the lightweight client-side
+    keyword heuristic misses.
+
+    Returns {query, canonical, is_sector}. `is_sector` is true only when the
+    query resolves to a curated SECTOR_SEEDS bucket; niche terms that the backend
+    would research via live SEC discovery resolve to None here, leaving the
+    client heuristic to make the call (it knows product/keyword sectors).
+    """
+    query = (q or "").strip()[:200]
+    canon = canonical_sector(query) if query else None
+    return JSONResponse(
+        content={"query": query, "canonical": canon,
+                 "is_sector": is_sector_query(query)},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 def _sse(obj: dict) -> str:
