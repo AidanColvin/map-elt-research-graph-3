@@ -41,6 +41,8 @@ BODY = ParagraphStyle("BODY", parent=ss["Normal"], fontName="Helvetica",
 BODYB = ParagraphStyle("BODYB", parent=BODY, fontName="Helvetica-Bold")
 SMALL = ParagraphStyle("SMALL", parent=ss["Normal"], fontName="Helvetica",
                        fontSize=7.5, leading=9.5, textColor=GREY)
+BYLINE = ParagraphStyle("BYLINE", parent=ss["Normal"], fontName="Helvetica-Bold",
+                        fontSize=9, leading=11, textColor=ACCENT)
 STEP_T = ParagraphStyle("STEP_T", parent=BODY, fontName="Helvetica-Bold",
                         fontSize=8.8, leading=10.5, textColor=NAVY)
 STEP_B = ParagraphStyle("STEP_B", parent=BODY, fontSize=7.8, leading=9.6,
@@ -60,6 +62,8 @@ story.append(Paragraph(
     "An automated research tool for partnership &amp; intelligence teams. "
     "Type a company, sector, or topic. Get a sourced, board-ready report in about a minute.",
     SUB))
+story.append(Spacer(1, 3))
+story.append(Paragraph("Aidan Colvin &nbsp;&bull;&nbsp; June 24, 2026", BYLINE))
 story.append(Spacer(1, 6))
 story.append(HRFlowable(width="100%", thickness=1.4, color=ACCENT,
                         spaceBefore=0, spaceAfter=8))
