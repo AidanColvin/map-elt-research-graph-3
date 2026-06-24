@@ -132,3 +132,64 @@ def test_digital_health_seeds_are_real_names():
     assert "Apple" in seeds
     assert "Teladoc Health" in seeds
     assert len(seeds) == 15
+
+
+# --- NAICS supersectors -----------------------------------------------------
+# The Projects UI lets users search the broad 2-digit NAICS sector names. Each
+# must resolve to a CURATED seed list (not fall through to live SEC full-text
+# discovery, which returns frequency-ranked OTC shells / blank-check SPACs).
+NAICS_SECTOR_CASES = [
+    ("Real Estate and Rental and Leasing", "real estate and rental and leasing"),
+    ("State and Local Government", "state and local government"),
+    ("Finance and Insurance", "finance and insurance"),
+    ("Health Care and Social Assistance", "healthcare"),
+    ("Professional and Technical Services", "professional and technical services"),
+    ("Durable Goods Manufacturing", "durable goods manufacturing"),
+    ("Nondurable Goods Manufacturing", "nondurable goods manufacturing"),
+    ("Wholesale Trade", "wholesale trade"),
+    ("Retail Trade", "retail"),
+    ("Information", "information"),
+    ("Construction", "construction"),
+    ("Transportation and Warehousing", "transportation and warehousing"),
+    ("Administrative and Waste Management Services", "administrative and waste management services"),
+    ("Accommodation and Food Services", "accommodation and food services"),
+    ("Federal Government", "federal government"),
+    ("Mining and Oil Extraction", "mining and oil extraction"),
+    ("Agriculture and Forestry", "agriculture and forestry"),
+    ("Utilities", "utilities"),
+    ("Educational Services", "educational services"),
+    ("Management of Companies", "management of companies"),
+    ("Arts and Entertainment", "arts and entertainment"),
+    ("Commercial Banking", "finance"),
+    ("Hospitals", "hospitals"),
+    ("Broadcasting and Telecommunications", "telecom"),
+]
+
+
+@pytest.mark.parametrize("term,expected", NAICS_SECTOR_CASES)
+def test_naics_supersectors_resolve_to_curated_seeds(term, expected):
+    canon = canonical_sector(term)
+    assert canon == expected, f"{term!r} routed to {canon!r}, expected {expected!r}"
+    assert canon in SECTOR_SEEDS, f"{expected!r} missing from SECTOR_SEEDS"
+    # No fall-through to discovery for any NAICS supersector.
+    assert len(SECTOR_SEEDS[canon]) >= 10
+
+
+def test_hospitals_is_distinct_from_broad_healthcare():
+    """'Hospitals' must surface pure hospital/facility operators, NOT the broad
+    healthcare umbrella of payers + pharma (UnitedHealth, J&J, Pfizer…)."""
+    seeds = SECTOR_SEEDS["hospitals"]
+    assert "HCA Healthcare" in seeds
+    assert "Tenet Healthcare" in seeds
+    # The broad-healthcare payers/pharma must not appear here.
+    for off_sector in ("UnitedHealth Group", "Johnson & Johnson", "Pfizer"):
+        assert off_sector not in seeds
+
+
+def test_naics_supersector_robustness():
+    """Abbreviations and common misspellings still route sensibly."""
+    assert canonical_sector("govt") == "state and local government"
+    assert canonical_sector("hosptials") == "hospitals"
+    assert canonical_sector("constuction") == "construction"
+    assert canonical_sector("transporation") == "transportation and warehousing"
+    assert canonical_sector("oil & gas") == "mining and oil extraction"
