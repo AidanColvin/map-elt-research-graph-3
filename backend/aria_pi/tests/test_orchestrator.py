@@ -70,6 +70,50 @@ def test_run_pipeline_with_override(monkeypatch):
     assert "section4_profiles" in body["data"]
 
 
+# ── resolve-kind (sector-vs-company routing for home search + Projects) ──────
+
+@pytest.mark.parametrize("query,canonical", [
+    ("Hospitals", "hospitals"),
+    ("Tech", "technology"),
+    ("Health Care and Social Assistance", "healthcare"),
+    ("Federal Government", "federal government"),
+    ("Finance and Insurance", "finance and insurance"),
+    ("hosptials", "hospitals"),   # misspelling
+    ("Govt", "state and local government"),
+])
+def test_resolve_kind_recognizes_sectors(query, canonical):
+    """
+    Takes: A GET on /resolve-kind for a recognized sector name.
+    Does: Classifies it via the curated resolver.
+    Returns: 200 with is_sector true and the canonical sector key — the home
+             search and Projects "auto" mode use this to run a sector scan.
+    """
+    r = client.get("/resolve-kind", params={"q": query})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["is_sector"] is True
+    assert body["canonical"] == canonical
+
+
+@pytest.mark.parametrize("query", ["Apple", "Pfizer", "Microsoft", "Tesla"])
+def test_resolve_kind_rejects_company_names(query):
+    """
+    Takes: A GET on /resolve-kind for a real company name.
+    Does: Classifies it.
+    Returns: is_sector false, so the subject routes to a single-company lookup
+             instead of being forced into a sector scan.
+    """
+    r = client.get("/resolve-kind", params={"q": query})
+    assert r.status_code == 200
+    assert r.json()["is_sector"] is False
+
+
+def test_resolve_kind_blank_query():
+    r = client.get("/resolve-kind", params={"q": "   "})
+    assert r.status_code == 200
+    assert r.json() == {"query": "", "canonical": None, "is_sector": False}
+
+
 # ── Seed resolution ──────────────────────────────────────────────────────────
 
 def test_resolve_seeds_override():

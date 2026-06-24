@@ -8,7 +8,9 @@ live. Specific sectors and curated aliases must keep resolving.
 """
 import pytest
 
-from aria_pi.sectors import canonical_sector, _BROAD_TARGETS, SECTOR_SEEDS
+from aria_pi.sectors import (
+    canonical_sector, is_sector_query, _BROAD_TARGETS, SECTOR_SEEDS,
+)
 from aria_pi.clients.sec_edgar_client import SECEdgarClient
 
 
@@ -84,6 +86,63 @@ def test_curated_targets_exist_in_seeds():
     for _, expected in ROUTING_CASES:
         if expected is not None:
             assert expected in SECTOR_SEEDS, expected
+
+
+# --- sector-vs-company classifier (home search + Projects "auto" routing) ---
+#
+# Regression guard for the bug where the home-page search and the Projects
+# report generator routed a sector query ("Hospitals") into a single-company
+# lookup instead of a multi-company sector scan. The frontend's "auto" mode
+# now confirms its verdict against is_sector_query (exposed at /resolve-kind),
+# so EVERY recognized sector NAME must classify as a sector, and real company
+# names must NOT.
+
+# The 24 NAICS supersector display names the Projects/Sectors UI offers. Each
+# must be recognized as a sector so it runs a curated multi-company scan.
+NAICS_SUPERSECTORS = [
+    "Real Estate and Rental and Leasing", "State and Local Government",
+    "Finance and Insurance", "Health Care and Social Assistance",
+    "Professional and Technical Services", "Durable Goods Manufacturing",
+    "Nondurable Goods Manufacturing", "Wholesale Trade", "Retail Trade",
+    "Information", "Construction", "Transportation and Warehousing",
+    "Administrative and Waste Management Services", "Accommodation and Food Services",
+    "Federal Government", "Mining and Oil Extraction", "Agriculture and Forestry",
+    "Utilities", "Educational Services", "Management of Companies",
+    "Arts and Entertainment", "Commercial Banking", "Hospitals",
+    "Broadcasting and Telecommunications",
+]
+
+
+@pytest.mark.parametrize("name", NAICS_SUPERSECTORS)
+def test_is_sector_query_recognizes_all_naics_supersectors(name):
+    assert is_sector_query(name) is True, name
+
+
+@pytest.mark.parametrize("term", [
+    "Tech", "AI", "Govt", "hosptials",      # abbreviation / misspelling forms
+    "Healthcare", "Fintech", "Oncology", "health tech",
+])
+def test_is_sector_query_recognizes_short_and_misspelled_sectors(term):
+    assert is_sector_query(term) is True, term
+
+
+@pytest.mark.parametrize("name", [
+    # Real companies must NOT be classified as sectors — otherwise a company
+    # lookup would be wrongly forced into a sector scan. "Apple" contains the
+    # "app" needle and resolves loosely in canonical_sector, so this is the
+    # specific regression the word-boundary classifier guards.
+    "Apple", "Pfizer", "Microsoft", "Tesla", "Nvidia", "Nike",
+    "Berkshire Hathaway", "JPMorgan Chase", "Boeing", "Coca-Cola",
+    "Acme Widgets Inc",
+])
+def test_is_sector_query_rejects_company_names(name):
+    assert is_sector_query(name) is False, name
+
+
+def test_is_sector_query_blank_is_false():
+    assert is_sector_query("") is False
+    assert is_sector_query("   ") is False
+    assert is_sector_query(None) is False
 
 
 # --- discovery query chain (pure, no network) ------------------------------

@@ -6,7 +6,7 @@ import MarkdownArticle from "@/app/components/MarkdownArticle";
 import { useDeepDive } from "./useDeepDive";
 import { useSectorScan } from "./useSectorScan";
 import { buildPartnershipMarkdown, type PartnerData } from "./PartnershipsView";
-import { detectSubjectKind } from "./sectors";
+import { detectSubjectKind, resolveSubjectKind } from "./sectors";
 import CompanyReportCard from "./CompanyReportCard";
 import SectorReportHeader from "./SectorReportHeader";
 import { buildCardData, buildCompanyCard, cardToMarkdown, type CompanyCardData } from "@/lib/companyCard";
@@ -275,15 +275,18 @@ export default function ProjectsCanvas({
   // takes: a subject string and the chosen mode ("auto" detects)
   // does: kicks off the matching pipeline (company profile + UNC, or sector
   //       scan + database). Used by the Run button and by auto-run on open.
-  function runSubject(s: string, chosen: "auto" | "company" | "sector") {
+  async function runSubject(s: string, chosen: "auto" | "company" | "sector") {
     if (!s) return;
     setSubject(s);
-    // In "auto" mode, decide company vs sector from the text (e.g. "health
-    // tech" → sector); otherwise honor the user's forced choice.
-    const eff: "company" | "sector" = chosen === "auto" ? detectSubjectKind(s) : chosen;
-    setResolvedMode(eff);
     setCompanyMd(""); setUncMd(""); setPartnerData(null); setSectorData(null); setSaveMsg("");
     setRunStatus("running");
+    // In "auto" mode, decide company vs sector from the text. We resolve through
+    // the backend's curated sector resolver (the same one the Sectors page uses)
+    // so a recognized sector — incl. the NAICS supersectors, abbreviations, and
+    // misspellings the client heuristic can't know — runs a multi-company sector
+    // scan instead of a single-company lookup. Otherwise honor the forced choice.
+    const eff: "company" | "sector" = chosen === "auto" ? await resolveSubjectKind(s) : chosen;
+    setResolvedMode(eff);
     if (eff === "company") {
       dive.run(s);   // Company Profile
       runUNC(s);     // UNC Partnership Profile
@@ -292,8 +295,20 @@ export default function ProjectsCanvas({
     }
   }
 
-  // Live preview of what "auto" will run, shown under the search bar.
-  const detected: "company" | "sector" = subject.trim() ? detectSubjectKind(subject) : "company";
+  // Live preview of what "auto" will run, shown under the search bar. Seeded by
+  // the instant client heuristic, then upgraded to the backend's verdict so the
+  // label never claims "Company" for a sector that will actually scan.
+  const [detected, setDetected] = useState<"company" | "sector">("company");
+  useEffect(() => {
+    const s = subject.trim();
+    if (!s) { setDetected("company"); return; }
+    setDetected(detectSubjectKind(s));        // instant, optimistic
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      resolveSubjectKind(s).then((k) => { if (!cancelled) setDetected(k); }).catch(() => {});
+    }, 350);                                   // debounce the backend confirm
+    return () => { cancelled = true; window.clearTimeout(t); };
+  }, [subject]);
 
   // Sync live hook output into local state only while a run is in flight, so
   // reopening a saved run is never clobbered by stale hook state.
