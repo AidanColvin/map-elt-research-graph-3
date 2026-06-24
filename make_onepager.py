@@ -45,21 +45,29 @@ STEP_T = ParagraphStyle("STEP_T", parent=BODY, fontName="Helvetica-Bold",
                         fontSize=8.8, leading=10.5, textColor=NAVY)
 STEP_B = ParagraphStyle("STEP_B", parent=BODY, fontSize=7.8, leading=9.6,
                         textColor=GREY)
+BULLET = ParagraphStyle("BULLET", parent=BODY, leftIndent=14, bulletIndent=2,
+                        bulletFontName="Helvetica", bulletFontSize=9,
+                        spaceBefore=1, spaceAfter=1)
 CARD_H = ParagraphStyle("CARD_H", parent=BODYB, fontSize=9, leading=11,
                         textColor=NAVY)
 
 story = []
 
 # --- Header ----------------------------------------------------------------
-story.append(Paragraph("MAP — Research, written for you.", H1))
+story.append(Paragraph("MAP: Research, written for you.", H1))
 story.append(Spacer(1, 2))
 story.append(Paragraph(
     "An automated research tool for partnership &amp; intelligence teams. "
-    "Type a company, sector, or topic — get a sourced, board-ready report in about a minute.",
+    "Type a company, sector, or topic. Get a sourced, board-ready report in about a minute.",
     SUB))
 story.append(Spacer(1, 6))
 story.append(HRFlowable(width="100%", thickness=1.4, color=ACCENT,
                         spaceBefore=0, spaceAfter=8))
+
+
+def bullet(text):
+    """A bullet with a proper hanging indent."""
+    return Paragraph(text, BULLET, bulletText="•")
 
 
 def section(title, flowables):
@@ -76,26 +84,26 @@ section("THE PROBLEM", [
         "Before any outreach, someone has to read the filings, check the trials, pull the grants, "
         "and find the researchers. Today that is slow, manual, and expensive:", BODY),
     Spacer(1, 3),
-    Paragraph("&bull;&nbsp; <b>Hours per company.</b> Research across SEC, PubMed, NIH and "
-              "ClinicalTrials can take a full day per target.", BODY),
-    Paragraph("&bull;&nbsp; <b>Sources are scattered.</b> Every data point lives in a different "
-              "database and format, with no single view.", BODY),
-    Paragraph("&bull;&nbsp; <b>Numbers go stale.</b> Revenue, trial status and leadership change "
-              "constantly — saved decks go out of date.", BODY),
-    Paragraph("&bull;&nbsp; <b>AI tools cost money and make things up.</b> Per-query fees add up, "
-              "and generated text can't always be trusted.", BODY),
+    bullet("<b>Hours per company.</b> Reading across SEC, PubMed, NIH and "
+           "ClinicalTrials can take a full day per target."),
+    bullet("<b>Sources are scattered.</b> Each fact lives in a different "
+           "database, in a different format. There is no single view."),
+    bullet("<b>Numbers go stale.</b> Revenue, trials and leaders keep changing. "
+           "Saved decks fall out of date."),
+    bullet("<b>AI tools cost money and make things up.</b> Per-query fees add up. "
+           "Made-up text cannot be trusted."),
 ])
 
 # --- Goals -----------------------------------------------------------------
 section("THE GOAL", [
     Paragraph(
-        "Give the team accurate company and partnership research in minutes instead of days — "
+        "Give the team accurate company and partnership research in minutes instead of days, "
         "with <b>every fact traceable to a real source</b>, <b>no AI guesswork</b>, and "
         "<b>no cost per report.</b>", BODY),
 ])
 
 # --- The Solution (three tools as cards) -----------------------------------
-story.append(Paragraph("THE SOLUTION — ONE APP, THREE TOOLS", SECT))
+story.append(Paragraph("THE SOLUTION: ONE APP, THREE TOOLS", SECT))
 
 card_data = [[
     Paragraph("Company deep dive", CARD_H),
@@ -103,7 +111,7 @@ card_data = [[
     Paragraph("UNC partnerships", CARD_H),
 ], [
     Paragraph("A full profile of any public company, built from its own SEC filings and live data.", STEP_B),
-    Paragraph("Type an industry — get the top companies in that sector, ranked and sourced.", STEP_B),
+    Paragraph("Type an industry and get the top companies in that sector, ranked and sourced.", STEP_B),
     Paragraph("For any company, finds real overlap with UNC research, plus ready-to-send talking points.", STEP_B),
 ]]
 card = Table(card_data, colWidths=[2.36 * inch] * 3)
@@ -122,20 +130,20 @@ card.setStyle(TableStyle([
 story.append(card)
 story.append(Spacer(1, 4))
 story.append(Paragraph(
-    "Output comes ready to use: <b>Word, Excel, PowerPoint, PDF or Markdown</b> — take it straight "
+    "Output comes ready to use: <b>Word, Excel, PDF or Markdown.</b> Take it straight "
     "into a meeting or to leadership.", BODY))
 story.append(Spacer(1, 7))
 
 # --- How it works (4 steps) ------------------------------------------------
-story.append(Paragraph("HOW IT WORKS — FOUR STEPS, NO GUESSWORK", SECT))
+story.append(Paragraph("HOW IT WORKS: FOUR STEPS, NO GUESSWORK", SECT))
 
 steps = [
     ("1. You type a name or topic",
      "A company, a sector, or a research area. No account needed to try it."),
     ("2. MAP reads the public record",
-     "It checks SEC EDGAR, NIH grants, PubMed papers, and ClinicalTrials.gov — all at once."),
+     "It checks SEC EDGAR, NIH grants, PubMed papers, and ClinicalTrials.gov, all at once."),
     ("3. A sourced brief assembles",
-     "Overview, financials, research alignment and partnership signals — built live, with citations."),
+     "Overview, financials, research fit and partnership signals, built live with citations."),
     ("4. You get a brief you can use",
      "Download, share with leadership, or use it to draft outreach. Every line traces to a source."),
 ]
@@ -172,16 +180,15 @@ story.append(Spacer(1, 8))
 # --- Maintenance & Cost (highlighted) --------------------------------------
 mc_title = Paragraph("LONG-TERM MAINTENANCE &amp; COST", SECT)
 mc_body = [
-    Paragraph("&bull;&nbsp; <b>$0 to run, per report.</b> No AI sits in the request path and no paid "
-              "API keys are required — so there is no per-use or per-query fee.", BODY),
-    Paragraph("&bull;&nbsp; <b>Free public data.</b> Every number and citation comes from free "
-              "government and research databases (SEC, NIH, PubMed, ClinicalTrials).", BODY),
-    Paragraph("&bull;&nbsp; <b>Hosting is the only recurring cost.</b> Standard low-cost web hosting; "
-              "no expensive infrastructure or licenses.", BODY),
-    Paragraph("&bull;&nbsp; <b>Maintenance is light.</b> Upkeep is occasional adjustments when a public "
-              "data source changes its format — not constant rebuilds.", BODY),
-    Paragraph("&bull;&nbsp; <b>Always current.</b> Reports are generated fresh each time, so the data is "
-              "live rather than a deck that quietly goes stale.", BODY),
+    bullet("<b>$0 per report.</b> No AI runs behind it. No paid keys. So there is no "
+           "fee per use."),
+    bullet("<b>Free data.</b> Every number and link comes from free public databases "
+           "(SEC, NIH, PubMed, ClinicalTrials)."),
+    bullet("<b>Free to host.</b> It is free to run today, and it always will be."),
+    bullet("<b>Light upkeep.</b> We only tweak it when a data source changes. There "
+           "are no constant rebuilds."),
+    bullet("<b>Always fresh.</b> Each report is built new, so the data is live. "
+           "Nothing goes stale."),
 ]
 mc_inner = [[mc_title]] + [[f] for f in mc_body]
 mc_tbl = Table(mc_inner, colWidths=[7.1 * inch])
