@@ -314,6 +314,21 @@ export async function mockBackend(page: Page): Promise<void> {
     });
   });
 
+  // Company-vs-sector classifier used by the Dashboard (Home) search bar and the
+  // Projects "auto" mode. Deterministic + offline: echo the query and report
+  // not-a-sector. The client heuristic already upgrades every known sector name
+  // to "sector" before this endpoint is ever called, so returning is_sector:false
+  // here only affects company-looking queries — exactly what the tests type.
+  await page.route('**/api/resolve-kind**', async (route) => {
+    const url = new URL(route.request().url());
+    const q = url.searchParams.get('q') || '';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ query: q, canonical: null, is_sector: false }),
+    });
+  });
+
   // Freshness signature (saved-report re-verification).
   await page.route('**/api/freshness**', async (route) => {
     await route.fulfill({

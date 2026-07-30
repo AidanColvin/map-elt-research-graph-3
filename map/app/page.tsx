@@ -18,6 +18,7 @@ import type { ReportData } from "@/components/Report";
 import { FONT, cardStyle } from "@/components/workspace/ui";
 import type { AccountProfile } from "@/components/workspace/accountProfile";
 import { getUniqueAccounts } from "@/components/workspace/accountsData";
+import { resolveSubjectKind } from "@/components/workspace/sectors";
 
 // Single Apple-style nav bar: the logo, the view tabs, and the Profile button
 // all sit on one horizontal axis (no separate stacked sub-nav).
@@ -294,6 +295,34 @@ export default function MapHome() {
     }
   }
 
+  // takes: a free-text subject typed into the Dashboard search bar
+  // does: runs the report directly instead of opening a new Project. It resolves
+  //       whether the text reads as a single company or a sector — the SAME
+  //       resolver the Sectors page and the Projects "auto" mode use — then
+  //       streams the matching report into the shared Company or Sector view
+  //       (these are the same dive/scan hook instances those tabs render) and
+  //       focuses that tab. This makes the home search behave like the in-tool
+  //       search bars: type a name, get a report.
+  // returns: nothing
+  async function runFromDashboard(name: string) {
+    const q = name.trim();
+    if (!q) return;
+    // resolveSubjectKind returns instantly for anything the client heuristic
+    // already reads as a sector, and only calls the backend to UPGRADE a
+    // company-looking query to a recognized sector — so a single-company lookup
+    // is never wrongly forced, and a backend outage falls back to "company".
+    const kind = await resolveSubjectKind(q);
+    if (kind === "sector") {
+      setSectorDraft(q);
+      setView("sector");
+      scan.run(q);
+    } else {
+      setCompanyDraft(q);
+      setView("company");
+      dive.run(q);
+    }
+  }
+
   // The auth gate shows on every hard refresh / first load by design: the
   // session lives only in React state for this page load.
   if (showIntro) {
@@ -350,10 +379,7 @@ export default function MapHome() {
           style={{ display: view === "dashboard" ? "block" : "none" }}
         >
           <DashboardHome
-            onRunProject={(name) => {
-              setProjectsQuery(name);
-              setView("projects");
-            }}
+            onRunProject={runFromDashboard}
             onOpenCompanyView={() => setView("company")}
             onOpenSectorView={() => setView("sector")}
             onPrefillSector={(name) => {
