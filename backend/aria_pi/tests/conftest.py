@@ -1,8 +1,8 @@
 """Shared pytest fixtures and helpers for the ARIA-PI backend test suite.
 
 Every test mocks external HTTP so the suite is hermetic — no test ever
-touches the live SEC, PubMed, NIH, ClinicalTrials, Tavily, or Anthropic
-endpoints. `FakeResponse` stands in for a `requests.Response`.
+touches the live SEC, PubMed, NIH, ClinicalTrials, or Tavily endpoints.
+`FakeResponse` stands in for a `requests.Response`.
 """
 import pytest
 

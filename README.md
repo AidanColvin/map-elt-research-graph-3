@@ -96,7 +96,7 @@ A normal "AI report tool" calls a language model. That costs money and needs a k
 2. **Live reports.** Any other company, and every sector scan, is built on demand from free public APIs (SEC EDGAR, Wikipedia, OpenAlex, ClinicalTrials.gov, PubMed, NIH RePORTER). No model. The profile narrative is the company's *own* words, taken from its latest 10-K.
 3. **Deterministic talking points.** The talking-points step is template assembly from data. No model. No key. No cost. It reads the partnership evidence already on hand and writes up to 8 ranked points.
 
-No language model runs anywhere in the request path. No Anthropic or OpenAI key is used or set.
+No language model runs anywhere in the request path. No model API key is used or set.
 
 ## System architecture
 
@@ -168,7 +168,7 @@ flowchart TD
     S --> R["client renders via react-markdown"]
 ```
 
-`findCurated()` (in `map/lib/registry.ts`) cleans the query and checks it against each curated company's slug, name, ticker, and aliases. So `AAPL`, `apple`, and `Apple Inc.` all hit the Apple report. `claude` hits Anthropic. `chatgpt` hits OpenAI.
+`findCurated()` (in `map/lib/registry.ts`) cleans the query and checks it against each curated company's slug, name, ticker, and aliases. So `AAPL`, `apple`, and `Apple Inc.` all hit the Apple report. `chatgpt` hits OpenAI.
 
 ### Live report assembly
 

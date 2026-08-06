@@ -74,7 +74,7 @@ export type ReportData = {
   section7_verification: { label: string; checked: boolean }[];
   references: { id: number; title: string; year: string; publisher: string; url: string }[];
   _validation?: { total_claims: number; verified: number; unverified: number; issues: any[] };
-  _meta?: { claude_live?: boolean; model?: string; seed_companies?: string[]; resolution?: string; generated_at?: string };
+  _meta?: { model?: string; seed_companies?: string[]; resolution?: string; generated_at?: string };
   _stub?: boolean;
 };
 

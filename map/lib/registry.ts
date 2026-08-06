@@ -106,7 +106,7 @@ export const CURATED: CuratedMeta[] = [
   {
     slug: "anthropic",
     name: "Anthropic",
-    aliases: ["anthropic pbc", "claude"],
+    aliases: ["anthropic pbc"],
     type: "Private",
     hq: "San Francisco, CA",
     sector: "Frontier AI",
