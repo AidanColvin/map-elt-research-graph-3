@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readJsonBody, validatePartnership } from '@/lib/proxyGuard';
 import { verifyAuth, clientKey } from '@/lib/verifyAuth';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { redactPeople } from '@/lib/redactPeople';
+import { isApprovedCaller } from '@/lib/serverApproval';
 
 // Never cache — every partnership lookup must hit the backend live.
 export const dynamic = 'force-dynamic';
@@ -48,7 +50,13 @@ export async function POST(req: NextRequest) {
     });
     clearTimeout(timeout);
     const data = await upstream.json();
-    return NextResponse.json(data, {
+    // Named investigators leave this server ONLY for a positively verified,
+    // approved account. Anything else — anonymous, unverifiable, or a
+    // deployment with no service account — is redacted before the response is
+    // written, so the names never travel and cannot be read from the network
+    // tab. See lib/redactPeople.ts.
+    const approved = await isApprovedCaller(decoded);
+    return NextResponse.json(redactPeople(data, approved), {
       status: upstream.status,
       headers: { 'Cache-Control': 'no-store' },
     });

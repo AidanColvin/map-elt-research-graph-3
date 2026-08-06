@@ -126,9 +126,17 @@ nicety. `clearSession()` only forgets the session.
 `x-forwarded-for` — it is caller-controlled and previously defeated the limiter
 outright.
 
-### 7. Add a Content-Security-Policy
-The strongest single mitigation for the XSS that would defeat the storage
-protections above. Currently absent.
+### 7. Tighten the existing Content-Security-Policy
+A CSP is already served from `next.config.mjs`, along with HSTS, `X-Frame-Options:
+DENY`, `nosniff`, `Referrer-Policy: no-referrer` and a `Permissions-Policy`. That
+is a genuinely good baseline — an earlier draft of this document wrongly said it
+was missing.
+
+The remaining weakness is `script-src 'unsafe-inline'`, which is what a CSP is
+mainly there to prevent. Next.js needs it for its inline bootstrap unless nonces
+are wired up. Moving to a nonce-based CSP is the single biggest hardening left
+here, because `'unsafe-inline'` is exactly the gap an injected script would use
+to read the storage this document works to protect.
 
 ### 8. Reconsider Sentry's payload
 `sentry-sdk` runs with `send_default_pii=False` (good). Confirm report content
