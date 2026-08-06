@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FONT } from "./ui";
 import { ACCOUNTS } from "@/components/workspace/accountsData";
 import { authFetch } from "@/lib/authFetch";
+import { openReport } from "@/lib/openReport";
 import { buildMailtoHref } from "@/lib/talkingPoints";
 import { partnershipCsv } from "@/lib/partnershipCsv";
 import PartnershipGraph from "./PartnershipGraph";
@@ -599,7 +600,10 @@ export function buildPartnershipMarkdown(data: PartnerData): string {
     resolvedName.toLowerCase().includes(a.account.toLowerCase())
   );
   if (inventoryMatch?.linkToReport) {
-    L.push(`- 📄 **Partnership Profile on file** — [open the full background profile for ${inventoryMatch.account}](${inventoryMatch.linkToReport})`);
+    // The real report URL is server-gated and never embedded in exportable text
+    // (it would be a dead, tokenless link outside the app). State that a profile
+    // exists; the live "Open profile" button in the app fetches it with auth.
+    L.push(`- 📄 **Partnership Profile on file** for ${inventoryMatch.account} — open it from the Partnerships view (approved accounts).`);
   }
   L.push("");
   L.push("**UNC partnership models**");
@@ -1265,7 +1269,7 @@ export default function PartnershipsView({
                     {inventoryMatch?.linkToReport && (
                       <div style={{ border: "1px solid rgba(0,0,0,0.06)", borderLeft: "4px solid #5b6cff", borderRadius: 12, padding: 16, marginBottom: 18 }}>
                         <p style={{ fontSize: 13.5, fontWeight: 600, margin: "0 0 4px" }}>📄 Partnership Profile on file</p>
-                        <a href={inventoryMatch.linkToReport} target="_blank" rel="noopener noreferrer" style={{ fontSize: 13, fontWeight: 500, color: "#5b6cff", textDecoration: "none" }}>Open the {inventoryMatch.account} profile →</a>
+                        <button onClick={() => void openReport(inventoryMatch.linkToReport)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontSize: 13, fontWeight: 500, color: "#5b6cff" }}>Open the {inventoryMatch.account} profile →</button>
                       </div>
                     )}
                     <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 16 }}>

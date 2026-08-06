@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import type { AccountProfile, UncPartner } from "./accountProfile";
 import { FONT } from "./ui";
+import { openReport, isReportLink } from "@/lib/openReport";
 
 // takes: a headcount (or null)
 // does: formats it with grouped thousands and tabular figures, em dash on null
@@ -403,14 +404,28 @@ export default function InteractiveAccountsTable({
       {v || "—"}
     </span>
   );
-  const link = (href: string, label: string): ReactNode =>
-    href && /^https?:\/\//.test(href) ? (
+  const link = (href: string, label: string): ReactNode => {
+    // Gated report links carry no URL — only an opaque id. Render a button that
+    // exchanges it for the real URL through the auth-gated route on click, so an
+    // internal SharePoint address never sits in the page for a scraper to read.
+    if (isReportLink(href)) {
+      return (
+        <button
+          onClick={(ev) => { ev.stopPropagation(); void openReport(href); }}
+          style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: "#0071e3", fontWeight: 500, fontSize: "inherit" }}
+        >
+          {label} ↗
+        </button>
+      );
+    }
+    return href && /^https?:\/\//.test(href) ? (
       <a href={href} target="_blank" rel="noreferrer" title={href} onClick={(ev) => ev.stopPropagation()} style={{ color: "#0071e3", textDecoration: "none", fontWeight: 500 }}>
         {label} ↗
       </a>
     ) : (
       <span style={{ color: "#c7c7cc" }}>{href || "—"}</span>
     );
+  };
   // Normalizes a website value (which may omit the scheme) into a full URL.
   const toHref = (url: string): string => (url && !/^https?:\/\//i.test(url) ? `https://${url}` : url);
   const host = (url: string): string => {

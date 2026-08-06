@@ -96,10 +96,20 @@ rules restrict `accounts/{fingerprint}` to owner-write, self-read.
 Until this exists, every other item is defense in depth on a gate that can be
 stepped around.
 
-### 2. Stop shipping the partner table to the client wholesale
-`accountsData.ts` is compiled into the JS bundle, so the full table is in any
-visitor's browser before a single permission check runs. Client-side gating
-cannot un-ship it. Serve it from an authenticated endpoint, paginated.
+### 2. Stop shipping the partner table to the client wholesale — PARTLY DONE
+`accountsData.ts` is compiled into the JS bundle, so the public company facts
+(name, revenue, employees, sector — all SEC-public) are in any visitor's
+browser before a permission check runs. That remains true and is the next
+structural fix: serve the facts from an authenticated, paginated endpoint.
+
+**What is already fixed:** the genuinely sensitive part of that table — the
+internal SharePoint report URLs, complete with their `?e=` share tokens — was in
+the bundle too and was retrievable by an anonymous GET of a `/_next` chunk (a
+confirmed breach). Those URLs now live only in `lib/reportLinks.ts`, a
+server-side module the client cannot import, keyed by an opaque id. The browser
+carries only `/api/report-link?r=<id>`; the real URL is handed out by that route
+solely to a verified, approved caller (fail closed), and the app opens it via an
+authenticated fetch. No internal URL or share token ships to the browser.
 
 ### 3. Decide the policy on named investigators
 This is a judgement call, not a code change, and it should be made explicitly:

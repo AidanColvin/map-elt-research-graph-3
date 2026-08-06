@@ -13,16 +13,9 @@ import { deriveEmployees } from "./accountEnrich";
  * Report links are auth-gated UNC SharePoint URLs (sign-in required).
  */
 
-// Shared SharePoint folder prefix for the "Link to report" PDFs.
-const RPT =
-  "https://adminliveunc.sharepoint.com/:b:/r/sites/UNCInnovateCarolinaIndustryPartnerships-ResearchAnalyticsIntelligence/Shared%20Documents/Partnership%20Inventory%20Profiles%20(due%20June%208)/";
-
-// takes: a filename and its SharePoint share token
-// does: assembles the full auth-gated report URL from the shared folder prefix
-// returns: the complete "Link to report" URL string
-function rpt(file: string, e: string): string {
-  return `${RPT}${file}?csf=1&web=1&e=${e}`;
-}
+// Report links are opaque ids here; the real auth-gated SharePoint URLs live
+// server-side in lib/reportLinks.ts and are served only to approved callers
+// via /api/report-link. No internal URL or share token ships to the browser.
 
 // takes: a partial AccountProfile (only the fields present in the source)
 // does: fills every missing AccountProfile field with an empty string so the
@@ -97,7 +90,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (Amazon.com, Inc., fiscal year ended Dec 31, 2025, filed Feb 2026) \u2014 https://www.sec.gov/Archives/edgar/data/0001018724/000101872426000004/amzn-20251231.htm",
-    linkToReport: rpt("Amazon_Web_Services_(AWS)_Partnership_Profile.pdf", "47XvoE"),
+    linkToReport: "/api/report-link?r=a84aeda3c5",
   }),
   row({
     account: "Anthropic",
@@ -119,7 +112,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.anthropic.com (official website; company page https://www.anthropic.com/company)",
-    linkToReport: rpt("Anthropic_Partnership_Profile.pdf", "vjBY3C"),
+    linkToReport: "/api/report-link?r=e27a8ba71a",
   }),
   row({
     account: "Apple",
@@ -141,7 +134,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Sept 27, 2025, filed Oct 31, 2025) \u2014 https://www.sec.gov/Archives/edgar/data/0000320193/000032019325000079/aapl-20250927.htm",
-    linkToReport: rpt("Apple_Partnership_Profile.pdf", "jPYNnQ"),
+    linkToReport: "/api/report-link?r=e22c62bc1f",
   }),
   row({
     account: "Bayer (AskBio)",
@@ -164,7 +157,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "Bayer Annual Report 2025 (German public company; not SEC 10-K) \u2014 https://www.bayer.com/sites/default/files/2026-03/bayer-annual-report-2025.pdf; AskBio site https://www.askbio.com",
-    linkToReport: rpt("Bayer_AskBio_UNC_Partner_Profile.pdf", "m7vIrx"),
+    linkToReport: "/api/report-link?r=693d8fa6e6",
   }),
   row({
     account: "BD",
@@ -186,7 +179,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Sept 30, 2025, filed Nov 25, 2025) \u2014 https://www.sec.gov/Archives/edgar/data/0000010795/000001079525000099/bdx-20250930.htm",
-    linkToReport: rpt("BD_UNC_Partner_Profile.pdf", "48J7m8"),
+    linkToReport: "/api/report-link?r=3afdb1fbdc",
   }),
   row({
     account: "Blue Cross Blue Shield NC",
@@ -209,7 +202,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.bluecrossnc.com (corporate fact sheet at https://mediacenter.bcbsnc.com/resources/reports); 2025 results: https://businessnc.com/n-c-blue-cross-posts-497m-loss-15-revenue-decline-in-2025/",
-    linkToReport: rpt("Blue%20Cross%20Blue%20Shield%20NC.pdf", "o240Ym"),
+    linkToReport: "/api/report-link?r=b977b22d81",
   }),
   row({
     account: "BMS",
@@ -231,7 +224,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Dec 31, 2025, filed Feb 2026) \u2014 https://www.sec.gov/Archives/edgar/data/0000014272/000001427226000004/bmy-20251231.htm",
-    linkToReport: rpt("BMS_UNC_Partner_Profile.pdf", "YO5nRG"),
+    linkToReport: "/api/report-link?r=bca0eff80c",
   }),
   row({
     account: "Bandwidth",
@@ -274,7 +267,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended July 26, 2025), filed September 2025 \u2014 https://www.sec.gov/Archives/edgar/data/0000858877/000085887725000111/csco-20250726.htm",
-    linkToReport: rpt("Cisco_UNC_Partner_Profile.pdf", "19k9wp"),
+    linkToReport: "/api/report-link?r=2c1e287930",
   }),
   row({
     account: "Databricks",
@@ -296,7 +289,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.databricks.com/company/newsroom/press-releases/databricks-grows-65-yoy-surpasses-5-4-billion-revenue-run-rate",
-    linkToReport: rpt("Databricks_Partnership_Profile.pdf", "19gi4K"),
+    linkToReport: "/api/report-link?r=31c1fbb96a",
   }),
   row({
     account: "Duke Energy",
@@ -339,7 +332,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed February 12, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0000059478/000005947826000013/lly-20251231.htm",
-    linkToReport: rpt("EliLilly_UNC_Partner_Profile.pdf", "6Hc14H"),
+    linkToReport: "/api/report-link?r=2ea96a0c4f",
   }),
   row({
     account: "Epic Games",
@@ -362,7 +355,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.epicgames.com/site/en-US/about",
-    linkToReport: rpt("Epic_Games_Partnership_Profile.pdf", "PyCROc"),
+    linkToReport: "/api/report-link?r=1a3300ab56",
   }),
   row({
     account: "Eshelman Institute for Innovation",
@@ -385,7 +378,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://eshelmaninnovation.org/about/ and https://www.unc.edu/posts/2024/03/13/eshelman-innovation-begins-its-second-decade/",
-    linkToReport: rpt("Google_Partnership_Profile.pdf", "6KDubq"),
+    linkToReport: "/api/report-link?r=6d32dfbe4c",
   }),
   row({
     account: "Fred Eshelman",
@@ -407,7 +400,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.eshelmanventures.com/about; https://pharmacy.unc.edu/history/",
-    linkToReport: rpt("IBM_UNC_Partner_Profile.pdf", "R7ZPUP"),
+    linkToReport: "/api/report-link?r=18be74ba43",
   }),
   row({
     account: "Google",
@@ -430,7 +423,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Dec 31, 2025), filed February 4, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0001652044/000165204426000018/goog-20251231.htm",
-    linkToReport: rpt("Leidos_Partnership_Profile.pdf", "MjTsmB"),
+    linkToReport: "/api/report-link?r=85ab45614b",
   }),
   row({
     account: "Golden LEAF Foundation",
@@ -452,7 +445,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://goldenleaf.org (grant database: https://goldenleaf.org/grant-search/)",
-    linkToReport: rpt("GoldenLEAF_UNC_Partner_Profile.pdf", "d6C3m9"),
+    linkToReport: "/api/report-link?r=2dfe5259fc",
   }),
   row({
     account: "IBM",
@@ -474,7 +467,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Dec 31, 2025), filed February 24, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0000051143/000005114326000010/ibm-20251231.htm",
-    linkToReport: rpt("Lenovo_UNC_Partner_Profile.pdf", "TZ67oe"),
+    linkToReport: "/api/report-link?r=3fe3df9fc0",
   }),
   row({
     account: "GSK",
@@ -496,7 +489,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 20-F FY2025 (year ended Dec 31, 2025), filed March 6, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0001131399/000113139926000004/gsk-20251231.htm",
-    linkToReport: rpt("GSK_UNC_Partner_Profile.pdf", "IXn0Xu"),
+    linkToReport: "/api/report-link?r=81d0e6b961",
   }),
   row({
     account: "Hatteras Venture Partners",
@@ -518,7 +511,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://hatterasvp.com",
-    linkToReport: rpt("Hatteras_UNC_Partner_Profile.pdf", "S2NZpk"),
+    linkToReport: "/api/report-link?r=06e2aa370d",
   }),
   row({
     account: "IQVIA",
@@ -540,7 +533,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Dec 31, 2025), filed February 2026 \u2014 https://s201.q4cdn.com/580005511/files/doc_financials/2025/q4/IQV-2025-12-31-10K_Filed-with-exhibits.pdf (EDGAR: https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=0001478242&type=10-K)",
-    linkToReport: rpt("IQVIA_UNC_Partner_Profile.pdf", "6wFU7v"),
+    linkToReport: "/api/report-link?r=f8d5f8708a",
   }),
   row({
     account: "Johnson & Johnson",
@@ -562,7 +555,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended December 28, 2025), filed February 11, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0000200406/000020040626000016/jnj-20251228.htm",
-    linkToReport: rpt("JohnsonJohnson_UNC_Partner_Profile.pdf", "Evo9ds"),
+    linkToReport: "/api/report-link?r=85a2feecdf",
   }),
   row({
     account: "Labcorp",
@@ -584,7 +577,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed February 24, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/920148/000092014826000111/lh-20251231.htm",
-    linkToReport: rpt("Labcorp_Profile_6_9_2026.pdf", "XBHvlq"),
+    linkToReport: "/api/report-link?r=a570367d13",
   }),
   row({
     account: "Leidos",
@@ -606,7 +599,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended January 2, 2026), filed February 17, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/1336920/000133692026000030/ldos-20260102.htm",
-    linkToReport: rpt("Leidos_Partnership_Profile.pdf", "SWegHO"),
+    linkToReport: "/api/report-link?r=9fa975660e",
   }),
   row({
     account: "Lenovo",
@@ -629,7 +622,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "Lenovo FY2025/26 Q4 and full-year results announcement (May 2026) \u2014 https://investor.lenovo.com/en/financial/results/press_2526_q4.pdf ; https://news.lenovo.com/pressroom/press-releases/fy-2025-26/ (not SEC-registered; HKEX filer)",
-    linkToReport: rpt("Meta_Partnership_Profile.pdf", "FIKd9j"),
+    linkToReport: "/api/report-link?r=17274fd9fa",
   }),
   row({
     account: "Lockheed Martin",
@@ -651,7 +644,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed January 29, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/936468/000162828026004195/lmt-20251231.htm",
-    linkToReport: rpt("Microsoft_Partnership_Profile.pdf", "k7YntB"),
+    linkToReport: "/api/report-link?r=8c93d69efe",
   }),
   row({
     account: "Merck",
@@ -673,7 +666,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed February 24, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/310158/000031015826000063/mrk-20251231.htm",
-    linkToReport: rpt("Merck_UNC_Partner_Profile.pdf", "5f2peS"),
+    linkToReport: "/api/report-link?r=6dbdf711f3",
   }),
   row({
     account: "NC Commerce",
@@ -696,7 +689,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.commerce.nc.gov/about-us",
-    linkToReport: rpt("NCCommerce_UNC_Partner_Profile.pdf", "LiDAUI"),
+    linkToReport: "/api/report-link?r=086383f198",
   }),
   row({
     account: "Meta",
@@ -718,7 +711,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed January 28, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0001326801/000162828026003942/meta-20251231.htm",
-    linkToReport: rpt("NVIDIA_Partnership_Profile.pdf", "F43erM"),
+    linkToReport: "/api/report-link?r=877295c981",
   }),
   row({
     account: "Microsoft",
@@ -740,7 +733,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed July 30, 2025 \u2014 https://www.sec.gov/Archives/edgar/data/0000789019/000095017025100235/msft-20250630.htm",
-    linkToReport: rpt("Microsoft_Partnership_Profile.pdf", "XiSJJk"),
+    linkToReport: "/api/report-link?r=9628a8546d",
   }),
   row({
     account: "NVIDIA",
@@ -762,7 +755,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2026, filed February 25, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0001045810/000104581026000021/nvda-20260125.htm",
-    linkToReport: rpt("Oracle_Partnership_Profile.pdf", "4VilOX"),
+    linkToReport: "/api/report-link?r=41b646dd0b",
   }),
   row({
     account: "NCDHHS",
@@ -785,7 +778,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.ncdhhs.gov/about/overview; NC General Assembly HHS budget highlights \u2014 https://webservices.ncleg.gov/ViewDocSiteFile/83432",
-    linkToReport: rpt("NCDHHS_UNC_Partner_Profile.pdf", "bX1RQJ"),
+    linkToReport: "/api/report-link?r=e41ce7472a",
   }),
   row({
     account: "OpenAI",
@@ -808,7 +801,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://openai.com (company and structure pages: https://openai.com/our-structure/)",
-    linkToReport: rpt("OpenAI_Partnership_Profile.pdf", "0so8wa"),
+    linkToReport: "/api/report-link?r=503705a0bd",
   }),
   row({
     account: "Oracle",
@@ -830,7 +823,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed June 18, 2025 \u2014 https://www.sec.gov/Archives/edgar/data/0001341439/000095017025087926/orcl-20250531.htm",
-    linkToReport: rpt("RedHat_IBM_UNC_Partner_Profile.pdf", "XvL3qS"),
+    linkToReport: "/api/report-link?r=5ecce28185",
   }),
   row({
     account: "Pfizer",
@@ -852,7 +845,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed February 26, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0000078003/000007800326000026/pfe-20251231.htm",
-    linkToReport: rpt("Pfizer_Profile_6_9_2026.pdf", "qNNHMe"),
+    linkToReport: "/api/report-link?r=062e2dfba5",
   }),
   row({
     account: "Palantir Technologies",
@@ -874,7 +867,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025, filed Feb 17, 2026 \u2014 https://investors.palantir.com/files/2025%20FY%20PLTR%2010-K.pdf (EDGAR CIK 1321655)",
-    linkToReport: rpt("Salesforce_Partnership_Profile.pdf", "yrNeIU"),
+    linkToReport: "/api/report-link?r=9693af4dcb",
   }),
   row({
     account: "Red Hat (IBM)",
@@ -896,7 +889,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended Dec 31, 2025), filed February 24, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0000051143/000005114326000010/ibm-20251231.htm",
-    linkToReport: rpt("SAS_Institute_UNC_Partner_Profile.pdf", "53M9cQ"),
+    linkToReport: "/api/report-link?r=20ec35fcee",
   }),
   row({
     account: "Salesforce",
@@ -918,7 +911,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2026 (period ended Jan 31, 2026), filed Mar 2, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0001108524/000110852426000060/crm-20260131.htm",
-    linkToReport: rpt("Snowflake_Partnership_Profile.pdf", "0KVVb3"),
+    linkToReport: "/api/report-link?r=ef2333b474",
   }),
   row({
     account: "SAS Institute",
@@ -940,7 +933,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://www.sas.com/en_us/company-information.html (private company; figures per company profile sources, e.g., https://craft.co/sas)",
-    linkToReport: rpt("Splunk_Cisco_UNC_Partner_Profile.pdf", "4cXuMP"),
+    linkToReport: "/api/report-link?r=ec8795a6b3",
   }),
   row({
     account: "Snowflake",
@@ -962,7 +955,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2026 (period ended Jan 31, 2026), filed/signed Mar 20, 2026 \u2014 https://www.sec.gov/Archives/edgar/data/0001640147/000164014726000008/snow-20260131.htm",
-    linkToReport: rpt("Snowflake_Partnership_Profile.pdf", "ceIAHB"),
+    linkToReport: "/api/report-link?r=be9f636a0c",
   }),
   row({
     account: "Splunk (Cisco)",
@@ -984,7 +977,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "SEC Form 10-K FY2025 (fiscal year ended July 26, 2025), filed September 2025 \u2014 https://www.sec.gov/Archives/edgar/data/0000858877/000085887725000111/csco-20250726.htm",
-    linkToReport: rpt("Splunk_Cisco_UNC_Partner_Profile.pdf", "H4oJeG"),
+    linkToReport: "/api/report-link?r=8108c8c035",
   }),
   row({
     account: "USAMRDC",
@@ -1007,7 +1000,7 @@ const CORE_ACCOUNTS: AccountProfile[] = [
     researchBy: "Map research (SEC EDGAR)",
     dateOfResearch: "2026-06-12",
     resources: "https://mrdc.health.mil/index.cfm/about/headquarters; https://mrdc.health.mil/index.cfm/about/mission_vision",
-    linkToReport: rpt("USAMRDC_UNC_Partner_Profile.pdf", "Xdltbv"),
+    linkToReport: "/api/report-link?r=93c098eb99",
   }),
 ];
 
