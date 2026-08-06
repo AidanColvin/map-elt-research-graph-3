@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Intro from "@/components/Intro";
-import AuthGate, { clearSession, type MapUser } from "@/components/AuthGate";
+import AuthGate, { clearSession, getSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
@@ -10,6 +10,7 @@ import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
 import PartnershipsView from "@/components/workspace/PartnershipsView";
 import SignInRequired from "@/components/workspace/SignInRequired";
+import PendingApproval from "@/components/workspace/PendingApproval";
 import ProjectsCanvas from "@/components/workspace/ProjectsCanvas";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
@@ -255,16 +256,27 @@ export default function MapHome() {
     setUser(null);
   };
 
-  // Skip the intro animation when ?screenshot=1 is present (used by the
-  // Playwright screenshot harness): dismiss the intro and seed the same guest
-  // session the "Continue as guest" button creates, so the dashboard renders
-  // immediately. Read window only after mount to avoid a hydration mismatch —
-  // the server always renders with showIntro = true and no user.
+  // Two test escape hatches, read only after mount to avoid a hydration
+  // mismatch (the server always renders with showIntro = true and no user):
+  //
+  //   ?screenshot=1 — dismiss the intro AND seed the guest session, so the
+  //                   dashboard renders immediately for the screenshot harness.
+  //   ?skipIntro=1  — dismiss the intro ONLY, leaving the visitor signed out so
+  //                   the real sign-in and approval flow can be exercised.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has("screenshot")) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has("screenshot")) {
       setShowIntro(false);
       setUser({ email: "guest", guest: true, role: "user" });
+      return;
     }
+    if (params.has("skipIntro")) setShowIntro(false);
+
+    // Restore a previous session. Without this the session was written on
+    // sign-in but never read back, so every refresh silently signed the user
+    // out and their saved projects looked as though they had vanished.
+    const stored = getSession();
+    if (stored) setUser(stored);
   }, []);
 
   // Keep the browser tab title in step with the active view (this is an SPA, so
@@ -343,6 +355,21 @@ export default function MapHome() {
   if (showIntro) {
     return <Intro onDone={() => setShowIntro(false)} />;
   }
+  // A registered account that the owner has not approved never reaches the
+  // workspace. Guests are exempt: they were never in the queue, and the views
+  // that carry identifiable data already turn them away on their own.
+  if (user && !user.guest && user.status && user.status !== "approved") {
+    return (
+      <PendingApproval
+        user={user}
+        onSignOut={() => {
+          clearSession();
+          setUser(null);
+        }}
+      />
+    );
+  }
+
   if (!user) {
     return <AuthGate onDone={setUser} />;
   }

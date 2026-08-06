@@ -9,13 +9,19 @@ import {
   OAuthProvider,
 } from "firebase/auth";
 import { firebaseEnabled, getFirebaseAuth } from "@/lib/firebase";
+import { hashPassword, verifyPassword, type StoredCredential } from "@/lib/credentials";
+import { requestAccess, statusFor, type ApprovalStatus } from "@/lib/accountApproval";
+import { createVault, emailFingerprint, maskEmail } from "@/lib/ownerVault";
 
 /**
  * Keyless auth gate shown after the intro animation.
  *
  * - Email/password accounts live entirely in the browser (localStorage) —
  *   no server, no database, no API keys, consistent with the project's
- *   "completely free to run" rule.
+ *   "completely free to run" rule. Only a salted PBKDF2 digest is stored;
+ *   the plaintext password is never persisted (see lib/credentials.ts).
+ * - A new account is PENDING until an owner approves it (lib/accountApproval.ts),
+ *   so registering does not by itself grant access to the data views.
  * - Google / Microsoft buttons are present but real OAuth requires
  *   registering client IDs with those providers, so they explain that and
  *   offer guest mode instead.
@@ -24,14 +30,21 @@ import { firebaseEnabled, getFirebaseAuth } from "@/lib/firebase";
 
 export type MapRole = "developer" | "user";
 export type MapUser = {
+  /**
+   * The MASKED address (`a•••e@example.com`), never the real one. The session
+   * object is plain localStorage; storing the real address here would have
+   * republished it to anything that can read storage, undoing the sealing done
+   * in lib/ownerVault.ts. "guest" for guest sessions.
+   */
   email: string;
+  /** SHA-256 of the real address. Scopes per-user storage without revealing it. */
+  fingerprint?: string;
   guest: boolean;
   role: MapRole;
   // Optional display name (e.g. from a Google profile).
   name?: string;
-  // The plaintext password is held ONLY in memory for the current session so
-  // the account page can show/copy it; it is never written to storage.
-  password?: string;
+  // Owner-approval state. Absent for guests, who never enter the queue.
+  status?: ApprovalStatus;
 };
 
 const USERS_KEY = "map.users";
@@ -68,7 +81,7 @@ export function clearSession() {
   } catch {}
 }
 
-function loadUsers(): Record<string, string> {
+function loadUsers(): Record<string, StoredCredential> {
   try {
     return JSON.parse(localStorage.getItem(USERS_KEY) || "{}");
   } catch {
@@ -168,6 +181,32 @@ function GoogleIcon() {
   );
 }
 
+// takes: a verified email address
+// does: resolves the account's approval state, enrolling it on first sight.
+//       Developer emails are pre-trusted so the owner is never locked out of
+//       their own approval queue.
+// returns: the approval status
+async function resolveStatus(email: string): Promise<ApprovalStatus> {
+  const existing = await statusFor(email);
+  if (existing) return existing;
+  return requestAccess(email, roleForEmail(email) === "developer");
+}
+
+// takes: the signing-in email and the password just entered
+// does: creates the owner key vault on the owner's first sign-in, so later
+//       signups have a public key to seal their address to. The password never
+//       leaves this call — it only derives the wrapping key.
+// returns: nothing
+async function bootstrapOwnerVault(email: string, password: string): Promise<void> {
+  if (roleForEmail(email) !== "developer") return;
+  try {
+    await createVault(password);
+  } catch {
+    // A missing SubtleCrypto (non-secure origin) must not block sign-in; the
+    // roster simply stores masks and fingerprints without a sealed address.
+  }
+}
+
 export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }) {
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [email, setEmail] = useState("");
@@ -178,14 +217,13 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
   // form instead of doing a jarring full-page redirect during Firebase calls.
   const [busy, setBusy] = useState<null | "email" | "Google" | "Microsoft">(null);
 
-  // takes: the signed-in MapUser (may include an in-memory password)
-  // does: persists a sanitized session (never the password) and hands the
-  //       full in-memory user to the app
+  // takes: the signed-in MapUser
+  // does: persists the session (no credential material is ever included) and
+  //       hands the user to the app
   // returns: nothing
   function finish(user: MapUser) {
     try {
-      const { password, ...safe } = user;
-      localStorage.setItem(SESSION_KEY, JSON.stringify(safe));
+      localStorage.setItem(SESSION_KEY, JSON.stringify(user));
     } catch {}
     onDone(user);
   }
@@ -228,12 +266,14 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
           mode === "signup"
             ? await createUserWithEmailAndPassword(auth, em, password)
             : await signInWithEmailAndPassword(auth, em, password);
+        await bootstrapOwnerVault(em, password);
         finish({
-          email: cred.user.email || em,
+          email: maskEmail(cred.user.email || em),
+          fingerprint: await emailFingerprint(em),
           guest: false,
           role: roleForEmail(em),
           name: cred.user.displayName || undefined,
-          password,
+          status: await resolveStatus(em),
         });
       } catch (err) {
         setError(prettyError(err));
@@ -243,21 +283,48 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       return;
     }
 
-    // Keyless browser-local fallback.
-    const users = loadUsers();
-    const existing = users[em];
-    if (existing === undefined) {
-      users[em] = password;
-      try {
-        localStorage.setItem(USERS_KEY, JSON.stringify(users));
-      } catch {}
-      finish({ email: em, guest: false, role: roleForEmail(em), password });
-      return;
+    // Keyless browser-local fallback. Only a salted PBKDF2 digest is stored —
+    // the plaintext password is never written anywhere (see lib/credentials.ts).
+    setBusy("email");
+    try {
+      await bootstrapOwnerVault(em, password);
+      const users = loadUsers();
+      // The credential store is keyed by fingerprint too — keying it by address
+      // would republish every user's email in localStorage key names.
+      const accountKey = await emailFingerprint(em);
+      const existing = users[accountKey];
+
+      if (existing === undefined) {
+        if (mode === "login") {
+          // Do not silently create an account on a login attempt: a typo in the
+          // email would otherwise register a new one and look like success.
+          return setError("No account found for that email. Create one first.");
+        }
+        users[accountKey] = await hashPassword(password);
+        try {
+          localStorage.setItem(USERS_KEY, JSON.stringify(users));
+        } catch {}
+        // Developer emails are pre-trusted; everyone else joins the queue.
+        const status = await resolveStatus(em);
+        finish({ email: maskEmail(em), fingerprint: accountKey, guest: false, role: roleForEmail(em), status });
+        return;
+      }
+
+      if (!(await verifyPassword(password, existing))) {
+        // Same wording for a wrong password and an unknown one on this path, so
+        // the form does not confirm which emails are registered.
+        return setError("Incorrect email or password.");
+      }
+      finish({
+        email: maskEmail(em),
+        fingerprint: accountKey,
+        guest: false,
+        role: roleForEmail(em),
+        status: await resolveStatus(em),
+      });
+    } finally {
+      setBusy(null);
     }
-    if (existing !== password) {
-      return setError("Incorrect password for this account. Try again.");
-    }
-    finish({ email: em, guest: false, role: roleForEmail(em), password });
   }
 
   // takes: "Google" or "Microsoft"
@@ -285,10 +352,12 @@ export default function AuthGate({ onDone }: { onDone: (user: MapUser) => void }
       const cred = await signInWithPopup(auth, p);
       const em = (cred.user.email || "").toLowerCase();
       finish({
-        email: cred.user.email || provider,
+        email: em ? maskEmail(em) : provider,
+        fingerprint: em ? await emailFingerprint(em) : undefined,
         guest: false,
         role: roleForEmail(em),
         name: cred.user.displayName || undefined,
+        status: await resolveStatus(em),
       });
     } catch (err) {
       setError(prettyError(err));

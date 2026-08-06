@@ -49,13 +49,35 @@ export function savedId(kind: SavedKind, query: string): string {
   return `${kind}:${normalizeQuery(query)}`;
 }
 
+// takes: an email address
+// does: derives a short, stable, non-reversible namespace id for it
+// returns: a hex digest fragment
+//
+// The namespace used to be the raw address (`map:saved:email:alice@example.com`),
+// which published every user's real email in localStorage KEY NAMES — readable
+// without opening a single value. A synchronous FNV-1a digest is used rather
+// than SubtleCrypto because every caller here is synchronous; this is a privacy
+// namespace, not a security boundary, so a non-cryptographic hash is the right
+// tool as long as it does not carry the address itself.
+function namespaceFor(email: string): string {
+  let hash = 0x811c9dc5;
+  const normalized = email.trim().toLowerCase();
+  for (let i = 0; i < normalized.length; i++) {
+    hash ^= normalized.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return `u${hash.toString(16).padStart(8, "0")}`;
+}
+
 // takes: the current MapUser (or null)
 // does: resolves the storage scope — the Firebase uid (when a real account is
-//       signed in) and the localStorage namespace key
+//       signed in) and an opaque localStorage namespace that never contains the
+//       user's address
 // returns: { uid, localKey }
 function scopeOf(user: MapUser | null): { uid: string | null; localKey: string } {
   const uid = !user?.guest ? getFirebaseAuth()?.currentUser?.uid ?? null : null;
-  const localKey = uid ?? (user && !user.guest ? `email:${user.email}` : "guest");
+  const localKey =
+    uid ?? (user && !user.guest ? user.fingerprint ?? namespaceFor(user.email) : "guest");
   return { uid, localKey };
 }
 

@@ -3,13 +3,14 @@
 /*
  * AccountView — the /account page (reached via the Profile button).
  * # takes: { user: MapUser; onSignOut: () => void }
- * # does: shows the signed-in account's Name, Email, Role and password
+ * # does: shows the signed-in account's Name, Email, Role and access state
  *         (masked by default, with a one-click copy), plus sign out
  * # returns: JSX for the account page
  */
 
 import { useState } from "react";
 import type { MapUser } from "@/components/AuthGate";
+import ApprovalsPanel from "@/components/workspace/ApprovalsPanel";
 import type { SavedReportsState } from "./useSavedReports";
 import type { SavedReport } from "@/lib/savedReports";
 import { relativeTime } from "./SavedReports";
@@ -30,6 +31,16 @@ function displayName(user: MapUser): string {
 // does: renders the account page UI (single component; the copy handler is its
 //       own single-responsibility function)
 // returns: the account view element
+// takes: the signed-in user
+// does: describes the account's owner-approval state in plain words
+// returns: the label shown on the Account page
+function accessLabel(user: MapUser): string {
+  if (user.guest) return "Guest — reports only";
+  if (user.status === "approved") return "Approved";
+  if (user.status === "denied") return "Not approved";
+  return "Waiting for owner approval";
+}
+
 export default function AccountView({
   user,
   onSignOut,
@@ -41,26 +52,6 @@ export default function AccountView({
   saved: SavedReportsState;
   onOpenProject: (r: SavedReport) => void;
 }) {
-  const [revealed, setRevealed] = useState(false);
-  const [copied, setCopied] = useState(false);
-
-  const hasPassword = Boolean(user.password);
-
-  // takes: nothing
-  // does: copies the unmasked password to the clipboard via the Clipboard API,
-  //       then briefly flips the button label to "Copied"
-  // returns: nothing (async)
-  async function copyPassword() {
-    if (!user.password) return;
-    try {
-      await navigator.clipboard.writeText(user.password);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard unavailable — no-op */
-    }
-  }
-
   return (
     <CanvasCard title="Account">
       <div style={{ padding: "24px 28px 32px", fontFamily: FONT }}>
@@ -105,41 +96,20 @@ export default function AccountView({
         <Field label="Name" value={displayName(user)} />
         <Field label="Email" value={user.guest ? "—" : user.email} />
 
-        {/* Password row — masked by default, with reveal + copy. */}
+        {/* Password is never displayed. It is not held in the session and is
+            not recoverable by design — only a salted digest is stored. */}
         <div style={{ padding: "12px 0", borderTop: "1px solid rgba(0,0,0,0.06)" }}>
           <div style={{ fontSize: 12, color: "#a3a3a3", marginBottom: 6 }}>Password</div>
-          {hasPassword ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                readOnly
-                type={revealed ? "text" : "password"}
-                value={user.password}
-                style={{
-                  flex: 1,
-                  border: "1px solid rgba(0,0,0,0.1)",
-                  borderRadius: 10,
-                  padding: "9px 12px",
-                  fontSize: 14,
-                  fontFamily: FONT,
-                  background: "#fafafa",
-                  color: "#1d1d1f",
-                }}
-              />
-              <button className="ws-btn" style={btn} onClick={() => setRevealed((r) => !r)}>
-                {revealed ? "Hide" : "Show"}
-              </button>
-              <button className="ws-btn" style={btn} onClick={copyPassword}>
-                {copied ? "Copied" : "Copy"}
-              </button>
-            </div>
-          ) : (
-            <div style={{ fontSize: 13.5, color: "#86868b", lineHeight: 1.5 }}>
-              {user.guest
-                ? "Guests don't have a password."
-                : "Signed in with Google — there's no password to display. Passwords are managed securely by Firebase and are never stored by this app."}
-            </div>
-          )}
+          <div style={{ fontSize: 13.5, color: "#86868b", lineHeight: 1.5 }}>
+            {user.guest
+              ? "Guests don't have a password."
+              : "Stored as a salted hash and never shown. Nothing here — or in this browser — can read it back."}
+          </div>
         </div>
+
+        <Field label="Access" value={accessLabel(user)} />
+
+        <ApprovalsPanel user={user} />
 
         {/* Projects — the reports this account has saved to review later.
             Reopening shows the saved copy instantly (it re-verifies freshness
