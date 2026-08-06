@@ -9,6 +9,7 @@ import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
 import PartnershipsView from "@/components/workspace/PartnershipsView";
+import SignInRequired from "@/components/workspace/SignInRequired";
 import ProjectsCanvas from "@/components/workspace/ProjectsCanvas";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
@@ -32,12 +33,17 @@ type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "
 // "company" route is the one-company report generator and reads "Companies".
 // The view keys stay "accounts" and "company" so nothing that references the
 // routes breaks.
-const VIEWS: { key: View; label: string }[] = [
+//
+// `requiresAccount` marks the views whose contents name real people or list the
+// full partner table. Guests can still reach the tab (hiding it would be more
+// confusing than explaining it), but the view itself asks them to sign in —
+// see components/workspace/SignInRequired.tsx.
+const VIEWS: { key: View; label: string; requiresAccount?: boolean }[] = [
   { key: "dashboard", label: "Home" },
   { key: "company", label: "Companies" },   // single-company report generator
   { key: "sector", label: "Sectors" },
-  { key: "partnerships", label: "Partnerships" },
-  { key: "accounts", label: "Directory" },  // the big company table
+  { key: "partnerships", label: "Partnerships", requiresAccount: true },
+  { key: "accounts", label: "Directory", requiresAccount: true },  // the big company table
   { key: "projects", label: "Projects" },
 ];
 
@@ -240,6 +246,15 @@ export default function MapHome() {
   // guests). Lives at the page level so every view shares one synced list.
   const saved = useSavedReports(user);
 
+  // takes: nothing
+  // does: drops the guest session so AuthGate re-renders and the visitor can
+  //       sign in for a view that names people (Directory / Partnerships)
+  // returns: nothing
+  const handleSignInFromGuest = () => {
+    clearSession();
+    setUser(null);
+  };
+
   // Skip the intro animation when ?screenshot=1 is present (used by the
   // Playwright screenshot harness): dismiss the intro and seed the same guest
   // session the "Continue as guest" button creates, so the dashboard renders
@@ -430,14 +445,18 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <AccountsCanvas
-            extraRows={packageRows}
-            onRunDeepDive={(name) => {
-              setCompanyDraft(name);
-              dive.run(name);
-              setView("company");
-            }}
-          />
+          {user.guest ? (
+            <SignInRequired viewLabel="Directory" onSignIn={handleSignInFromGuest} />
+          ) : (
+            <AccountsCanvas
+              extraRows={packageRows}
+              onRunDeepDive={(name) => {
+                setCompanyDraft(name);
+                dive.run(name);
+                setView("company");
+              }}
+            />
+          )}
         </div>
 
         {/* Partnerships is an in-app view (not a route), so switching to it
@@ -454,7 +473,11 @@ export default function MapHome() {
           {/* White canvas panel — matches the Company view so the UNC page reads
               on white, not the grey page background. */}
           <section style={{ ...cardStyle, padding: "26px 28px 36px" }}>
-            <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
+            {user.guest ? (
+              <SignInRequired viewLabel="Partnerships" onSignIn={handleSignInFromGuest} />
+            ) : (
+              <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
+            )}
           </section>
         </div>
 

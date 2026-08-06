@@ -11,7 +11,7 @@ Flow per request:
   4. Validate sources against the blocklist (no Wikipedia / aggregators).
   5. Return the report.
 """
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, Field, conlist, constr
@@ -86,6 +86,66 @@ app.add_middleware(
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Content-Type"],
 )
+
+# Every valid request body here is a flat object of short strings, so a 16 KB
+# cap matches the frontend proxy's own limit and rejects pathological payloads
+# before Pydantic ever parses them.
+MAX_BODY_BYTES = 16 * 1024
+
+
+@app.middleware("http")
+async def guard_request_body(request: Request, call_next):
+    """Reject oversized or pathologically nested JSON before it is parsed.
+
+    Python's JSON parser recurses per nesting level, so a deeply nested body
+    raised RecursionError inside Pydantic and surfaced as an unhandled 500.
+    Bounding size and depth here turns that into a clean 413/400.
+
+    Takes: request — the incoming request; call_next — the next ASGI handler.
+    Gives: the downstream response, or a 413/400 JSONResponse when the body
+           exceeds the size cap or the nesting-depth cap.
+    """
+    if request.method in ("POST", "PUT", "PATCH"):
+        body = await request.body()
+        if len(body) > MAX_BODY_BYTES:
+            return JSONResponse({"detail": "Request body too large"}, status_code=413)
+        if _nesting_depth_exceeds(body, limit=64):
+            return JSONResponse({"detail": "Request body nested too deeply"}, status_code=400)
+    return await call_next(request)
+
+
+def _nesting_depth_exceeds(raw: bytes, limit: int) -> bool:
+    """Check whether a JSON body nests deeper than a limit.
+
+    Counts brackets textually rather than parsing, so it is cheap and — unlike
+    json.loads — cannot itself blow the stack on hostile input. String contents
+    are skipped so brackets inside string literals never count.
+
+    Takes: raw — the raw request body; limit — the maximum allowed depth.
+    Gives: True when nesting exceeds the limit, False otherwise.
+    """
+    depth = 0
+    in_string = False
+    escaped = False
+    for byte in raw:
+        char = chr(byte)
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char in "[{":
+            depth += 1
+            if depth > limit:
+                return True
+        elif char in "]}":
+            depth -= 1
+    return False
 
 
 # Length/size caps stop a single request from forcing a huge fan-out or an
