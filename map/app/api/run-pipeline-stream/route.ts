@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server';
 import { readJsonBody, validatePipeline } from '@/lib/proxyGuard';
 import { verifyAuth, clientKey } from '@/lib/verifyAuth';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { isApprovedCaller } from '@/lib/serverApproval';
+import { redactSseFrame } from '@/lib/redactSse';
 
 // takes: a status and message
 // does: builds a JSON error Response (this route otherwise streams SSE)
@@ -10,6 +12,32 @@ function jsonError(status: number, error: string): Response {
   return new Response(JSON.stringify({ error }), {
     status,
     headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+// takes: nothing
+// does: builds a TransformStream that redacts investigator names from each SSE
+//       `data:` frame, buffering across chunk boundaries so a frame split mid-JSON
+//       is still parsed whole
+// returns: the TransformStream<Uint8Array, Uint8Array>
+function redactStream(): TransformStream<Uint8Array, Uint8Array> {
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  let buffer = '';
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += decoder.decode(chunk, { stream: true });
+      // SSE frames are separated by a blank line. Process every complete frame
+      // and keep the trailing partial in the buffer.
+      const frames = buffer.split('\n\n');
+      buffer = frames.pop() ?? '';
+      for (const frame of frames) {
+        controller.enqueue(encoder.encode(redactSseFrame(frame) + '\n\n'));
+      }
+    },
+    flush(controller) {
+      if (buffer) controller.enqueue(encoder.encode(redactSseFrame(buffer)));
+    },
   });
 }
 
@@ -43,6 +71,11 @@ export async function POST(req: NextRequest) {
   const { allowed, retryAfterSeconds } = checkRateLimit(clientKey(req, decoded?.uid), 'pipeline', 10);
   if (!allowed) return rateLimitResponse(retryAfterSeconds);
 
+  // Whether this caller may see named investigators. Resolved once, up front, so
+  // the transform stream below can strip names from the final SSE data frame the
+  // same way the non-streaming route does. Fail closed: anonymous → redact.
+  const approved = await isApprovedCaller(decoded);
+
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 295_000);
 
@@ -67,8 +100,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Pipe the upstream SSE stream straight to the client.
-    return new Response(upstream.body, {
+    // Pipe the upstream SSE stream through a redactor. An approved caller passes
+    // through untouched; for everyone else each `data:` frame is parsed and any
+    // investigator names in it are stripped before the frame reaches the client,
+    // so the final report frame cannot leak the names the non-streaming route
+    // already protects.
+    const safeBody = approved ? upstream.body : upstream.body.pipeThrough(redactStream());
+
+    return new Response(safeBody, {
       status: 200,
       headers: {
         'Content-Type': 'text/event-stream; charset=utf-8',

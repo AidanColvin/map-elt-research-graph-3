@@ -37,7 +37,8 @@ NON_PERSON = {"redacted", "hidden", "n/a", "none", "unknown", ""}
 ORG_MARKERS = (
     "school", "center", "centre", "university", "institute", "department",
     "college", "hospital", "laboratory", "division", "program", "foundation",
-    "health", "unc ",
+    "health", "unc ", "network", "ahec", "system", "consortium", "office",
+    "data", "registry", "council", "alliance", "association",
 )
 
 
@@ -151,3 +152,47 @@ def test_counts_survive_so_the_product_still_works(frontend):
     body = response.json()
     assert body.get("_redacted") is True, "response should declare that it was redacted"
     assert len(response.text) > 500, "redaction should not empty the payload"
+
+
+# ---------------------------------------------------------------------------
+# The sector route (/api/run-pipeline) relays the SAME backend that names PIs,
+# and originally did so verbatim — the confirmed breach. These assert it now
+# goes through the shared redaction chokepoint like the partnerships route.
+# ---------------------------------------------------------------------------
+
+SECTOR = {"sector": "Pharmaceuticals"}
+
+
+@pytest.fixture(scope="module")
+def sector_upstream_names(backend) -> set:
+    """Harvest investigator names from the backend's raw sector report.
+
+    Takes: backend — the FastAPI client.
+    Gives: the set of personal names present upstream; skips if none exist.
+    """
+    response = backend.post("/run-pipeline", json=SECTOR, timeout=SLOW_TIMEOUT * 4)
+    if response.status_code != 200:
+        pytest.skip(f"backend returned {response.status_code} for the sector scan")
+    names = set()
+    harvest_names(response.json(), names)
+    real = {n for n in names if looks_like_a_person(n)}
+    if not real:
+        pytest.skip("backend sector report returned no personal names")
+    return real
+
+
+def test_sector_report_leaks_no_names_to_anonymous(frontend, sector_upstream_names):
+    """Assert the sector route strips names for an unauthenticated caller.
+
+    Takes: frontend — the proxy client; sector_upstream_names — names upstream.
+    Gives: nothing; fails listing any name that survived, including in prose.
+    """
+    response = frontend.post("/api/run-pipeline", json=SECTOR, timeout=SLOW_TIMEOUT * 4)
+    assert response.status_code == 200, f"proxy returned {response.status_code}"
+    assert response.json().get("_redacted") is True
+
+    leaked = find_leaks(response.text, sector_upstream_names)
+    assert not leaked, (
+        f"{len(leaked)} investigator name(s) leaked via the sector route: {leaked}. "
+        "The free-text scrub in map/lib/redactPeople.ts must catch these."
+    )

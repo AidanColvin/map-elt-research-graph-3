@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { readJsonBody, validatePipeline } from '@/lib/proxyGuard';
 import { verifyAuth, clientKey } from '@/lib/verifyAuth';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rateLimit';
+import { relayJson } from '@/lib/relayGuard';
 
 // Never cache this route. Every search must hit the backend and return a
 // freshly generated report — we explicitly opt out of all Next.js caching so
@@ -62,11 +63,10 @@ export async function POST(req: NextRequest) {
 
     clearTimeout(timeout);
 
-    const data = await upstream.json();
-    return NextResponse.json(data, {
-      status: upstream.status,
-      headers: { 'Cache-Control': 'no-store' },
-    });
+    // Relay through the shared chokepoint: names are stripped unless the caller
+    // is a verified, approved account. The sector report staples NIH PIs and
+    // grant numbers into the payload, so this is not optional.
+    return relayJson(req, upstream);
   } catch (err: any) {
     clearTimeout(timeout);
     const isTimeout = err?.name === 'AbortError';

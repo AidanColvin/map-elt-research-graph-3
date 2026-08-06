@@ -41,28 +41,33 @@ export async function verifyAuth(request: NextRequest): Promise<{ uid: string } 
   }
 }
 
-// Headers whose value is stamped by the platform edge, in trust order. Vercel
-// sets `x-vercel-forwarded-for` itself and strips any client-supplied copy, so
-// it cannot be forged from outside. `x-real-ip` is set by the same edge.
-//
-// `x-forwarded-for` is deliberately NOT in this list: it is caller-controlled,
-// and trusting it let anyone mint a fresh rate-limit bucket per request by
-// rotating the header, which defeated the limiter completely.
-const TRUSTED_IP_HEADERS = ['x-vercel-forwarded-for', 'x-real-ip'] as const;
+// On Vercel, `x-vercel-forwarded-for` is stamped by the platform edge, which
+// strips any client-supplied copy — so it is trustworthy THERE and only there.
+// Off Vercel (local dev, a self-hosted node with no trusted proxy in front)
+// every forwarded-for header is caller-controlled: a previous version trusted
+// `x-vercel-forwarded-for`/`x-real-ip` unconditionally, and an attacker rotated
+// `x-real-ip` to mint a fresh rate-limit bucket per request, defeating the
+// limiter. So the header is trusted ONLY when we can confirm we are running on
+// the platform that sets it.
+const ON_VERCEL = !!process.env.VERCEL;
+const TRUSTED_IP_HEADER = 'x-vercel-forwarded-for';
 
 // takes: the incoming request and an optional verified uid
-// does: derives a stable rate-limit key — the verified uid when available, else
-//       the platform-attested client IP (so anonymous callers are throttled
-//       per-client and cannot escape their bucket by forging a header)
+// does: derives a stable rate-limit key — the verified uid when available; else
+//       the platform-attested client IP, but ONLY where the platform is known to
+//       stamp it; otherwise a single shared bucket that cannot be escaped by
+//       forging a header
 // returns: a rate-limit key string
 export function clientKey(request: NextRequest, uid?: string | null): string {
   if (uid) return uid;
-  for (const header of TRUSTED_IP_HEADERS) {
-    const ip = (request.headers.get(header) ?? '').split(',')[0].trim();
+  if (ON_VERCEL) {
+    const ip = (request.headers.get(TRUSTED_IP_HEADER) ?? '').split(',')[0].trim();
     if (ip) return `ip:${ip}`;
   }
-  // No platform header (local dev, or an edge that does not stamp one). Fall
-  // back to a single shared bucket rather than a spoofable one: a shared limit
-  // throttles abuse, whereas trusting x-forwarded-for would remove the limit.
+  // Not on a platform whose IP header we can trust. A single shared bucket still
+  // throttles abuse; trusting a spoofable header would instead REMOVE the limit,
+  // which is strictly worse. The trade-off is that all anonymous callers share
+  // one bucket off-Vercel — acceptable for a low-traffic tool, and the honest
+  // failure direction.
   return 'anon';
 }
