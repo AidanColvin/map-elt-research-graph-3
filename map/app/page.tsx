@@ -8,7 +8,7 @@ import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import AccountView from "@/components/workspace/AccountView";
 import DashboardHome from "@/components/workspace/DashboardHome";
-import PartnershipsView from "@/components/workspace/PartnershipsView";
+import PartnershipInventoryView from "@/components/workspace/PartnershipInventoryView";
 import SignInRequired from "@/components/workspace/SignInRequired";
 import PendingApproval from "@/components/workspace/PendingApproval";
 import ProjectsCanvas from "@/components/workspace/ProjectsCanvas";
@@ -238,9 +238,13 @@ export default function MapHome() {
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
   const [projectsQuery, setProjectsQuery] = useState("");
-  const [partnershipDraft, setPartnershipDraft] = useState("");
   // Companies added to the Database this session by a sector Package run.
   const [packageRows, setPackageRows] = useState<AccountProfile[]>([]);
+  // The signed inventory token minted by /api/inventory/unlock after a correct
+  // password entry. It is the credential the gated data API actually honors —
+  // holding it (not a local flag) is what "unlocked" means. Persisted per
+  // browser so the code isn't re-asked on every refresh.
+  const [pwToken, setPwToken] = useState<string | null>(null);
   const dive = useDeepDive();
   const scan = useSectorScan();
   // Per-user saved reports (Firestore for signed-in accounts, device-local for
@@ -264,6 +268,18 @@ export default function MapHome() {
   //   ?skipIntro=1  — dismiss the intro ONLY, leaving the visitor signed out so
   //                   the real sign-in and approval flow can be exercised.
   useEffect(() => {
+    // Restore a previous password unlock first — it must apply on EVERY load
+    // path, including the ?screenshot short-circuit below. The stored value is
+    // the server-minted token; if it has expired the data API returns 401 and
+    // the views re-show the gate on their own.
+    try {
+      localStorage.removeItem("map.pwUnlock"); // pre-token flag, now meaningless
+      const stored = localStorage.getItem("map.pwToken");
+      if (stored) setPwToken(stored);
+    } catch {
+      // storage unavailable — the guest can re-enter the code
+    }
+
     const params = new URLSearchParams(window.location.search);
     if (params.has("screenshot")) {
       setShowIntro(false);
@@ -278,6 +294,18 @@ export default function MapHome() {
     const stored = getSession();
     if (stored) setUser(stored);
   }, []);
+
+  // takes: the token minted by the server after a correct password entry
+  // does: stores it as this browser's inventory credential
+  // returns: nothing
+  const handlePasswordUnlock = (token: string) => {
+    setPwToken(token);
+    try {
+      localStorage.setItem("map.pwToken", token);
+    } catch {
+      // storage unavailable — the unlock still holds for this page load
+    }
+  };
 
   // Keep the browser tab title in step with the active view (this is an SPA, so
   // there is one document; the title is updated client-side per tab).
@@ -302,9 +330,7 @@ export default function MapHome() {
   // returns: nothing
   function openProject(r: SavedReport) {
     if (r.kind === "partnership") {
-      // Re-open a saved UNC report in the UNC view; PartnershipsView re-runs the
-      // live lookup for the subject so the evidence is current.
-      setPartnershipDraft(r.query);
+      // Saved UNC reports predate the inventory table; just focus the view.
       setView("partnerships");
     } else if (r.kind === "company") {
       setCompanyDraft(r.query);
@@ -472,11 +498,18 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {user.guest ? (
-            <SignInRequired viewLabel="Directory" onSignIn={handleSignInFromGuest} />
+          {user.guest && !pwToken ? (
+            <SignInRequired
+              viewLabel="Directory"
+              onSignIn={handleSignInFromGuest}
+              onUnlock={handlePasswordUnlock}
+            />
           ) : (
             <AccountsCanvas
               extraRows={packageRows}
+              pwToken={pwToken}
+              onSignIn={handleSignInFromGuest}
+              onUnlock={handlePasswordUnlock}
               onRunDeepDive={(name) => {
                 setCompanyDraft(name);
                 dive.run(name);
@@ -500,10 +533,18 @@ export default function MapHome() {
           {/* White canvas panel — matches the Company view so the UNC page reads
               on white, not the grey page background. */}
           <section style={{ ...cardStyle, padding: "26px 28px 36px" }}>
-            {user.guest ? (
-              <SignInRequired viewLabel="Partnerships" onSignIn={handleSignInFromGuest} />
+            {user.guest && !pwToken ? (
+              <SignInRequired
+                viewLabel="Partnerships"
+                onSignIn={handleSignInFromGuest}
+                onUnlock={handlePasswordUnlock}
+              />
             ) : (
-              <PartnershipsView saved={saved} initialQuery={partnershipDraft} />
+              <PartnershipInventoryView
+                pwToken={pwToken}
+                onSignIn={handleSignInFromGuest}
+                onUnlock={handlePasswordUnlock}
+              />
             )}
           </section>
         </div>

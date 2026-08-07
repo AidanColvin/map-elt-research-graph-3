@@ -39,6 +39,11 @@ const PUBLIC_API = [
   '/api/run-pipeline',        // also covers /api/run-pipeline-stream (prefix)
   '/api/freshness',
   '/api/resolve-kind',        // keyless sector-vs-company classifier (guests included)
+  '/api/inventory',           // IS the gate: /unlock verifies the shared password
+                              // server-side (rate-limited) and /data refuses every
+                              // caller without a minted token or approved account.
+                              // Guests present X-Inventory-Token, not Bearer, so the
+                              // Bearer prefilter below must not run for these routes.
 ];
 
 export function middleware(request: NextRequest) {
