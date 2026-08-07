@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { mockBackend, gotoWorkspace, clickNav, visibleView } from './helpers';
+import { mockBackend, gotoWorkspace, clickNav, visibleView, unlockWithPassword } from './helpers';
 
 /**
  * Coverage for the interactive Database ("Data" tab) intelligence features:
@@ -12,6 +12,10 @@ test.describe('Data tab — interactive database', () => {
     await mockBackend(page);
     await gotoWorkspace(page);
     await clickNav(page, 'Directory');
+    // The Directory is behind the server-side access gate for guests; enter
+    // the shared password so the workbook rows load from /api/inventory/data.
+    await unlockWithPassword(page);
+    await visibleView(page).locator('.db-table tbody tr').first().waitFor({ state: 'visible', timeout: 20000 });
   });
 
   test('renders summary cards, the fit column, and a live count', async ({ page }) => {
@@ -20,11 +24,12 @@ test.describe('Data tab — interactive database', () => {
     for (const label of ['Total Partners', 'NC-Based', 'Life Sciences', 'Public Companies']) {
       await expect(view.getByText(label, { exact: true }).first()).toBeVisible({ timeout: 8000 });
     }
-    // UNC Fit (est.) column header + at least one badge.
-    await expect(view.locator('.db-table thead th', { hasText: 'UNC Fit' }).first()).toBeVisible();
+    // Fit column header + at least one badge (columns today: Company,
+    // Employees, UNC, Fit, Sector, Revenue, Actions).
+    await expect(view.locator('.db-table thead th', { hasText: 'Fit' }).first()).toBeVisible();
     await expect(view.locator('.db-table tbody tr').first()).toBeVisible();
     await expect(
-      view.locator('.db-table tbody tr td:nth-child(2)').getByText(/^(High|Mid|Low)$/).first(),
+      view.locator('.db-table tbody tr').first().getByText(/^(High|Mid|Low)$/).first(),
     ).toBeVisible();
     // Live count line.
     await expect(view.getByText(/Showing \d+ of \d+ partners/).first()).toBeVisible();
@@ -53,32 +58,30 @@ test.describe('Data tab — interactive database', () => {
     const view = visibleView(page);
     await view.locator('.db-table tbody tr').first().click();
 
+    // The slide-out drawer stays mounted; when open it carries the selected
+    // company's aria-label (React omits aria-hidden={false} entirely).
     const panel = page.locator('aside[role="dialog"]');
-    const deepDive = panel.getByRole('button', { name: /run deep dive/i });
-    await expect(deepDive).toBeVisible({ timeout: 8000 });
-    // Panel always shows HQ / location and Revenue field labels.
-    await expect(panel.getByText('HQ / location', { exact: true })).toBeVisible();
+    await expect(panel).toHaveAttribute('aria-label', /details$/, { timeout: 8000 });
+    // The drawer's quick stats always include Employees / Revenue / HQ.
+    await expect(panel.getByText('HQ', { exact: true })).toBeVisible();
+    await expect(panel.getByText('Revenue', { exact: true }).first()).toBeVisible();
 
     await page.keyboard.press('Escape');
-    // Panel content unmounts when deselected, so the CTA detaches.
-    await expect(deepDive).toHaveCount(0);
+    // Deselecting drops the company aria-label (and unmounts the body).
+    await expect(panel).not.toHaveAttribute('aria-label', /details$/);
   });
 
-  test('"Run Deep Dive" navigates to the Company view', async ({ page }) => {
+  test('the row Profile action navigates to the Company view', async ({ page }) => {
     const view = visibleView(page);
     const firstRow = view.locator('.db-table tbody tr').first();
     const company = (await firstRow.locator('td').first().innerText()).split('\n')[0].trim();
 
-    await firstRow.click();
-    const panel = page.locator('aside[role="dialog"]');
-    await panel.getByRole('button', { name: /run deep dive/i }).click();
+    // The deep-dive CTA lives in the row's Actions column today.
+    await firstRow.getByRole('button', { name: /profile/i }).click();
 
     // The Data table is no longer the visible view…
     await expect(page.locator('.db-table')).toBeHidden({ timeout: 8000 });
     // …and the chosen company is carried into the Company view (prefilled input).
-    await expect(
-      page.locator('.ws-view:visible input').filter({ hasText: '' }).first(),
-    ).toBeVisible();
     await expect(page.locator(`.ws-view:visible input[value="${company}"]`)).toBeVisible({
       timeout: 8000,
     });

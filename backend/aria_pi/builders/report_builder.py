@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import urllib.parse
 from datetime import datetime
 from typing import Dict, List, Any
@@ -631,8 +632,15 @@ class ReportBuilder:
         seen = set()
 
         def add_faculty(name: str, school: str, focus: str, sources: List[str]):
-            key = (name.lower().strip(), focus[:60])
-            if not name or key in seen:
+            # Strip BEFORE the emptiness guard: a whitespace-only PI name is
+            # truthy and used to render as a blank faculty row in section 2.2.
+            # Requiring a letter also rejects punctuation-only artifacts like
+            # ", " from a grant record with empty first/last name fields.
+            name = (name or "").strip()
+            if not re.search(r"[A-Za-z]", name):
+                return
+            key = (name.lower(), focus[:60])
+            if key in seen:
                 return
             seen.add(key)
             unc_faculty.append({

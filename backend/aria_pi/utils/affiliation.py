@@ -64,7 +64,7 @@ def is_unc_affiliation(affiliation: str) -> bool:
 # stripped). Values are matched case-insensitively as substrings against author
 # affiliations and used verbatim to build PubMed/OpenAlex queries.
 _COMPANY_ALIASES = {
-    "meta": ["Meta Platforms", "Facebook"],
+    "meta": ["Meta Platforms", "Facebook", "Meta AI", "Meta, Menlo Park"],
     "alphabet": ["Google", "DeepMind", "Verily", "Alphabet"],
     "google": ["Google", "DeepMind", "Verily"],
     "amazon web services": ["Amazon Web Services", "Amazon.com"],
@@ -74,6 +74,60 @@ _COMPANY_ALIASES = {
     "bandwidth": ["Bandwidth Inc", "Bandwidth.com"],
     "ibm": ["IBM", "International Business Machines"],
     "sas": ["SAS Institute"],
+    # Common-word company names. Each bare token below matches ordinary prose —
+    # "visa" (immigration), "block"/"Block Center" (surname, buildings),
+    # "affirm" (verb), "target"/"gap"/"shell"/"square"/"ally"/"discover"
+    # (everyday words), "amazon" (the region), "oracle" (Delphi, model names),
+    # "green dot" (a literal green dot in vision studies) — so they surfaced
+    # fake UNC ties (a "Visa" NIH grant about student visas; a "Block" paper in
+    # Nature via an author's Block-named center). Their queries and affiliation
+    # checks must use corporate phrases only; _AMBIGUOUS_TOKENS below stops the
+    # bare token from re-entering as a fallback.
+    "block": ["Block, Inc", "Block Inc", "Square, Inc", "Square Inc"],
+    "square": ["Square, Inc", "Square Inc", "Block, Inc"],
+    "visa": ["Visa Inc", "Visa, Inc", "Visa Research", "Visa International", "Visa U.S.A"],
+    "ally": ["Ally Financial", "Ally Bank"],
+    "ally financial": ["Ally Financial", "Ally Bank"],
+    "amazon": ["Amazon.com", "Amazon Web Services", "Amazon, Inc", "Amazon Inc"],
+    "target": ["Target Corporation", "Target Corp"],
+    "shell": ["Shell plc", "Royal Dutch Shell", "Shell Oil", "Shell Global Solutions"],
+    "stripe": ["Stripe, Inc", "Stripe Inc"],
+    "discover": ["Discover Financial"],
+    "discover financial": ["Discover Financial"],
+    "gap": ["Gap Inc", "Gap, Inc"],
+    "affirm": ["Affirm Holdings", "Affirm, Inc", "Affirm Inc"],
+    "affirm holdings": ["Affirm Holdings", "Affirm, Inc", "Affirm Inc"],
+    "oracle": ["Oracle Corporation", "Oracle Corp", "Oracle Health", "Oracle Cerner", "Oracle Labs"],
+    "green dot": ["Green Dot Corporation", "Green Dot Corp", "Green Dot Bank"],
+    # Science-vocabulary collisions: "Tesla" is the magnetic-field unit in every
+    # MRI grant, "stem" is stem cells / STEM education, "micron" is µm,
+    # "arm" is a robotic arm or a trial arm, "unity" and "compass" are ordinary
+    # nouns, "chewy" describes food texture.
+    "tesla": ["Tesla, Inc", "Tesla Inc", "Tesla Motors", "Tesla Energy"],
+    "stem": ["Stem, Inc", "Stem Inc"],
+    "unity": ["Unity Software", "Unity Technologies"],
+    "unity software": ["Unity Software", "Unity Technologies"],
+    "micron": ["Micron Technology"],
+    "arm": ["Arm Holdings", "ARM Limited", "Arm Ltd"],
+    "arm holdings": ["Arm Holdings", "ARM Limited", "Arm Ltd"],
+    "compass": ["Compass, Inc", "Compass Inc", "Compass Real Estate"],
+    "chewy": ["Chewy, Inc", "Chewy Inc"],
+    # Common-bigram company names: quoted-phrase search is punctuation-blind,
+    # so "Pattern Energy" matches "...activity pattern, energy expenditure..."
+    # in an aging-institute abstract, and "First Solar" matches "the first
+    # solar-powered...". Anchor them to their full corporate names.
+    "pattern energy": ["Pattern Energy Group"],
+    "first solar": ["First Solar, Inc", "First Solar Inc"],
+}
+
+# Normalized keys whose BARE name must never be used as a query phrase or an
+# affiliation match — only their corporate aliases above identify the company.
+# (Distinctive coined names — Pfizer, Nvidia, Zscaler — stay matchable bare.)
+_AMBIGUOUS_TOKENS = {
+    "meta", "apple", "sas", "aws", "block", "square", "visa", "ally",
+    "amazon", "target", "shell", "stripe", "discover", "gap", "affirm",
+    "oracle", "green dot", "tesla", "stem", "unity", "micron", "arm",
+    "compass", "chewy", "pattern energy", "first solar",
 }
 
 _PARENS_RE = re.compile(r"\(.*?\)")
@@ -131,7 +185,14 @@ def company_query_clause(name: str, field: str = "Affiliation") -> str:
 def company_affiliation_regex(name: str):
     phrases = company_aliases(name)
     base = re.sub(r"\s+", " ", _PARENS_RE.sub(" ", name or "")).strip()
-    if base and base.lower() not in {p.lower() for p in phrases}:
+    # The bare name is a usable fallback ONLY when it isn't a common word: for
+    # ambiguous names (Block, Visa, Target…) the corporate aliases are the
+    # whole identity, and re-adding the bare token here would reopen the exact
+    # false-positive hole the alias table closes.
+    key = _norm(name)
+    core = re.sub(r"\s+", " ", _CORP_SUFFIX_RE.sub(" ", key)).strip()
+    ambiguous = key in _AMBIGUOUS_TOKENS or core in _AMBIGUOUS_TOKENS
+    if base and not ambiguous and base.lower() not in {p.lower() for p in phrases}:
         phrases.append(base)
 
     pats = []

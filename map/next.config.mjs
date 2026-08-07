@@ -17,13 +17,19 @@ const nextConfig = {
   // control. External origins cover Firebase auth and the keyless logo/avatar
   // fallback chain; all data APIs are called server-side (same-origin 'self').
   async headers() {
+    // Next's dev runtime evaluates code via eval (react-refresh, source maps).
+    // Without 'unsafe-eval' in DEV ONLY, the client bundle throws EvalError
+    // before hydration — the intro splash freezes and the whole app is dead
+    // under `next dev` (and every Playwright run against it). Production CSP
+    // is unchanged: no eval.
+    const devEval = process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : "";
     const csp = [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "frame-ancestors 'none'",
       "form-action 'self'",
-      "script-src 'self' 'unsafe-inline' https://apis.google.com https://*.firebaseapp.com",
+      `script-src 'self' 'unsafe-inline'${devEval} https://apis.google.com https://*.firebaseapp.com`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https://www.google.com https://icons.duckduckgo.com",
       "font-src 'self' data:",

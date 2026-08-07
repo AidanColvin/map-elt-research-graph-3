@@ -37,10 +37,11 @@ test('home search runs a COMPANY report in the Companies view — not a Projects
   const body = await view.innerText();
   expect(body).toContain('Executive Summary');
 
-  // Crucially, it did NOT open the Projects pipeline (no project picker / run
-  // controls anywhere on the page).
-  await expect(page.getByTestId('run-pipeline')).toHaveCount(0);
-  await expect(page.getByTestId('create-project')).toHaveCount(0);
+  // Crucially, it did NOT open the Projects pipeline. Every workspace view
+  // stays MOUNTED (display:none) by design, so the picker exists in the DOM —
+  // what matters is that it is not the view on screen.
+  await expect(visibleView(page).getByTestId('run-pipeline')).toHaveCount(0);
+  await expect(visibleView(page).getByTestId('create-project')).toHaveCount(0);
 });
 
 test('home search runs a SECTOR scan in the Sectors view', async ({ page }) => {

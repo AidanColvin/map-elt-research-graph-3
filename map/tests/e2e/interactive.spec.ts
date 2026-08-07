@@ -68,25 +68,28 @@ test.describe('Map workspace — interactive flows', () => {
   });
 
   /**
-   * 2. Running from the dashboard: submitting the project search spins up a named
-   *    project and runs its pipeline, landing the user in the Projects view with
-   *    the company's artifacts rendered.
+   * 2. Running from the dashboard: submitting a COMPANY into the home search
+   *    streams that company's report in the Companies view (the same behavior
+   *    as the in-tool Companies search bar — home-search.spec covers the
+   *    routing in detail; this asserts the end state renders).
    */
-  test('running a subject from the dashboard search opens its project', async ({ page }) => {
+  test('running a subject from the dashboard search opens its report', async ({ page }) => {
     test.setTimeout(REPORT_TIMEOUT + 20000);
     await gotoWorkspace(page);
 
-    // The dashboard search runs a new project for whatever you type.
     const dash = visibleView(page);
     const search = dash.locator('input[placeholder*="project" i]').first();
     await expect(search).toBeVisible({ timeout: 8000 });
     await search.fill('Apple');
     await search.press('Enter');
 
-    // We land in the Projects view on the "Apple" project…
-    await expect(visibleView(page).getByText(/PROJECT — APPLE/i)).toBeVisible({ timeout: REPORT_TIMEOUT });
-    // …and the company pipeline renders its artifacts.
-    await expect(visibleView(page).getByText('Company Profile', { exact: false }).first()).toBeVisible({ timeout: REPORT_TIMEOUT });
+    // We land on the Companies tab with the streamed Apple report.
+    await expect(
+      page.locator('nav[aria-label="Workspace views"] .ws-nav-item.active'),
+    ).toHaveText('Companies', { timeout: 15000 });
+    await expect(
+      visibleView(page).getByRole('heading', { name: 'Apple', exact: true }),
+    ).toBeVisible({ timeout: REPORT_TIMEOUT });
   });
 
   /**

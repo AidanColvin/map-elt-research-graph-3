@@ -372,14 +372,39 @@ class SECEdgarClient:
         us_gaap = ((data.get("facts") or {}).get("us-gaap") or {})
         dei = ((data.get("facts") or {}).get("dei") or {})
 
+        def full_year_duration(e: dict) -> bool:
+            """True when the fact covers a full fiscal year (or is an instant).
+
+            The form/fp filter alone is not enough: every fact in a 10-K
+            carries fp="FY" — including quarterly comparatives — and when a
+            concept has only 10-Q entries the fallback used to pick the latest
+            QUARTER as "annual revenue" (EA showed $2.0B, one quarter of ~$7.5B).
+            Duration is the property that actually distinguishes them. Instant
+            facts (cash, equity — no "start") pass through untouched.
+            """
+            s, en = e.get("start"), e.get("end")
+            if not s or not en:
+                return True
+            try:
+                days = (date.fromisoformat(en) - date.fromisoformat(s)).days
+            except ValueError:
+                return True
+            return 300 <= days <= 400
+
         def latest_annual(concept_name: str, unit: str, source: dict = us_gaap):
             concept = source.get(concept_name) or {}
             entries = ((concept.get("units") or {}).get(unit) or [])
             # Prefer annual filings: 10-K (domestic) or 20-F (foreign private
-            # issuers like Spotify). Fall back to most recent of any form.
+            # issuers like Spotify) — but only facts spanning a full year. Fall
+            # back to any full-year fact. A concept with ONLY sub-year facts
+            # contributes nothing: returning its latest quarter here is how a
+            # single quarter used to masquerade as annual revenue, because
+            # most_recent() then preferred its newer end-date over the true
+            # full-year fact under a sibling concept.
             annual = [e for e in entries
-                      if e.get("form") in ("10-K", "20-F", "40-F") and e.get("fp") == "FY"]
-            pool = annual or entries
+                      if e.get("form") in ("10-K", "20-F", "40-F") and e.get("fp") == "FY"
+                      and full_year_duration(e)]
+            pool = annual or [e for e in entries if full_year_duration(e)]
             if not pool:
                 return None
             pick = max(pool, key=lambda e: e.get("end", ""))
@@ -426,6 +451,8 @@ class SECEdgarClient:
                 for e in ((concept.get("units") or {}).get(unit) or []):
                     if e.get("form") not in ("10-K", "20-F", "40-F") or e.get("fp") != "FY":
                         continue
+                    if not full_year_duration(e):
+                        continue  # quarterly comparative inside a 10-K
                     fy = e.get("fy")
                     val = e.get("val")
                     if fy is None or val is None:

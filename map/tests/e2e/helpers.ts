@@ -457,6 +457,23 @@ export async function clickNav(page: Page, label: string): Promise<void> {
 }
 
 /**
+ * The gated views (Partnerships / Directory) turn a guest away until the
+ * shared access password is entered. Drive the real dialog: Password button →
+ * type the code → Go. The server mints a token, the view fetches its data.
+ * No-op when the view is already unlocked (token persisted from a prior test).
+ */
+export async function unlockWithPassword(page: Page, password = 'unc-blue'): Promise<void> {
+  const view = visibleView(page);
+  const pwButton = view.getByRole('button', { name: 'Password', exact: true });
+  if (!(await pwButton.isVisible().catch(() => false))) return; // already unlocked
+  await pwButton.click();
+  const dialog = page.getByRole('dialog', { name: 'Password' });
+  await dialog.getByRole('textbox').fill(password);
+  await dialog.getByRole('button', { name: 'Go' }).click();
+  await dialog.waitFor({ state: 'hidden', timeout: 15000 });
+}
+
+/**
  * Open the Account view via the right-hand Profile button (this is the only
  * route to the "Accounts" view; it is intentionally not a nav tab).
  */

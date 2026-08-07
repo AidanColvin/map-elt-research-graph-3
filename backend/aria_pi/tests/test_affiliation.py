@@ -20,7 +20,7 @@ def test_is_unc_affiliation_rejects_sibling_campuses_and_nc_state():
 
 
 def test_company_aliases_maps_ambiguous_names():
-    assert company_aliases("Meta") == ["Meta Platforms", "Facebook"]
+    assert company_aliases("Meta")[:2] == ["Meta Platforms", "Facebook"]
     assert company_aliases("Amazon Web Services (AWS)") == ["Amazon Web Services", "Amazon.com"]
     # Unmapped distinctive names fall back to the de-parenthesized name.
     assert company_aliases("Moderna") == ["Moderna"]
@@ -47,3 +47,61 @@ def test_company_regex_excludes_meta_research_but_keeps_meta_platforms():
 def test_company_regex_matches_distinctive_names():
     assert company_affiliation_regex("NVIDIA").search("NVIDIA Corporation, Santa Clara")
     assert company_affiliation_regex("Salesforce").search("Salesforce Research")
+
+
+def test_common_word_companies_never_match_bare_prose():
+    # "Visa" must mean the payments company, not immigration paperwork.
+    rx = company_affiliation_regex("Visa")
+    assert not rx.search("supported by a J-1 visa program, Chapel Hill, NC")
+    assert not rx.search("Visakhapatnam Institute of Medical Sciences")
+    assert rx.search("Visa Research, Visa Inc, Foster City, CA")
+    # "Block" is a surname and a building — only the corporate entity counts.
+    rx = company_affiliation_regex("Block")
+    assert not rx.search("Block Center for Integrative Cancer Research")
+    assert not rx.search("Gene Block Laboratory, UCLA")
+    assert rx.search("Block, Inc, San Francisco, CA")
+    # "Affirm" is a verb in half of all abstracts.
+    rx = company_affiliation_regex("Affirm Holdings")
+    assert not rx.search("these results affirm the hypothesis")
+    assert rx.search("Affirm Holdings, San Francisco")
+    # "Amazon" alone is a rainforest; the company writes Amazon.com / AWS.
+    rx = company_affiliation_regex("Amazon")
+    assert not rx.search("Amazon Basin Ecology Program, Manaus")
+    assert rx.search("Amazon.com, Inc, Seattle, WA")
+    # "Green Dot" appears literally in vision studies.
+    rx = company_affiliation_regex("Green Dot Corporation")
+    assert not rx.search("a green dot stimulus was displayed")
+    assert rx.search("Green Dot Corporation, Austin, TX")
+    # "Tesla" is the magnetic-field unit in every MRI grant.
+    rx = company_affiliation_regex("Tesla")
+    assert not rx.search("images acquired on a 3 Tesla scanner")
+    assert rx.search("Tesla, Inc, Palo Alto, CA")
+    # "Stem" is stem cells, not the storage company.
+    rx = company_affiliation_regex("Stem")
+    assert not rx.search("Center for Stem Cell Biology")
+    assert rx.search("Stem, Inc, San Francisco")
+    # "Micron" is a unit of length; "Arm" is a robotic arm or a trial arm.
+    assert not company_affiliation_regex("Micron").search("particles under 5 micron diameter")
+    assert company_affiliation_regex("Micron").search("Micron Technology, Boise, ID")
+    assert not company_affiliation_regex("Arm Holdings").search("the placebo arm of the trial")
+    assert company_affiliation_regex("Arm Holdings").search("Arm Holdings plc, Cambridge, UK")
+    # Common-bigram names: the phrase must be the corporation, not prose.
+    rx = company_affiliation_regex("Pattern Energy")
+    assert not rx.search("activity pattern energy expenditure in older adults")
+    assert rx.search("Pattern Energy Group, San Francisco")
+    rx = company_affiliation_regex("First Solar")
+    assert not rx.search("the first solar-powered irrigation study")
+    assert rx.search("First Solar, Inc, Tempe, AZ")
+
+
+def test_common_word_companies_query_only_corporate_phrases():
+    for name, banned in [("Visa", '"Visa"[Affiliation]'),
+                         ("Block", '"Block"[Affiliation]'),
+                         ("Target", '"Target"[Affiliation]'),
+                         ("Affirm Holdings", '"Affirm Holdings"[Affiliation]')]:
+        clause = company_query_clause(name)
+        if name == "Affirm Holdings":
+            # The full corporate name IS the safe phrase here.
+            assert banned in clause
+        else:
+            assert banned not in clause, f"{name}: bare token leaked into {clause}"

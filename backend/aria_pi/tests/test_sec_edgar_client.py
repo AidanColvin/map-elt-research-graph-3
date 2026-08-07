@@ -374,3 +374,42 @@ def test_get_unc_alumni_from_website_skips_js_shell():
     with patch("aria_pi.clients.sec_edgar_client.requests.get",
                return_value=shell):
         assert client.get_unc_alumni_from_website("Acme", "https://acme.com") == []
+
+
+def test_latest_annual_prefers_full_year_over_latest_quarter():
+    """
+    Takes: XBRL where one revenue concept has only quarterly 10-Q facts and
+           another carries the genuine 10-K full-year fact with an older end.
+    Does: Assembles company facts.
+    Returns: the FULL-YEAR value as revenue — never the more recent quarter
+             (EA's $2.0B Q1 was reported as its "annual" revenue before this).
+    """
+    client = SECEdgarClient()
+    xbrl_payload = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"val": 2_000_000_000, "start": "2025-04-01", "end": "2025-06-30",
+             "form": "10-Q", "fp": "Q1", "fy": 2026, "accn": "0000000000-25-000002"},
+        ]}},
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [
+            {"val": 7_500_000_000, "start": "2024-04-01", "end": "2025-03-31",
+             "form": "10-K", "fp": "FY", "fy": 2025, "accn": "0000000000-25-000001"},
+            # Quarterly comparative INSIDE the 10-K: same form/fp, short span.
+            {"val": 1_900_000_000, "start": "2025-01-01", "end": "2025-03-31",
+             "form": "10-K", "fp": "FY", "fy": 2025, "accn": "0000000000-25-000001"},
+        ]}},
+    }}}
+    submissions = {
+        "name": "Electronic Arts Inc.",
+        "tickers": ["EA"],
+        "filings": {"recent": {"form": [], "filingDate": [],
+                               "accessionNumber": [], "primaryDocument": []}},
+    }
+
+    def fake_get(self, url, **kwargs):
+        return FakeResponse(xbrl_payload if "companyfacts" in url else submissions)
+
+    with patch.object(client, "_find_cik", return_value="712515"), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get", new=fake_get):
+        facts = client.get_company_facts("Electronic Arts")
+    assert facts["xbrl"]["revenue"]["value"] == 7_500_000_000
+    assert facts["xbrl"]["revenue"]["end"] == "2025-03-31"
