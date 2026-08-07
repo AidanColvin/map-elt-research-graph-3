@@ -319,6 +319,23 @@ function Empty({ label }: { label: string }) {
   return <p style={styles.empty}>{label}</p>;
 }
 
+// Server-side redaction (lib/redactPeople.ts) drops an unapproved caller's
+// people-subtree entries wholesale, leaving `{ redacted: true }` in place of
+// the real row so the COUNT survives. Rendering those bare into a table's
+// name/school/focus cells prints one blank row per hidden person; this
+// component swaps them for a single honest line instead.
+function isRedactedRow(x: unknown): boolean {
+  return !!(x && typeof x === 'object' && (x as { redacted?: boolean }).redacted === true);
+}
+
+function RedactedNote({ count }: { count: number }) {
+  return (
+    <p style={{ ...styles.empty, fontStyle: 'italic' }}>
+      {count} {count === 1 ? 'name is' : 'names are'} withheld — sign in with an approved account to see named individuals.
+    </p>
+  );
+}
+
 // ── Defensive defaults — any missing field falls back to {} or [] ─────────────
 export function normalize(raw: any): ReportData {
   const d = raw || {};
@@ -868,15 +885,26 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
         ) : <Empty label="None identified." />}
 
         <H3>2.2 UNC Faculty with Verified Sector Expertise</H3>
-        {data.section2_internal_mapping.unc_faculty?.length ? (
-          <Table
-            headers={['Faculty', 'School', 'Research Focus', 'Ref.']}
-            rows={data.section2_internal_mapping.unc_faculty.map((f) => [
-              <strong key="n">{f.name}</strong>, f.school, f.research_focus,
-              <Cite key="s" urls={f.sources} />,
-            ])}
-          />
-        ) : <Empty label="None identified." />}
+        {(() => {
+          const all = data.section2_internal_mapping.unc_faculty ?? [];
+          if (!all.length) return <Empty label="None identified." />;
+          const visible = all.filter((f) => !isRedactedRow(f));
+          const hidden = all.length - visible.length;
+          return (
+            <>
+              {visible.length > 0 && (
+                <Table
+                  headers={['Faculty', 'School', 'Research Focus', 'Ref.']}
+                  rows={visible.map((f) => [
+                    <strong key="n">{f.name}</strong>, f.school, f.research_focus,
+                    <Cite key="s" urls={f.sources} />,
+                  ])}
+                />
+              )}
+              {hidden > 0 && <RedactedNote count={hidden} />}
+            </>
+          );
+        })()}
 
         <H3>2.3 UNC Data Assets Relevant to This Sector</H3>
         {data.section2_internal_mapping.data_assets?.length ? (
@@ -1127,15 +1155,26 @@ export default function Report({ data: rawInput, hideToc = false }: { data: any;
         ) : <Empty label="None documented." />}
 
         <H3>5.2 UNC Research Capacity</H3>
-        {data.section5_value_prop.research_capacity?.length ? (
-          <Table
-            headers={['Name', 'Role', 'Expertise', 'Ref.']}
-            rows={data.section5_value_prop.research_capacity.map((d) => [
-              <strong key="n">{d.name}</strong>, d.role, d.expertise,
-              <Cite key="s" urls={d.sources} />,
-            ])}
-          />
-        ) : <Empty label="None documented." />}
+        {(() => {
+          const all = data.section5_value_prop.research_capacity ?? [];
+          if (!all.length) return <Empty label="None documented." />;
+          const visible = all.filter((d) => !isRedactedRow(d));
+          const hidden = all.length - visible.length;
+          return (
+            <>
+              {visible.length > 0 && (
+                <Table
+                  headers={['Name', 'Role', 'Expertise', 'Ref.']}
+                  rows={visible.map((d) => [
+                    <strong key="n">{d.name}</strong>, d.role, d.expertise,
+                    <Cite key="s" urls={d.sources} />,
+                  ])}
+                />
+              )}
+              {hidden > 0 && <RedactedNote count={hidden} />}
+            </>
+          );
+        })()}
 
         <H3>5.3 Talent Pipeline</H3>
         {data.section5_value_prop.talent_pipeline?.length ? (

@@ -8,7 +8,9 @@ trial-level relationship between the sponsor and UNC.
 """
 import re
 import requests
-from typing import List
+from typing import List, Optional
+
+from aria_pi.utils.affiliation import company_aliases, is_ambiguous_company
 
 # Common legal-entity suffixes that carry no discriminating information.
 _NOISE = {'inc', 'corp', 'ltd', 'llc', 'lp', 'plc', 'co', 'the', 'and',
@@ -35,7 +37,8 @@ def _sponsor_tokens(name: str) -> set:
     return {t for t in tokens if len(t) >= 3 and t not in _NOISE}
 
 
-def _is_actual_sponsor(company_name: str, lead: str, collabs: List[str]) -> bool:
+def _is_actual_sponsor(company_name: str, lead: str, collabs: List[str],
+                        alias_phrases: Optional[List[str]] = None) -> bool:
     """Return True only when the company is a genuine trial sponsor/collaborator.
 
     The old `query.term` approach matched any trial where the company name
@@ -47,17 +50,24 @@ def _is_actual_sponsor(company_name: str, lead: str, collabs: List[str]) -> bool
     Token overlap alone is still too loose: a single common token matches a
     DIFFERENT entity that merely contains the word — "Amazon" matched the
     Brazilian "Amazon University", attaching premature-newborn trials to the
-    retailer. So a candidate is rejected when it is an academic / medical /
-    government institution that the company itself is not.
+    retailer; a bare "Target" matched an unrelated "Target Discovery
+    Institute" trial. So a candidate is rejected when it is an academic /
+    medical / government institution the company itself is not, AND — for
+    ambiguous bare-word names — matching requires ALL tokens of a real
+    corporate alias ("target" + "corporation"), not just the one shared word.
     """
     q = _sponsor_tokens(company_name)
     if not q:
         return False
     company_is_institution = bool(q & _INSTITUTION)
+    alias_token_sets = [_sponsor_tokens(a) for a in (alias_phrases or [])]
 
     def _matches(name: str) -> bool:
         toks = _sponsor_tokens(name)
-        if not (q & toks):
+        if alias_token_sets:
+            if not any(a.issubset(toks) for a in alias_token_sets if a):
+                return False
+        elif not (q & toks):
             return False
         # Reject "Amazon" -> "Amazon University": the candidate is an institution
         # type the company is not. (Institutional companies like "Mayo Clinic"
@@ -81,7 +91,16 @@ class ClinicalTrialsClient:
         # fields — far more precise than query.term (full-text), which would
         # match a trial titled "Apple Cider Vinegar Study" under Apple Inc.
         # We fetch a larger page and post-filter to the genuine matches.
-        params = {"query.spons": sponsor_name, "pageSize": 20}
+        #
+        # An ambiguous bare name ("Target", "Visa"…) is searched and matched
+        # by its real corporate phrase instead — searching CT.gov for bare
+        # "Target" pulls in any sponsor whose name merely contains the word
+        # ("Target Discovery Institute"), and the post-filter below requires
+        # every token of that phrase, not just the shared one.
+        ambiguous = is_ambiguous_company(sponsor_name)
+        aliases = company_aliases(sponsor_name) if ambiguous else []
+        query_text = aliases[0] if aliases else sponsor_name
+        params = {"query.spons": query_text, "pageSize": 20}
         try:
             response = self._session.get(self.base_url, params=params, timeout=6)
             response.raise_for_status()
@@ -104,7 +123,8 @@ class ClinicalTrialsClient:
             collaborators = [c.get("name") for c in collaborators_raw if c.get("name")]
 
             # Post-filter: drop trials where the company isn't actually a sponsor
-            if not _is_actual_sponsor(sponsor_name, lead_sponsor, collaborators):
+            if not _is_actual_sponsor(sponsor_name, lead_sponsor, collaborators,
+                                       alias_phrases=aliases):
                 continue
 
             facilities = []

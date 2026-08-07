@@ -105,3 +105,40 @@ def test_common_word_companies_query_only_corporate_phrases():
             assert banned in clause
         else:
             assert banned not in clause, f"{name}: bare token leaked into {clause}"
+
+
+def test_insurance_common_words_never_match_bare_prose():
+    # "Progressive" is a stock adjective in medical abstracts.
+    rx = company_affiliation_regex("Progressive")
+    assert not rx.search("a diagnosis of progressive multiple sclerosis")
+    assert not rx.search("progressive hearing loss in older adults")
+    assert rx.search("Progressive Corporation, Mayfield Village, OH")
+    # "Travelers" names any traveler-health study, not the insurer.
+    rx = company_affiliation_regex("Travelers")
+    assert not rx.search("malaria prophylaxis in returning travelers")
+    assert not rx.search("a cohort of international travelers")
+    assert rx.search("Travelers Companies, New York, NY")
+
+
+def test_insurance_common_words_query_only_corporate_phrases():
+    assert '"Progressive"[Affiliation]' not in company_query_clause("Progressive")
+    assert '"Travelers"[Affiliation]' not in company_query_clause("Travelers")
+
+
+def test_mosaic_never_matches_genetic_mosaicism():
+    rx = company_affiliation_regex("Mosaic")
+    assert not rx.search("a case of chromosomal mosaicism in a developmental cohort")
+    assert not rx.search("genetic mosaic analysis of neuronal lineages")
+    assert rx.search("Mosaic Company, Tampa, FL")
+    assert '"Mosaic"[Affiliation]' not in company_query_clause("Mosaic")
+
+
+def test_rtx_and_moog_never_match_unrelated_science():
+    # RTX = Resiniferatoxin, a standard pain-research reagent abbreviation.
+    rx = company_affiliation_regex("RTX")
+    assert not rx.search("rats were injected with RTX (resiniferatoxin) intrathecally")
+    assert rx.search("RTX Corporation, Arlington, VA")
+    # Moog is also a common surname.
+    rx = company_affiliation_regex("Moog")
+    assert not rx.search("Moog CM, Department of Otolaryngology, University of Iowa")
+    assert rx.search("Moog Inc, East Aurora, NY")

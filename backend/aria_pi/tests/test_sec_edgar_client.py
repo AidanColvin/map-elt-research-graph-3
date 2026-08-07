@@ -472,3 +472,144 @@ def test_find_cik_tie_prefers_cap_ranked_flagship_over_spinoff():
     ]
     with patch("aria_pi.clients.sec_edgar_client.load_tickers", return_value=tickers):
         assert client._find_cik("Honeywell") == "773840"
+
+
+def test_annual_series_trusts_self_reported_fy_for_jan_ending_companies():
+    """
+    Takes: a Jan-31-fiscal-year-end company (Salesforce's real shape) whose
+           XBRL self-reports fy=2025 for the period ENDING 2025-01-31 — i.e.
+           the END-YEAR naming convention (also used by Walmart, NVIDIA).
+    Does: builds the annual series.
+    Returns: the point stays labeled FY2025 — NOT shifted back to FY2024. A
+             blanket "Jan/Feb end → prior year" rule (built for Target/Lowe's,
+             which use the OPPOSITE start-year convention) shipped and
+             mislabeled this exact shape before being caught.
+    """
+    client = SECEdgarClient()
+    xbrl = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"val": 34_900_000_000, "start": "2023-02-01", "end": "2024-01-31",
+             "form": "10-K", "fp": "FY", "fy": 2024, "accn": "a1"},
+            {"val": 37_900_000_000, "start": "2024-02-01", "end": "2025-01-31",
+             "form": "10-K", "fp": "FY", "fy": 2025, "accn": "a2"},
+        ]}},
+    }}}
+    submissions = {"name": "Salesforce, Inc.", "tickers": ["CRM"],
+                   "filings": {"recent": {"form": [], "filingDate": [],
+                                          "accessionNumber": [], "primaryDocument": []}}}
+
+    def fake_get(self, url, **kwargs):
+        return FakeResponse(xbrl if "companyfacts" in url else submissions)
+
+    with patch.object(client, "_find_cik", return_value="1108524"), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get", new=fake_get):
+        facts = client.get_company_facts("Salesforce")
+    series = {pt["fy"]: pt["val"] for pt in facts["xbrl"]["series"]["revenue"]}
+    assert series[2025] == 37_900_000_000
+    assert series[2024] == 34_900_000_000
+
+
+def test_annual_series_resolves_same_fy_collision_without_dropping_a_year():
+    """
+    Takes: two facts under one concept that self-report the IDENTICAL fy but
+           whose end dates are over a year apart — the actual LabCorp entity-
+           swap symptom (a holdco reorg mistagged a comparative period).
+    Does: builds the annual series.
+    Returns: both periods survive as distinct points (the newer one re-homed
+             to its own calendar year) instead of one silently overwriting
+             the other and dropping a year from the chart.
+    """
+    client = SECEdgarClient()
+    xbrl = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"val": 14_900_000_000, "start": "2021-01-01", "end": "2021-12-31",
+             "form": "10-K", "fp": "FY", "fy": 2021, "accn": "a1"},
+            # Collides on fy=2021 but is really the FY2022 period.
+            {"val": 12_200_000_000, "start": "2022-01-01", "end": "2022-12-31",
+             "form": "10-K", "fp": "FY", "fy": 2021, "accn": "a2"},
+        ]}},
+    }}}
+    submissions = {"name": "LabCorp Holdings Inc.", "tickers": ["LH"],
+                   "filings": {"recent": {"form": [], "filingDate": [],
+                                          "accessionNumber": [], "primaryDocument": []}}}
+
+    def fake_get(self, url, **kwargs):
+        return FakeResponse(xbrl if "companyfacts" in url else submissions)
+
+    with patch.object(client, "_find_cik", return_value="1"), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get", new=fake_get):
+        facts = client.get_company_facts("LabCorp")
+    series = {pt["fy"]: pt["val"] for pt in facts["xbrl"]["series"]["revenue"]}
+    assert series[2021] == 14_900_000_000
+    assert series[2022] == 12_200_000_000
+
+
+def test_annual_series_shifts_confirmed_start_year_retailers():
+    """
+    Takes: Target's CIK (27419, a confirmed start-year fiscal namer) with an
+           XBRL fact self-reporting fy=2023 for the period ending 2023-01-28
+           — Target's own investor-relations page calls that period "fiscal
+           2022" ($109.1B), not "fiscal 2023".
+    Does: builds the annual series.
+    Returns: the point is labeled FY2022, matching Target's own convention —
+             not the raw self-reported XBRL fy.
+    """
+    client = SECEdgarClient()
+    xbrl = {"facts": {"us-gaap": {
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [
+            {"val": 109_120_000_000, "start": "2022-01-30", "end": "2023-01-28",
+             "form": "10-K", "fp": "FY", "fy": 2023, "accn": "a1"},
+        ]}},
+    }}}
+    submissions = {"name": "Target Corporation", "tickers": ["TGT"],
+                   "filings": {"recent": {"form": [], "filingDate": [],
+                                          "accessionNumber": [], "primaryDocument": []}}}
+
+    def fake_get(self, url, **kwargs):
+        return FakeResponse(xbrl if "companyfacts" in url else submissions)
+
+    with patch.object(client, "_find_cik", return_value="27419"), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get", new=fake_get):
+        facts = client.get_company_facts("Target")
+    series = {pt["fy"]: pt["val"] for pt in facts["xbrl"]["series"]["revenue"]}
+    assert series[2022] == 109_120_000_000
+    assert 2023 not in series
+
+
+def test_annual_series_handles_targets_duplicated_self_reported_fy():
+    """
+    Takes: Target's ACTUAL XBRL shape — self-reported fy=2018 duplicated
+           across TWO genuinely different periods (ending 2017-01-28 and
+           2018-02-03), confirmed live against the real SEC data. Naively
+           adjusting the duplicated fy (fy - 1) just moves the collision:
+           both facts would still land on the same computed fy and the
+           "genuine collision" fallback would re-home one of them WITHOUT
+           the retailer shift, silently reverting to the wrong label — the
+           actual bug this test catches.
+    Does: builds the annual series.
+    Returns: both periods survive as DISTINCT, correctly-shifted years
+             (FY2016 and FY2017) — no collision, no dropped year, no
+             unshifted fallback label.
+    """
+    client = SECEdgarClient()
+    xbrl = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"val": 70_271_000_000, "start": "2016-01-31", "end": "2017-01-28",
+             "form": "10-K", "fp": "FY", "fy": 2018, "accn": "a1"},
+            {"val": 72_714_000_000, "start": "2017-01-29", "end": "2018-02-03",
+             "form": "10-K", "fp": "FY", "fy": 2018, "accn": "a2"},
+        ]}},
+    }}}
+    submissions = {"name": "Target Corporation", "tickers": ["TGT"],
+                   "filings": {"recent": {"form": [], "filingDate": [],
+                                          "accessionNumber": [], "primaryDocument": []}}}
+
+    def fake_get(self, url, **kwargs):
+        return FakeResponse(xbrl if "companyfacts" in url else submissions)
+
+    with patch.object(client, "_find_cik", return_value="27419"), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get", new=fake_get):
+        facts = client.get_company_facts("Target")
+    series = {pt["fy"]: pt["val"] for pt in facts["xbrl"]["series"]["revenue"]}
+    assert series[2016] == 70_271_000_000
+    assert series[2017] == 72_714_000_000

@@ -1135,6 +1135,7 @@ function magnitudeFallback(
   currency: string,
   category: string,
   instant: boolean,
+  cik: string,
 ): YearValue[] {
   const keywords = CATEGORY_KEYWORDS[category];
   if (!keywords) return [];
@@ -1147,7 +1148,7 @@ function magnitudeFallback(
     if (!keywords.some(kw => normalized.includes(kw))) continue;
     const units = (conceptData as any)?.units?.[currency];
     if (!Array.isArray(units)) continue;
-    const series = toAnnual(units, instant);
+    const series = toAnnual(units, instant, cik);
     if (!series.length) continue;
     const mag = Math.max(...series.map(yv => Math.abs(yv.val)));
     if (mag > bestMag) { bestMag = mag; bestSeries = series; }
@@ -1188,6 +1189,7 @@ function mergedAnnualNs(
   names: string[],
   currency: string,
   instant: boolean,
+  cik: string,
 ): YearValue[] {
   const root = f?.[ns];
   if (!root) return [];
@@ -1202,7 +1204,7 @@ function mergedAnnualNs(
   for (const name of names) {
     const units = root[name]?.units?.[currency];
     if (!Array.isArray(units)) continue;
-    const series = toAnnual(units, instant);
+    const series = toAnnual(units, instant, cik);
     if (series.length) ranked.push(series);
   }
   ranked.sort((a, b) => {
@@ -1229,18 +1231,37 @@ function seriesFor(
   concept: Concept,
   currency: string,
   instant: boolean,
+  cik: string,
 ): YearValue[] {
-  const gaap = mergedAnnualNs(f, "us-gaap", concept.gaap, currency, instant);
+  const gaap = mergedAnnualNs(f, "us-gaap", concept.gaap, currency, instant, cik);
   if (gaap.length) return gaap;
-  return mergedAnnualNs(f, "ifrs-full", concept.ifrs, currency, instant);
+  return mergedAnnualNs(f, "ifrs-full", concept.ifrs, currency, instant, cik);
 }
+
+// CIKs of filers CONFIRMED (against their own investor-relations figures) to
+// name a January/February-ending fiscal year by its STARTING calendar year —
+// "fiscal 2022" for the period ending Feb 2023. This is the opposite of the
+// more common convention: Walmart, NVIDIA, and Salesforce also end in
+// January, but self-report XBRL fy by the ENDING calendar year, and their
+// self-reported fy already matches their own convention with no adjustment.
+// There is no calendar-only rule correct for both groups — SEC XBRL's "fy"
+// tag reflects each filer's own DEI self-declaration, which for these
+// retailers runs one year ahead of their own prose/investor-relations
+// terminology. Curated like the alias tables in backend/aria_pi/utils/
+// affiliation.py: extend as new mismatches are confirmed, don't guess.
+// resolveCik() zero-pads to 10 digits (see format() above) — this set must
+// match that shape, not the bare CIK.
+const START_YEAR_FISCAL_CIKS = new Set([
+  "0000027419",   // Target Corporation — fiscal 2022 (ended Feb 2023) = $109.1B
+  "0000060667",   // Lowe's Companies — fiscal 2022 (ended Feb 2023) = $97.1B
+]);
 
 /**
  * given raw XBRL USD entries
  * return one clean annual value per fiscal year (10-K full-year periods)
  * instant=true for balance-sheet items (point in time); false for flows
  */
-function toAnnual(entries: any[] | null, instant: boolean): YearValue[] {
+function toAnnual(entries: any[] | null, instant: boolean, cik: string): YearValue[] {
   if (!entries) return [];
   const byFy = new Map<number, { val: number; end: string }>();
   for (const e of entries) {
@@ -1251,18 +1272,39 @@ function toAnnual(entries: any[] | null, instant: boolean): YearValue[] {
         (new Date(e.end).getTime() - new Date(e.start).getTime()) / 86_400_000;
       if (days < 350 || days > 380) continue; // keep only full-year durations
     }
-    // Label the point by its PERIOD, not the filing it appeared in: XBRL's
-    // "fy" names the report, so comparative years carry the wrong label
-    // (LabCorp's entity swap showed FY2022 revenue as FY2021 and dropped a
-    // year). Fiscal-year convention = calendar year of the period end, except
-    // retail years ending Jan/Feb (Lowe's, Target) belong to the PRIOR year.
-    let fy = e.fy as number;
-    if (typeof e.end === "string" && /^\d{4}-\d{2}/.test(e.end)) {
-      const [y, m] = [Number(e.end.slice(0, 4)), e.end.slice(5, 7)];
-      fy = m === "01" || m === "02" ? y - 1 : y;
+    const end = (e.end as string) || "";
+    let fy: number;
+    if (START_YEAR_FISCAL_CIKS.has(cik) && /^\d{4}-(01|02)/.test(end)) {
+      // These filers' self-reported fy is unreliable here — Target's OWN
+      // XBRL data tags fy=2018 on BOTH the period ending 2017-01-28 and the
+      // period ending 2018-02-03, two genuinely different years. Adjusting
+      // that duplicated label (fy - 1) just moves the collision; deriving
+      // the label straight from the period's own calendar year sidesteps
+      // the bad field entirely and naturally gives each period a distinct
+      // fy — shifted back one to match the filer's start-year convention.
+      fy = Number(end.slice(0, 4)) - 1;
+    } else {
+      fy = e.fy as number;
     }
+    // Only override fy on a genuine COLLISION: two facts landing on the
+    // SAME computed fy with end dates over ~200 days apart is the LabCorp
+    // entity-swap symptom (its holdco reorg mistagged a comparative under
+    // the wrong fy) — re-home the newer fact under its own calendar year
+    // instead of overwriting the unrelated period. Companies above already
+    // sidestep this via calendar-derived fy, so it only fires for the
+    // self-reported-fy default path.
     const prev = byFy.get(fy);
-    if (!prev || e.end > prev.end) byFy.set(fy, { val: e.val, end: e.end });
+    if (prev && prev.end && end) {
+      const gapDays =
+        Math.abs(new Date(end).getTime() - new Date(prev.end).getTime()) / 86_400_000;
+      if (gapDays > 200) {
+        const derivedFy = /^\d{4}/.test(end) ? Number(end.slice(0, 4)) : fy;
+        const slot = byFy.get(derivedFy);
+        if (!slot || end > slot.end) byFy.set(derivedFy, { val: e.val, end });
+        continue;
+      }
+    }
+    if (!prev || end > prev.end) byFy.set(fy, { val: e.val, end });
   }
   return [...byFy.entries()]
     .map(([fy, v]) => ({ fy, val: v.val }))
@@ -1282,8 +1324,8 @@ export async function fetchFinancials(cik: string): Promise<Financials | null> {
   const currency = detectCurrency(f);
   // Try priority concepts first; fall back to magnitude scan for non-standard filers.
   const sf = (concept: Concept, instant: boolean, cat: string) => {
-    const s = seriesFor(f, concept, currency, instant);
-    return s.length ? s : magnitudeFallback(f, currency, cat, instant);
+    const s = seriesFor(f, concept, currency, instant, cik);
+    return s.length ? s : magnitudeFallback(f, currency, cat, instant, cik);
   };
   return {
     currency,

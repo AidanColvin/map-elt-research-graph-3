@@ -118,6 +118,27 @@ _COMPANY_ALIASES = {
     # solar-powered...". Anchor them to their full corporate names.
     "pattern energy": ["Pattern Energy Group"],
     "first solar": ["First Solar, Inc", "First Solar Inc"],
+    # Ordinary-vocabulary collisions from the insurance sector: "progressive"
+    # is a stock adjective in medical abstracts ("progressive multiple
+    # sclerosis", "progressive hearing loss") and "travelers" names any
+    # traveler-health study ("returning travelers", "travelers' diarrhea") —
+    # both matched NIH grant text and PubMed affiliations with zero connection
+    # to the insurers.
+    "progressive": ["Progressive Corporation", "Progressive Corp", "The Progressive Corporation"],
+    "travelers": ["Travelers Companies", "The Travelers Companies", "Travelers Indemnity",
+                  "Travelers Insurance"],
+    # "Mosaic" (the fertilizer company, ticker MOS) collides with "mosaic" /
+    # "mosaicism" — a standard genetics term (chromosomal mosaicism, genetic
+    # mosaic) — so neuroscience/developmental NIH grants about mosaicism
+    # attributed themselves to the fertilizer company.
+    "mosaic": ["Mosaic Company", "The Mosaic Company"],
+    # "RTX" is Resiniferatoxin, a capsaicin-analog compound named by its
+    # abbreviation "RTX" throughout pain/neuroscience literature — a defense
+    # contractor's ticker colliding with a pharmacology reagent.
+    "rtx": ["RTX Corporation", "RTX Corp", "Raytheon Technologies", "Raytheon Company"],
+    # "Moog" (the aerospace actuator maker, NYSE: MOG.A) is also a common
+    # German/Dutch surname that turned up as an unrelated paper author.
+    "moog": ["Moog Inc", "Moog, Inc"],
 }
 
 # Normalized keys whose BARE name must never be used as a query phrase or an
@@ -127,7 +148,8 @@ _AMBIGUOUS_TOKENS = {
     "meta", "apple", "sas", "aws", "block", "square", "visa", "ally",
     "amazon", "target", "shell", "stripe", "discover", "gap", "affirm",
     "oracle", "green dot", "tesla", "stem", "unity", "micron", "arm",
-    "compass", "chewy", "pattern energy", "first solar",
+    "compass", "chewy", "pattern energy", "first solar", "progressive",
+    "travelers", "mosaic", "rtx", "moog",
 }
 
 _PARENS_RE = re.compile(r"\(.*?\)")
@@ -182,6 +204,16 @@ def company_query_clause(name: str, field: str = "Affiliation") -> str:
 #       or a hyphen, so "Meta Platforms" counts but "meta-analysis",
 #       "metabolic", and "Meta-Research" do not.
 # returns: a compiled regex, or None if no usable token exists
+def is_ambiguous_company(name: str) -> bool:
+    """True when the bare name is a common word/phrase, not a safe token to
+    match on its own — the shared check behind every ambiguous-name guard
+    (PubMed/NIH affiliation matching here, ClinicalTrials.gov sponsor matching
+    in clinicaltrials_client.py)."""
+    key = _norm(name)
+    core = re.sub(r"\s+", " ", _CORP_SUFFIX_RE.sub(" ", key)).strip()
+    return key in _AMBIGUOUS_TOKENS or core in _AMBIGUOUS_TOKENS
+
+
 def company_affiliation_regex(name: str):
     phrases = company_aliases(name)
     base = re.sub(r"\s+", " ", _PARENS_RE.sub(" ", name or "")).strip()
@@ -189,9 +221,7 @@ def company_affiliation_regex(name: str):
     # ambiguous names (Block, Visa, Target…) the corporate aliases are the
     # whole identity, and re-adding the bare token here would reopen the exact
     # false-positive hole the alias table closes.
-    key = _norm(name)
-    core = re.sub(r"\s+", " ", _CORP_SUFFIX_RE.sub(" ", key)).strip()
-    ambiguous = key in _AMBIGUOUS_TOKENS or core in _AMBIGUOUS_TOKENS
+    ambiguous = is_ambiguous_company(name)
     if base and not ambiguous and base.lower() not in {p.lower() for p in phrases}:
         phrases.append(base)
 

@@ -18,6 +18,33 @@ from aria_pi.lib.tickers import load_tickers
 
 logger = logging.getLogger(__name__)
 
+# takes: two "YYYY-MM-DD" date strings
+# does: computes the absolute day gap between them
+# returns: the day count, or a large sentinel if either string doesn't parse
+def _days_between(a: str, b: str) -> int:
+    try:
+        return abs((date.fromisoformat(a) - date.fromisoformat(b)).days)
+    except ValueError:
+        return 10_000
+
+
+# CIKs of filers CONFIRMED (against their own investor-relations figures) to
+# name a January/February-ending fiscal year by its STARTING calendar year —
+# "fiscal 2022" for the period ending Feb 2023. This is the opposite of the
+# more common convention: Walmart, NVIDIA, and Salesforce also end in
+# January, but self-report XBRL fy by the ENDING calendar year, and their
+# self-reported fy already matches their own convention with no adjustment.
+# There is no calendar-only rule that is correct for both groups — SEC XBRL's
+# "fy" tag reflects each filer's own DEI self-declaration, which for these
+# retailers runs one year ahead of their own prose/investor-relations
+# terminology. Curated like the company-alias tables in utils/affiliation.py:
+# extend as new mismatches are confirmed, don't guess.
+_START_YEAR_FISCAL_CIKS = {
+    "27419",   # Target Corporation — fiscal 2022 (ended Feb 2023) = $109.1B
+    "60667",   # Lowe's Companies — fiscal 2022 (ended Feb 2023) = $97.1B
+}
+
+
 USER_AGENT = "InnovateCarolina research.intelligence@unc.edu"
 HEADERS = {"User-Agent": USER_AGENT, "Accept": "application/json"}
 
@@ -466,25 +493,46 @@ class SECEdgarClient:
                         continue
                     if not full_year_duration(e):
                         continue  # quarterly comparative inside a 10-K
+                    fy = e.get("fy")
                     val = e.get("val")
                     end = e.get("end") or ""
-                    # Label the point by its PERIOD, not by the filing: the
-                    # XBRL "fy" field names the report a fact appeared in, so
-                    # comparatives carry the wrong year — LabCorp's entity swap
-                    # showed FY2022's revenue labeled FY2021 and dropped a
-                    # year. The fiscal-year convention (calendar year of the
-                    # period end) matches Apple (Sep), FedEx (May), Tesla (Dec);
-                    # retail years ending Jan/Feb (Lowe's, Target) belong to
-                    # the PRIOR calendar year.
-                    if len(end) >= 7 and end[:4].isdigit():
-                        fy = int(end[:4]) - (1 if end[5:7] in ("01", "02") else 0)
-                    else:
-                        fy = e.get("fy")
                     if fy is None or val is None:
                         continue
-                    # Prefer the later-filed value for a given fiscal year.
+                    # Trust the company's OWN self-reported fy by default — it
+                    # already matches most filers' real convention (Walmart,
+                    # NVIDIA, and Salesforce all end in January but self-report
+                    # fy by the ENDING calendar year — confirmed against their
+                    # own investor-relations figures). Curated exceptions
+                    # (Target, Lowe's) do NOT just need "fy - 1": their raw
+                    # self-reported fy is unreliable at the source — Target's
+                    # own XBRL data tags fy=2018 on BOTH the period ending
+                    # 2017-01-28 AND the period ending 2018-02-03, two
+                    # genuinely different years. Adjusting that duplicated
+                    # label just moves the collision, so for curated filers
+                    # the label is derived straight from the period's own
+                    # calendar year instead — sidestepping the bad field
+                    # entirely and naturally giving each period a distinct
+                    # fy, shifted back one to match the filer's start-year
+                    # convention.
+                    if cik in _START_YEAR_FISCAL_CIKS and len(end) >= 7 and end[5:7] in ("01", "02"):
+                        fy = int(end[:4]) - 1
+                    #
+                    # Only override fy when a genuine COLLISION shows up: two
+                    # facts landing on the SAME computed fy with end dates
+                    # >200 days apart is the LabCorp entity-swap symptom (its
+                    # holdco reorg mistagged a comparative under the wrong
+                    # fy). Curated filers above already sidestep this via
+                    # calendar-derived fy, so it only fires for the
+                    # self-reported-fy default path.
                     prev = by_fy.get(fy)
-                    if prev is None or (e.get("end", "") > prev.get("end", "")):
+                    if prev is not None and prev.get("end") and end and \
+                            _days_between(end, prev["end"]) > 200:
+                        derived_fy = int(end[:4]) if len(end) >= 4 and end[:4].isdigit() else fy
+                        slot = by_fy.get(derived_fy)
+                        if slot is None or end > slot.get("end", ""):
+                            by_fy[derived_fy] = {"fy": derived_fy, "val": val, "end": end}
+                        continue
+                    if prev is None or end > prev.get("end", ""):
                         by_fy[fy] = {"fy": int(fy), "val": val, "end": end}
                 if by_fy:
                     ranked.append((max(by_fy), len(by_fy), by_fy))

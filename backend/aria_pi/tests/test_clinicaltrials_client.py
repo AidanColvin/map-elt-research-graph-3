@@ -252,3 +252,40 @@ def test_unc_site_stats_counts_facility_matches_only():
     assert unc_site_stats(trials) == (True, 2)
     assert unc_site_stats([{"facilities": ["Mayo Clinic"]}]) == (False, 0)
     assert unc_site_stats([]) == (False, 0)
+
+
+def test_is_actual_sponsor_requires_full_alias_for_ambiguous_names():
+    """
+    Takes: an ambiguous bare company name ("Target") plus its real corporate
+           alias, matched against an UNRELATED sponsor that merely shares the
+           one common token ("Target Discovery Institute").
+    Does: checks sponsorship with alias_phrases supplied (the ambiguous path).
+    Returns: False for the token-collision sponsor, True for the genuine one.
+    """
+    aliases = ["Target Corporation", "Target Corp"]
+    assert not _is_actual_sponsor("Target", "Target Discovery Institute", [],
+                                   alias_phrases=aliases)
+    assert _is_actual_sponsor("Target", "Target Corporation", [],
+                               alias_phrases=aliases)
+    # A collaborator match works the same way.
+    assert _is_actual_sponsor("Target", "Some University", ["Target Corporation"],
+                               alias_phrases=aliases)
+
+
+def test_search_by_sponsor_queries_the_corporate_alias_for_ambiguous_names():
+    """
+    Takes: a mocked CT.gov response, called with the bare ambiguous name "Target".
+    Does: runs search_by_sponsor.
+    Returns: the actual API request used the full corporate phrase as
+             query.spons, not the bare word.
+    """
+    client = ClinicalTrialsClient()
+    captured = {}
+
+    def fake_get(self, url, params=None, **kwargs):
+        captured.update(params or {})
+        return FakeResponse({"studies": []})
+
+    with patch("aria_pi.clients.clinicaltrials_client.requests.Session.get", new=fake_get):
+        client.search_by_sponsor("Target")
+    assert captured.get("query.spons") == "Target Corporation"
