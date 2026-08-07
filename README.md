@@ -1,9 +1,17 @@
 # Map
 
+**[Live demo →](https://map-omega-azure.vercel.app)**
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+![Next.js 15](https://img.shields.io/badge/Next.js-15-black)
+![React 19](https://img.shields.io/badge/React-19-61dafb)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python%203.11-009688)
+![Tests](https://img.shields.io/badge/tests-pytest%20·%20Vitest%20·%20Playwright-blue)
+
 Map builds research reports on its own. One web app. Three engines. One login.
 
 * **Company Profile** — a full report on any public company. Real SEC numbers, the firm's own 10-K words, leadership charts, and live graphs.
-* **Sector Scan** — type an industry, get a sourced report in about a minute. It maps public companies to matching research at UNC Chapel Hill, scores them, and checks every citation.
+* **Sector Scan** — type an industry, get a sourced report in a few minutes. It maps public companies to matching research at UNC Chapel Hill, scores them, and checks every citation.
 * **UNC Partnership Intelligence** — for any company, it finds real UNC links: NIH grants, shared papers, joint trials, SEC filing mentions. Then it writes ready-to-send talking points.
 
 The one rule behind every choice: **the app must be free to run.**
@@ -47,8 +55,8 @@ The app has three surfaces.
 | Home | `dashboard` | The home screen. One search box and a 3D orbit. Type a name, press enter, and it opens a Project that runs the full pipeline. |
 | Companies | `company` | A Company Profile card — the single-company report generator. Search any public company. The report streams in. |
 | Sectors | `sector` | A Sector Scan card. Live progress ("N of M companies"), a ticker grid, and the full report. Click a ticker to load that company in the Companies view. |
-| Partnerships | `partnerships` | UNC Partnership Intelligence. Toggle company or sector. Shows real UNC signals plus a Talking Points card. |
-| Directory | `accounts` | The company database as a live table. Search, filter, sort, and export to CSV / Excel / PDF / Markdown. |
+| Partnerships | `partnerships` | UNC Partnership Intelligence. Toggle company or sector. Shows real UNC signals plus a Talking Points card. Requires an approved account. |
+| Directory | `accounts` | The company database as a live table. Search, filter, sort, and export to CSV / Excel / PDF / Markdown. Requires an approved account. |
 | Projects | `projects` | Saves one full pipeline run as a project. See [Projects canvas](#projects-canvas). |
 
 A seventh view, **Account** (`account`), is reached from the Profile button in the header, not the nav.
@@ -224,7 +232,7 @@ Charts have no dependencies. They are hand-built SVG and HTML, and ride *inside 
 
 ```mermaid
 flowchart LR
-    SRC["lib/generate.ts<br/>or curated .md"] -->|"```chart block (JSON)"| MD["Markdown stream"]
+    SRC["lib/generate.ts<br/>or curated .md"] -->|"fenced chart block (JSON)"| MD["Markdown stream"]
     MD --> RM["react-markdown"]
     RM -->|"code.language-chart"| INT["MarkdownArticle<br/>interceptor"]
     INT -->|"JSON.parse OK"| CH{"spec.type"}
@@ -244,7 +252,7 @@ While a chart block is still streaming (the JSON is not done), the interceptor s
 
 Give it a sector (say `Oncology`, `Semiconductors`, or `Energy Minerals`). The backend then:
 
-1. Resolves the sector to a company set: 39 curated sectors, or live SEC EDGAR full-text search for niche terms.
+1. Resolves the sector to a company set: 59 curated sectors, or live SEC EDGAR full-text search for niche terms.
 2. Pulls primary-source data per company, in parallel, from SEC EDGAR, ClinicalTrials.gov, PubMed, and NIH RePORTER.
 3. Builds a 7-section report plus a one-page summary. Every claim has at least two citable URLs.
 4. Streams real progress to the browser as each company resolves.
@@ -260,8 +268,8 @@ sequenceDiagram
     PX->>OR: forward request
     OR->>OR: resolve sector to company set (≤ 22)
     OR-->>UI: event: stage · key="resolved" (total N)
-    OR->>API: SEC facts prefetch (≤ 8 workers, 15 s budget)
-    par one worker per company · 44 s total budget
+    OR->>API: SEC facts prefetch (≤ 8 workers, 40 s budget)
+    par one worker per company · 270 s total budget
         OR->>API: SEC EDGAR (facts, XBRL, filings)
         OR->>API: ClinicalTrials.gov (pipeline)
         OR->>API: PubMed (UNC co-authorship)
@@ -282,7 +290,7 @@ sequenceDiagram
     end
 ```
 
-The seven event types the stream emits are `resolved`, `progress`, `heartbeat`, `building`, `verifying`, `done`, and `error`. The seven event types the stream emits are `resolved`, `progress`, `heartbeat`, `building`, `verifying`, `done`, and `error`. If streaming is not available, the frontend falls back to a plain `/run-pipeline` request with a cosmetic progress bar.
+The seven event types the stream emits are `resolved`, `progress`, `heartbeat`, `building`, `verifying`, `done`, and `error`. If streaming is not available, the frontend falls back to a plain `/run-pipeline` request with a cosmetic progress bar.
 
 ### Sector resolution
 
@@ -291,7 +299,7 @@ Before any fetch, the orchestrator turns a free-text sector into a concrete comp
 ```mermaid
 flowchart TD
     IN["sector query<br/>(free text)"] --> CANON["canonicalize<br/>(lowercase, alias map)"]
-    CANON --> Q{"matches one of<br/>39 curated sectors?"}
+    CANON --> Q{"matches one of<br/>59 curated sectors?"}
     Q -->|"yes"| SEEDS["use curated SECTOR_SEEDS<br/>+ NC regional seeds<br/>(SAS, Red Hat, IQVIA, Labcorp…)"]
     Q -->|"no"| DISC["SEC EDGAR full-text discovery<br/>10-Ks, last 4 yrs · limit 15<br/>filtered to active CIKs"]
     DISC --> D2{"any companies<br/>found?"}
@@ -490,7 +498,7 @@ sequenceDiagram
 
 ## Company database
 
-The Companies view renders 309 companies parsed from the UNC industry company load template and enriched by research. Each profile carries aliases, parent account, sector profiles, a description, structure, ownership, address, founded year, employees, revenue, and a login-gated link to the source report.
+The Directory view renders 309 companies parsed from the UNC industry company load template and enriched by research. Each profile carries aliases, parent account, sector profiles, a description, structure, ownership, address, founded year, employees, and revenue. Source-report links are served as opaque IDs — the real auth-gated URLs live server-side (`lib/reportLinks.ts`) and are exchanged only through `/api/report-link` for approved, signed-in users.
 
 It renders as a live table: search by name / sector / HQ, type-filter pills (Public / Private / Nonprofit / Government), click-to-sort columns, structure pills, exchange tags, and a pinned first column. Downloads: CSV of the filtered set, plus `.xlsx`, landscape PDF, and raw Markdown.
 
@@ -499,11 +507,11 @@ It renders as a live table: search by name / sector / HQ, type-filter pills (Pub
 
 ## Authentication
 
-The workspace at `/` sits behind `AuthGate` (Firebase): email/password, Google, and Microsoft OAuth. The reports need no auth and no keys. The gate only covers the workspace UI. A standalone auth portal (login page plus account dashboard, React Router) lives under `map/src/`.
+The workspace at `/` sits behind `AuthGate` (Firebase): email/password, Google, and Microsoft OAuth. Signing up does not grant access by itself — a new account enters an **owner-approval queue** as `pending` (`lib/accountApproval.ts`); an owner approves or denies it from the Approvals panel, and only `approved` accounts reach the full workspace. The Partnerships and Directory tabs require an approved account; the report engines themselves need no keys. A standalone auth portal (login page plus account dashboard, React Router) lives under `map/src/`.
 
 ## Security and privacy
 
-The free, keyless, public-source design shapes the threat model. There are no paid keys to leak, no model in the path, and no private data beyond what a user chooses to save.
+The free, keyless, public-source design shapes the threat model. There are no paid keys to leak, no model in the path, and no private data beyond what a user chooses to save. Privacy notes live in [docs/PRIVACY.md](docs/PRIVACY.md).
 
 ```mermaid
 flowchart TB
@@ -515,7 +523,8 @@ flowchart TB
     end
 
     subgraph EDGE["Edge / proxy defenses  ·  Next.js"]
-        MW["middleware.ts\nper-IP rate limit → 429\npublic API allowlist bypasses Bearer gate"]
+        MW["middleware.ts\npublic API allowlist\nother routes need a Bearer token"]
+        RL["lib/rateLimit.ts\nper-uid token bucket → 429\n(applied in each API route)"]
         PG["proxyGuard.ts\n16 KB cap → 413\nshape + length checks → 400\ntimeout → 504"]
     end
 
@@ -525,19 +534,20 @@ flowchart TB
     end
 
     U --> SU --> RM
-    U --> MW --> PG
+    U --> MW --> RL --> PG
     U --> FS & LS
 ```
 
 ### What is hardened
 
 * **Markdown XSS.** `react-markdown` renders with no raw-HTML pass. Every link and image URL goes through `safeUrl` (`map/lib/markdownSafe.ts`). It strips control-character tricks, then allows only `http(s):`, `mailto:`, in-page anchors, and same-origin paths.
-* **Public API allowlist.** `middleware.ts` keeps an explicit `PUBLIC_API` list (`/api/generate`, `/api/partnerships`, `/api/talking-points`, `/api/run-pipeline`, `/api/freshness`). Routes off this list need a Bearer token.
-* **Rate limits.** Per-IP, per-route caps (`lib/rateLimit.ts`): `/api/generate` 10/min, `/api/run-pipeline*` 3/min, `/api/partnerships` 20/min. Over the cap returns 429.
+* **Public API allowlist.** `middleware.ts` keeps an explicit `PUBLIC_API` list (`/api/generate`, `/api/partnerships`, `/api/talking-points`, `/api/run-pipeline`, `/api/freshness`, `/api/resolve-kind`). Routes off this list — including the `/api/report-link` exchange — need a Bearer token.
+* **Rate limits.** Per-uid, per-route token buckets (`lib/rateLimit.ts`), enforced inside each API route: `/api/generate` 10/min, `/api/run-pipeline*` 3/min, `/api/partnerships` 20/min. Over the cap returns 429.
 * **Proxy abuse.** `proxyGuard.ts` checks before any upstream work: 16 KB body cap, JSON shape and length checks, fetch timeout, `no-store` cache headers.
 * **No secrets in the path.** No keys are required or committed. The optional `TAVILY_API_KEY` and `PATENTSVIEW_API_KEY` only add web-search and patent data; both default off.
-* **Security headers.** Every response carries CSP (`default-src 'self'`, `object-src 'none'`, `frame-ancestors 'self'`), HSTS, `X-Frame-Options: SAMEORIGIN`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and a `Permissions-Policy` that turns off camera/mic/geolocation.
-* **Per-user data isolation.** Saved reports for signed-in users live at `users/{uid}/savedReports/{id}` in Firestore, locked by rules that need `request.auth.uid == userId`.
+* **Security headers.** Every response carries CSP (`default-src 'self'`, `object-src 'none'`, `frame-ancestors 'none'`, with narrow script/connect allowances for Firebase and Google sign-in), HSTS, `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: no-referrer`, `Cache-Control: no-store`, and a `Permissions-Policy` that turns off camera/mic/geolocation/payment.
+* **Per-user data isolation.** Saved reports for signed-in users live at `users/{uid}/savedReports/{id}` in Firestore, locked by rules (`firestore.rules` at the repo root) that need `request.auth.uid == userId`.
+* **Error monitoring.** Sentry is wired for client, edge, and server errors but stays a no-op unless a DSN is set. No DSN, no telemetry.
 
 ### Honest limitations
 
@@ -582,10 +592,12 @@ map/                                  Next.js app  ·  one Vercel project
     api/run-pipeline/route.ts         JSON proxy → backend
     api/run-pipeline-stream/route.ts  SSE proxy → backend
     api/freshness/route.ts            data freshness check
+    api/resolve-kind/route.ts         keyless sector-vs-company classifier
+    api/report-link/route.ts          auth-gated opaque-ID → report-URL exchange
     components/                       MarkdownArticle (chart interceptor), Charts,
                                       CompanyLogo, IntroSplash
   components/
-    AuthGate.tsx                      Firebase sign-in gate
+    AuthGate.tsx                      Firebase sign-in gate + owner-approval queue
     workspace/
       DashboardHome.tsx               home view
       CompanyCanvas.tsx               Company Profile card
@@ -615,22 +627,28 @@ map/                                  Next.js app  ·  one Vercel project
     report-slides.ts                  per-sector .pptx deck + speaker notes
     report-export.ts / pdf-writer.ts  Markdown / PDF / Word exporters
     markdownSafe.ts                   safeUrl link/image allowlist
-    proxyGuard.ts / rateLimit.ts      proxy body checks, per-route rate limits
+    proxyGuard.ts / rateLimit.ts      proxy body checks, per-uid rate limits
     verifyAuth.ts                     optional Firebase token check (null for guests)
-  middleware.ts                       edge middleware · public API allowlist · rate limit
+    accountApproval.ts                owner-approval queue (pending/approved/denied)
+    reportLinks.ts                    server-side report-URL map (opaque IDs)
+  middleware.ts                       edge middleware · public API allowlist · Bearer gate
   content/reports/*.md                7 curated company profiles
   src/                                standalone Firebase auth portal
+  sentry.*.config.ts                  error monitoring (no-op without a DSN)
   tests/
-    unit/                             Vitest: markdownSafe, format, sec
-    e2e/                              Playwright: partnerships, talking-points,
-                                        company-profile, sector-package, security, smoke
+    unit/                             Vitest suites (markdownSafe, format, sec,
+                                        talkingPoints, dedup, sectorRouting, …)
+    e2e/                              Playwright specs (partnerships, talking-points,
+                                        company-profile, sector-package, projects,
+                                        auth-approval, security, smoke, …)
+                                        + live smoke scripts (prod-smoke, live-full)
 
 backend/                             Sector Scan + UNC Partnership · FastAPI · Vercel
   api/index.py                       Vercel ASGI entry point
-  vercel.json                        @vercel/python · maxDuration 60
+  vercel.json                        @vercel/python · maxDuration 300
   aria_pi/
     orchestrator.py                  FastAPI app, endpoints, concurrency, SSE
-    sectors.py                       sector resolution, 39 curated + NC seeds
+    sectors.py                       sector resolution, 59 curated + NC seeds
     config.py                        defaults (companies_per_report = 22)
     clients/
       sec_edgar_client.py            SEC verbatim quote extraction
@@ -649,11 +667,13 @@ backend/                             Sector Scan + UNC Partnership · FastAPI ·
     utils/                           affiliation, name_resolver, net_guard
     models/                          Pydantic models (claim, company, profile)
     data/                            curated UNC data (unc_programs.json, seeds)
-    tests/                           pytest suite (16 files)
+    tests/                           pytest suite (18 test files)
 
 ACCOUNTS_DATA.md                     accounts database citations
-company-intelligence-reports/        original program 1 (reference, not deployed)
-map-sector-scan-reports/             original program 2 (reference, not deployed)
+docs/PRIVACY.md                      privacy notes
+firebase.json / firestore.rules      Firebase hosting + Firestore security rules
+qa-sectors/                          live sector-scan QA audits and results
+tests/integration/                   cross-service integration tests
 ```
 
 Tech stack: Next.js 15 (App Router), React 19, TypeScript 5, Tailwind; FastAPI, Pydantic, Python 3; exports via `docx`, `jspdf`, `xlsx` (SheetJS), `pptxgenjs`; Firebase 12 for auth; Vercel for both runtimes.
@@ -686,7 +706,7 @@ cd backend && ./run_tests.sh   # or: pytest
 
 # frontend
 cd map
-npm run test:unit              # Vitest unit tests (markdownSafe, format, sec)
+npm run test:unit              # Vitest unit tests (9 suites of pure functions)
 npm test                       # Playwright e2e (fully mocked, runs offline)
 npm run typecheck              # tsc --noEmit
 ```
@@ -703,6 +723,8 @@ The backend suite covers every client, the report builder, the source tagger, se
 | `VERCEL_AUTOMATION_BYPASS_SECRET` | No | Set only if the backend project has Deployment Protection on. |
 | `NEXT_PUBLIC_FIREBASE_*` | No | Firebase web config. Checked in by default. |
 | `FIREBASE_SERVICE_ACCOUNT` | No | Enables server-side Firebase token checks. |
+| `NEXT_PUBLIC_SENTRY_DSN` / `SENTRY_DSN` | No | Turns on Sentry error monitoring. Omitted = no telemetry. |
+| `SENTRY_AUTH_TOKEN` | No | Enables source-map upload at build time. |
 
 **Backend:**
 
@@ -715,11 +737,11 @@ The company profile and talking-points engines need no env vars at all. No model
 
 ## Deployment
 
-Two Vercel projects, both on the free tier.
+Two Vercel projects. The frontend runs on the free tier; the backend sets `maxDuration: 300`, which requires a Vercel plan that allows 300-second functions. "Free to run" refers to per-request cost — no metered model or data API is ever billed.
 
 ```mermaid
 flowchart LR
-    R[this repo] --> V1["Vercel project 1\nroot: backend/\n@vercel/python via api/index.py\nmaxDuration 60 s"]
+    R[this repo] --> V1["Vercel project 1\nroot: backend/\n@vercel/python via api/index.py\nmaxDuration 300 s"]
     R --> V2["Vercel project 2\nroot: map/\nNext.js"]
     V2 -- "BACKEND_API_URL" --> V1
 ```
@@ -733,29 +755,29 @@ Set `BACKEND_API_URL` on the frontend project to the backend's URL. Curated Mark
 
 ## Performance and limits
 
-* **Concurrency budget.** Up to 22 companies are fetched in parallel under a hard 44-second budget, so the backend stays under Vercel's 60-second cap.
+* **Concurrency budget.** Up to 22 companies are fetched in parallel under a hard 270-second budget (`FETCH_BUDGET_SECONDS`), so the backend stays under Vercel's 300-second function cap with headroom for assembly.
 * **Streaming cadence.** Company profile reports stream in small chunks. Sector scan progress events fire as each company resolves.
 * **Talking points latency.** `/api/talking-points` does zero network calls. It is pure in-process assembly and returns in a few milliseconds.
 * **Export size.** PDF and Word capture the rendered page as paginated images, so big sector reports can run 70–95 pages and take ~20 seconds. Markdown, Excel, and PowerPoint come from data and stay small.
 * **Mobile.** The UI is responsive. Image-based PDF/Word capture is memory-heavy. On mobile, prefer Markdown / Excel / PowerPoint.
 
-A sector scan lives inside a hard time box so it never trips Vercel's 60-second function cap. The SEC facts prefetch is given its own 15-second slice, the parallel per-company fetch shares a 44-second budget, then assembly and verification run in the remaining headroom.
+A sector scan lives inside a hard time box so it never trips Vercel's 300-second function cap. The SEC facts prefetch runs first and eats into (not on top of) the shared 270-second data budget — its own slice is 40 seconds — then assembly and verification run in the remaining headroom. Whatever data has returned by the deadline is used as-is; the ReportBuilder derives a complete report from partial data.
 
 ```mermaid
 gantt
-    title Sector scan · time budget (seconds, within Vercel's 60 s cap)
+    title Sector scan · time budget (seconds, within Vercel's 300 s cap)
     dateFormat X
     axisFormat %S
     section Resolve
-    Sector to company set (max 22)  :r, 0, 2
+    Sector to company set (max 22)  :r, 0, 5
     section Fetch
-    SEC facts prefetch (8 workers)  :prefetch, 2, 17
-    Per-company fetch (1 per co)    :crit, fetch, 2, 46
+    SEC facts prefetch (8 workers)  :prefetch, 5, 45
+    Per-company fetch (1 per co)    :crit, fetch, 5, 275
     section Assemble
-    ReportBuilder 7 sections        :build, 46, 52
-    SourceTagger 2-source verify    :verify, 52, 56
+    ReportBuilder 7 sections        :build, 275, 288
+    SourceTagger 2-source verify    :verify, 288, 295
     section Limit
-    Vercel function cap (60 s)      :milestone, cap, 60, 0
+    Vercel function cap (300 s)     :milestone, cap, 300, 0
 ```
 
 Worker pools by stage: SEC facts prefetch up to **8** workers, streaming fetch **1 worker per company**, per-company enrichment up to **5**, and PubMed COI lookups run **sequentially** to respect the NCBI rate limit.
