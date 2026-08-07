@@ -441,27 +441,59 @@ class SECEdgarClient:
             return max(candidates, key=lambda r: r.get("end", ""))
 
         def annual_series(*concept_names: str, unit: str = "USD", src: dict = us_gaap, years: int = 11) -> list:
-            """Up to `years` of annual (10-K/FY) values, merged across concept
-            names and deduped by fiscal year. Returns [{fy, val}] ascending —
-            the time series used for the on-screen trend charts.
+            """Up to `years` of annual (10-K/FY) values, one point per fiscal year.
+
+            Two failure modes shape the merge rule:
+              - Apple RETIRED SalesRevenueNet after FY2018 and continued under a
+                new concept — history must merge across both or the chart loses
+                its early years.
+              - Pfizer reports total revenue AND contract-only revenue under
+                DIFFERENT concepts in the same years — a naive merge switched
+                streams mid-chart (FY2023 showed $50.9B product revenue against
+                FY2022's $100.3B total: a fake -49% year).
+            So: rank concepts by how recent a fiscal year they reach (ties:
+            coverage). The newest-ranked concept owns every year it reports;
+            older concepts only FILL YEARS it lacks. Overlapping years can
+            never mix streams, and a genuine concept handoff still yields the
+            full history.
             """
-            by_fy: dict[int, dict] = {}
+            ranked: list[tuple[int, int, dict]] = []
             for name in concept_names:
                 concept = src.get(name) or {}
+                by_fy: dict[int, dict] = {}
                 for e in ((concept.get("units") or {}).get(unit) or []):
                     if e.get("form") not in ("10-K", "20-F", "40-F") or e.get("fp") != "FY":
                         continue
                     if not full_year_duration(e):
                         continue  # quarterly comparative inside a 10-K
-                    fy = e.get("fy")
                     val = e.get("val")
+                    end = e.get("end") or ""
+                    # Label the point by its PERIOD, not by the filing: the
+                    # XBRL "fy" field names the report a fact appeared in, so
+                    # comparatives carry the wrong year — LabCorp's entity swap
+                    # showed FY2022's revenue labeled FY2021 and dropped a
+                    # year. The fiscal-year convention (calendar year of the
+                    # period end) matches Apple (Sep), FedEx (May), Tesla (Dec);
+                    # retail years ending Jan/Feb (Lowe's, Target) belong to
+                    # the PRIOR calendar year.
+                    if len(end) >= 7 and end[:4].isdigit():
+                        fy = int(end[:4]) - (1 if end[5:7] in ("01", "02") else 0)
+                    else:
+                        fy = e.get("fy")
                     if fy is None or val is None:
                         continue
                     # Prefer the later-filed value for a given fiscal year.
                     prev = by_fy.get(fy)
                     if prev is None or (e.get("end", "") > prev.get("end", "")):
-                        by_fy[fy] = {"fy": int(fy), "val": val, "end": e.get("end", "")}
-            ordered = sorted(by_fy.values(), key=lambda x: x["fy"])[-years:]
+                        by_fy[fy] = {"fy": int(fy), "val": val, "end": end}
+                if by_fy:
+                    ranked.append((max(by_fy), len(by_fy), by_fy))
+            ranked.sort(key=lambda t: (t[0], t[1]), reverse=True)
+            merged: dict[int, dict] = {}
+            for _, _, by_fy in ranked:
+                for fy, row in by_fy.items():
+                    merged.setdefault(fy, row)
+            ordered = sorted(merged.values(), key=lambda x: x["fy"])[-years:]
             return [{"fy": x["fy"], "val": x["val"]} for x in ordered]
 
         REV_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
@@ -486,7 +518,13 @@ class SECEdgarClient:
                 "NetCashProvidedByUsedInOperatingActivities", "USD"),
             "total_assets": most_recent("Assets"),
             "stockholders_equity": latest_annual("StockholdersEquity", "USD"),
-            "employees": latest_annual("EntityNumberOfEmployees", "pure", source=dei),
+            # Employee counts are rarely re-tagged: Merck's latest
+            # EntityNumberOfEmployees fact was Schering-Plough's 2009 headcount
+            # (24,700 shown as current for a 70,000-person company). A stale
+            # count is worse than none — only report one from the last ~2 years.
+            "employees": (lambda emp: emp if emp and (emp.get("end") or "") >=
+                          (date.today() - timedelta(days=730)).isoformat() else None)(
+                latest_annual("EntityNumberOfEmployees", "pure", source=dei)),
             "shares_outstanding": latest_annual("EntityCommonStockSharesOutstanding", "shares", source=dei),
             "series": {
                 "revenue": annual_series(*REV_CONCEPTS),
@@ -784,12 +822,14 @@ class SECEdgarClient:
         tickers = load_tickers()
         # Score each ticker. On ties, prefer the title with the FEWEST extra
         # descriptive tokens (tokens that are neither in the query nor a corporate
-        # suffix), then the shorter title. So "Goldman Sachs" → "Goldman Sachs
-        # Group Inc" (extras: none) over "Goldman Sachs BDC Inc" (extra: "bdc"),
-        # and "Coca-Cola" → "Coca-Cola Co" over the longer Europacific bottler.
+        # suffix), then the EARLIER position in SEC's ticker map — the file is
+        # market-cap ordered, so the flagship entity outranks a same-name
+        # spinoff. ("Honeywell" scored 80 for both "Honeywell International
+        # Inc" and the newly listed "Honeywell Aerospace Inc", each with one
+        # extra token; the old shorter-title tiebreak picked the spinoff.)
         best = None
-        best_key = (0, 1, 0)  # (score, -extra, -len): higher is better
-        for t in tickers:
+        best_key = (0, 1, 1)  # (score, -extra, -position): higher is better
+        for idx, t in enumerate(tickers):
             sym = (t.get("ticker") or "").lower()
             nt = _norm_name(t.get("title") or "")
             if not nt:
@@ -814,7 +854,7 @@ class SECEdgarClient:
             if score > 0:
                 extra = sum(1 for w in nt_tokens
                             if w not in nq_set and w not in _CORP_SUFFIX_TOKENS)
-                key = (score, -extra, -len(nt))
+                key = (score, -extra, -idx)
                 if key > best_key:
                     best_key = key
                     best = t

@@ -836,10 +836,26 @@ function riskHeadlines(riskSeg: string): string[] {
  * return the disclosed employee count phrase, if found
  */
 function extractEmployees(text: string): string | undefined {
-  const m = text.match(
-    /(?:had|employed|approximately|of)\s+([\d,]{4,})\s+(?:full-?\s?time\s+)?(?:employees|people|persons)/i,
-  );
-  return m ? m[1].replace(/,/g, ",") : undefined;
+  // A 10-K often mentions SEGMENT headcounts before the company total
+  // (Merck's first match was a 24,700-person unit in a 70,000-person
+  // company). Every such phrase names a subset, so the LARGEST match is the
+  // total. The word must be "employees" — matching "people" pulled in
+  // Moderna's vaccination statistics (680,000 people ≠ 5,800 employees) —
+  // and values above 3M are mis-parses (no employer is bigger than ~2.1M).
+  const all = [...text.matchAll(
+    /(?:had|have|employed|employs?)\s+(?:approximately\s+|about\s+|over\s+|more\s+than\s+)?([\d,]{4,})\s+(?:full-?\s?time\s+)?employees/gi,
+  )];
+  let best: number | undefined;
+  let bestRaw: string | undefined;
+  for (const m of all) {
+    const n = parseInt(m[1].replace(/,/g, ""), 10);
+    if (!Number.isFinite(n) || n > 3_000_000) continue;
+    if (best === undefined || n > best) {
+      best = n;
+      bestRaw = m[1];
+    }
+  }
+  return bestRaw;
 }
 
 const NAME = "[A-Z][A-Za-z.'’-]+(?:\\s+[A-Z][A-Za-z.'’-]+){1,3}";
@@ -1175,11 +1191,27 @@ function mergedAnnualNs(
 ): YearValue[] {
   const root = f?.[ns];
   if (!root) return [];
-  const byFy = new Map<number, number>();
+  // Concepts must not mix inside the years they share: Pfizer tags total
+  // revenue and contract-only revenue under different concepts, and a
+  // first-concept-wins merge switched streams mid-chart (a fake -49% year).
+  // Rank each concept's series by how recent a fiscal year it reaches (ties:
+  // coverage); the newest-ranked concept owns every year it reports, and the
+  // older ones only fill years it lacks — so a genuine concept handoff
+  // (Apple retired SalesRevenueNet in FY2018) still merges the full history.
+  const ranked: YearValue[][] = [];
   for (const name of names) {
     const units = root[name]?.units?.[currency];
     if (!Array.isArray(units)) continue;
-    for (const yv of toAnnual(units, instant)) {
+    const series = toAnnual(units, instant);
+    if (series.length) ranked.push(series);
+  }
+  ranked.sort((a, b) => {
+    const maxA = a[a.length - 1].fy, maxB = b[b.length - 1].fy;
+    return maxB - maxA || b.length - a.length;
+  });
+  const byFy = new Map<number, number>();
+  for (const series of ranked) {
+    for (const yv of series) {
       if (!byFy.has(yv.fy)) byFy.set(yv.fy, yv.val);
     }
   }
@@ -1219,8 +1251,18 @@ function toAnnual(entries: any[] | null, instant: boolean): YearValue[] {
         (new Date(e.end).getTime() - new Date(e.start).getTime()) / 86_400_000;
       if (days < 350 || days > 380) continue; // keep only full-year durations
     }
-    const prev = byFy.get(e.fy);
-    if (!prev || e.end > prev.end) byFy.set(e.fy, { val: e.val, end: e.end });
+    // Label the point by its PERIOD, not the filing it appeared in: XBRL's
+    // "fy" names the report, so comparative years carry the wrong label
+    // (LabCorp's entity swap showed FY2022 revenue as FY2021 and dropped a
+    // year). Fiscal-year convention = calendar year of the period end, except
+    // retail years ending Jan/Feb (Lowe's, Target) belong to the PRIOR year.
+    let fy = e.fy as number;
+    if (typeof e.end === "string" && /^\d{4}-\d{2}/.test(e.end)) {
+      const [y, m] = [Number(e.end.slice(0, 4)), e.end.slice(5, 7)];
+      fy = m === "01" || m === "02" ? y - 1 : y;
+    }
+    const prev = byFy.get(fy);
+    if (!prev || e.end > prev.end) byFy.set(fy, { val: e.val, end: e.end });
   }
   return [...byFy.entries()]
     .map(([fy, v]) => ({ fy, val: v.val }))

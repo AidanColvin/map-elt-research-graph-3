@@ -413,3 +413,62 @@ def test_latest_annual_prefers_full_year_over_latest_quarter():
         facts = client.get_company_facts("Electronic Arts")
     assert facts["xbrl"]["revenue"]["value"] == 7_500_000_000
     assert facts["xbrl"]["revenue"]["end"] == "2025-03-31"
+
+
+def test_annual_series_never_mixes_overlapping_concepts():
+    """
+    Takes: two revenue concepts that OVERLAP in FY2023 with different values
+           (total revenue vs contract-only, the Pfizer shape).
+    Does: builds the annual series.
+    Returns: FY2023 from the concept that reaches the newest fiscal year —
+             never the stale concept's value — while non-overlapping early
+             years still merge in (the Apple concept-handoff shape).
+    """
+    client = SECEdgarClient()
+    xbrl = {"facts": {"us-gaap": {
+        "Revenues": {"units": {"USD": [
+            {"val": 90, "start": "2017-01-01", "end": "2017-12-31",
+             "form": "10-K", "fp": "FY", "fy": 2017, "accn": "a1"},
+            {"val": 100, "start": "2023-01-01", "end": "2023-12-31",
+             "form": "10-K", "fp": "FY", "fy": 2023, "accn": "a2"},
+        ]}},
+        "RevenueFromContractWithCustomerExcludingAssessedTax": {"units": {"USD": [
+            {"val": 51, "start": "2023-01-01", "end": "2023-12-31",
+             "form": "10-K", "fp": "FY", "fy": 2023, "accn": "a3"},
+            {"val": 60, "start": "2024-01-01", "end": "2024-12-31",
+             "form": "10-K", "fp": "FY", "fy": 2024, "accn": "a4"},
+        ]}},
+    }}}
+    submissions = {"name": "X", "tickers": [],
+                   "filings": {"recent": {"form": [], "filingDate": [],
+                                          "accessionNumber": [], "primaryDocument": []}}}
+
+    def fake_get(self, url, **kwargs):
+        return FakeResponse(xbrl if "companyfacts" in url else submissions)
+
+    with patch.object(client, "_find_cik", return_value="1"), \
+         patch("aria_pi.clients.sec_edgar_client.requests.Session.get", new=fake_get):
+        facts = client.get_company_facts("X")
+    series = {pt["fy"]: pt["val"] for pt in facts["xbrl"]["series"]["revenue"]}
+    # FY2023 must come from the newest-reaching concept (51), not mix in 100…
+    assert series[2023] == 51 and series[2024] == 60
+    # …while the old concept still fills the year it alone covers.
+    assert series[2017] == 90
+
+
+def test_find_cik_tie_prefers_cap_ranked_flagship_over_spinoff():
+    """
+    Takes: a ticker map where the flagship and a same-name spinoff both match
+           the query with equal score and equally many extra tokens, with the
+           flagship EARLIER in SEC's (market-cap ordered) map.
+    Does: resolves the bare brand name.
+    Returns: the flagship's CIK — not the spinoff the old shorter-title
+             tiebreak used to pick ("Honeywell" → Honeywell Aerospace Inc).
+    """
+    client = SECEdgarClient()
+    tickers = [
+        {"cik_str": 773840, "ticker": "HON", "title": "HONEYWELL INTERNATIONAL INC"},
+        {"cik_str": 999999, "ticker": "HONA", "title": "Honeywell Aerospace Inc"},
+    ]
+    with patch("aria_pi.clients.sec_edgar_client.load_tickers", return_value=tickers):
+        assert client._find_cik("Honeywell") == "773840"
