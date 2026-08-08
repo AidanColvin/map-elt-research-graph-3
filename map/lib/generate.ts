@@ -224,7 +224,7 @@ function banner(profile: SecProfile | null, ticker?: string): string {
   if (profile?.hqCity)
     bits.push(`${profile.hqCity}${profile.hqState ? ", " + profile.hqState : ""}`);
   if (!bits.length)
-    return "> Private company — no SEC filings available. Profile assembled from public web sources.\n";
+    return "> No SEC filings located — the company may be private, a subsidiary, or a foreign filer (20-F/6-K). Profile assembled from public web sources.\n";
   return `> ${bits.join(" · ")}\n`;
 }
 
@@ -262,7 +262,7 @@ function execSummary(
   if (!overview && wiki?.description) lines.push(`It is ${withArticle(wiki.description)} [2].`);
   if (lines.length === 1)
     lines.push(
-      `${name} is a private company; detailed financials are not available through SEC EDGAR [1].`,
+      `Detailed financials for ${name} are not available through SEC EDGAR — it may be private, a subsidiary, or a foreign-listed filer (20-F/6-K) [1].`,
     );
   return lines.join(" ") + "\n";
 }
