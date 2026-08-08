@@ -245,6 +245,23 @@ def test_hospitals_is_distinct_from_broad_healthcare():
         assert off_sector not in seeds
 
 
+def test_genomics_is_distinct_from_biotech():
+    """
+    takes: nothing
+    does: confirms genomics resolves to its own seed set of sequencing / genetic
+          testing firms, not the biotech drug-developer set
+    gives: no assertion error when the two sectors do not share an identical set
+    """
+    assert canonical_sector("genomics") == "genomics"
+    assert canonical_sector("genome sequencing") == "genomics"
+    # Gene therapy and mRNA stay biotech (drug developers, not sequencing).
+    assert canonical_sector("gene therapy") == "biotech"
+    assert canonical_sector("mrna") == "biotech"
+    gen, bio = SECTOR_SEEDS["genomics"], SECTOR_SEEDS["biotech"]
+    assert "Illumina" in gen and "Natera" in gen
+    assert set(gen) != set(bio)
+
+
 def test_naics_supersector_robustness():
     """Abbreviations and common misspellings still route sensibly."""
     assert canonical_sector("govt") == "state and local government"

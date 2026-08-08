@@ -21,6 +21,13 @@ SECTOR_SEEDS = {
     "pharmaceutical": ["Johnson & Johnson", "Pfizer", "Merck", "Eli Lilly", "AbbVie",
                        "Bristol-Myers Squibb", "AstraZeneca", "Novartis", "Roche", "GSK",
                        "Sanofi", "Amgen", "Gilead Sciences", "Takeda Pharmaceutical", "Biogen"],
+    # Genomics / genetic testing / sequencing — a distinct sub-sector from
+    # drug-developing biotech: sequencing platforms, liquid biopsy, and genetic
+    # diagnostics. Without its own seeds "genomics" collapsed onto "biotech" and
+    # returned an identical company set.
+    "genomics": ["Illumina", "Pacific Biosciences of California", "10x Genomics", "Natera", "Guardant Health",
+                 "Exact Sciences", "Myriad Genetics", "NeoGenomics", "Veracyte", "Twist Bioscience",
+                 "CareDx", "Fulgent Genetics", "Bruker", "Laboratory Corporation of America", "Quest Diagnostics"],
     "ag-bio": ["Corteva", "Bayer", "Syngenta", "Ginkgo Bioworks", "Pivot Bio",
                "Nutrien", "CF Industries", "Mosaic", "FMC Corporation", "American Vanguard",
                "Scotts Miracle-Gro", "ICL Group", "Balchem Corporation", "Innospec", "Cabot Corporation"],
@@ -307,6 +314,7 @@ SECTOR_DOMAIN = {
     "oncology": "health", "biotech": "health", "pharmaceutical": "health",
     "ag-bio": "health", "medtech": "health", "rural health": "health",
     "health it": "health", "healthcare": "health", "digital health": "health",
+    "genomics": "health",
     "technology": "tech", "software": "tech", "artificial intelligence": "tech",
     "semiconductors": "tech", "cybersecurity": "tech", "cloud computing": "tech",
     "quantum computing": "tech", "robotics": "tech", "telecom": "tech",
@@ -373,7 +381,10 @@ _KEYWORD_ROUTES = [
     (("information services", "information sector"), "information"),
     (("oncolog", "cancer", "tumor"), "oncology"),
     (("pharma", "drug", "therapeut", "medicine"), "pharmaceutical"),
-    (("biotech", "biolog", "genom", "gene therap", "mrna"), "biotech"),
+    # Genomics must precede biotech so "genom"/"sequencing"/"genetic test"
+    # lands on its own seed set instead of collapsing onto biotech.
+    (("genom", "sequencing", "genetic test"), "genomics"),
+    (("biotech", "biolog", "gene therap", "mrna"), "biotech"),
     (("medtech", "medical device", "diagnostic", "imaging"), "medtech"),
     (("ehr", "electronic health record", "electronic medical record", "emr ",
       "epic", "cerner", "meditech", "health it", "health information",
