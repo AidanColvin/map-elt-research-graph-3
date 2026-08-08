@@ -511,12 +511,15 @@ class ReportBuilder:
         definition_text = first_str(ctx.get("definition"), derived_def)
 
         # Scale: curated → aggregate company revenue + R&D as a concrete proxy.
+        # The count is the REAL number of companies summed — a hardcoded "five"
+        # shipped while the totals summed 13–15 profiles.
+        n = len(companies)
         derived_scale = (
-            f"The five candidate companies reviewed for this report reported a "
+            f"The {n} candidate companies reviewed for this report reported a "
             f"combined latest-FY revenue of {_fmt_usd(total_rev)} and combined "
             f"R&D expense of {_fmt_usd(total_rd)} (latest 10-K filings on EDGAR)."
         ) if total_rev else (
-            f"Five candidate companies were analyzed. Combined SEC + ClinicalTrials "
+            f"{n} candidate companies were analyzed. Combined SEC + ClinicalTrials "
             f"data covered {total_trials} active trials and {total_grants} "
             f"UNC-held NIH grants mentioning these firms."
         )
@@ -550,13 +553,15 @@ class ReportBuilder:
                     "sources": ["https://clinicaltrials.gov", "https://www.sec.gov"],
                 })
 
-        # NC context: curated; fall back to a generic but factual statement.
+        # NC context: curated; fall back to a factual pointer WITHOUT any
+        # pipeline self-instruction (an earlier fallback leaked a note-to-self
+        # into the deliverable).
         nc_text = first_str(
             ctx.get("nc_context"),
-            ("North Carolina's industry context for this sector is documented by the NC "
-             "Biotechnology Center and the Economic Development Partnership of NC; "
-             "specific sector-level NC industry mapping should be added to the curated "
-             "context for future runs."),
+            ("North Carolina's footprint in this sector is documented by the "
+             "Economic Development Partnership of North Carolina (edpnc.com) and "
+             "the NC Department of Commerce; see those sources for state-level "
+             "employer and site data."),
         )
 
         return {
@@ -755,15 +760,18 @@ class ReportBuilder:
         parts = [facts.get("legal_name", c["name"]).rstrip(".") + "."]
         is_public = facts.get("is_public", bool(facts.get("cik")))
         if not is_public:
-            parts.append("Privately held — no SEC filings available; "
-                         "coverage below draws only on ClinicalTrials.gov, "
-                         "PubMed, and NIH RePORTER where the company is named.")
+            parts.append("No SEC filings located — the company may be privately "
+                         "held, listed only on a non-US exchange, or recently "
+                         "deregistered; coverage below draws only on "
+                         "ClinicalTrials.gov, PubMed, and NIH RePORTER where "
+                         "the company is named.")
         if facts.get("sic"):
             parts.append(f"{facts['sic']}.")
         if facts.get("hq"):
             parts.append(f"HQ: {_fmt_hq(facts['hq'])}.")
         if rev.get("value"):
-            parts.append(f"FY{rev.get('fy')} revenue: {_fmt_usd(rev['value'])}.")
+            fy_label = f"FY{rev['fy']} " if rev.get("fy") else "Latest reported "
+            parts.append(f"{fy_label}revenue: {_fmt_usd(rev['value'])}.")
         if rd.get("value"):
             parts.append(f"R&D: {_fmt_usd(rd['value'])}.")
         parts.append(f"{len(trials)} active trials.")
@@ -1262,7 +1270,21 @@ def _strongest_signal(c: dict) -> str:
 
 
 def _active_nih(c: dict) -> bool:
-    return any(str(g.get("fiscal_year", "")) for g in (c.get("nih_grants") or []))
+    """
+    takes: a company data dict
+    does: checks for an NIH grant funded within the last three fiscal years —
+          only that is "active" enough to warrant the verify-with-OSP flag
+          (older awards kept showing 2004–2011 grants as live relationships)
+    gives: True when a genuinely current grant exists
+    """
+    cutoff = datetime.now().year - 3
+    for g in c.get("nih_grants") or []:
+        try:
+            if int(str(g.get("fiscal_year", ""))) >= cutoff:
+                return True
+        except (TypeError, ValueError):
+            continue
+    return False
 
 
 def _has_unc_tie(c: dict) -> bool:
@@ -1349,14 +1371,16 @@ def _know_company(facts: dict, rev: dict, edgar_url: str) -> dict:
         bits.append(f"({sic})")
     if rev.get("value"):
         from_url = rev.get("url", edgar_url)
-        bits.append(f"reported FY{rev.get('fy')} revenue of {_fmt_usd(rev['value'])}")
+        fy_label = f"FY{rev['fy']} " if rev.get("fy") else "latest reported "
+        bits.append(f"reported {fy_label}revenue of {_fmt_usd(rev['value'])}")
         return {"text": " ".join(bits) + ".", "sources": [from_url, edgar_url]}
     if facts.get("cik"):
         bits.append(f"is SEC-registered (CIK {facts.get('cik')})")
     else:
-        # Honest: no CIK means it is not a current SEC filer (private company).
-        bits.append("is privately held with no SEC filings on record; "
-                    "public-source coverage is limited")
+        # Honest: no CIK means no CURRENT SEC filing was located — the company
+        # may be private, foreign-listed, or recently deregistered.
+        bits.append("has no SEC filings on record (it may be privately held or "
+                    "listed on a non-US exchange); public-source coverage is limited")
     # One genuine source only (EDGAR). Not duplicated to fake a second source —
     # the validator will flag this for analyst review, which is the honest state.
     return {"text": " ".join(bits) + ".", "sources": [edgar_url]}

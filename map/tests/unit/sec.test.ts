@@ -79,3 +79,36 @@ describe("latestQuarter", () => {
     expect(latestQuarter(f, REV, "USD")).toBeUndefined();
   });
 });
+
+import { reconcileLiabilities } from "@/lib/sec";
+
+/**
+ * reconcileLiabilities guards the "total liabilities = total assets" artifact
+ * and stale direct series (filers that stopped tagging us-gaap:Liabilities).
+ */
+describe("reconcileLiabilities", () => {
+  const yr = (fy: number, val: number) => ({ fy, val });
+
+  it("derives assets minus equity when no direct series exists", () => {
+    const out = reconcileLiabilities([], [yr(2025, 100)], [yr(2025, 40)]);
+    expect(out).toEqual([yr(2025, 60)]);
+  });
+
+  it("replaces a stale direct series (last tagged a decade ago)", () => {
+    const direct = [yr(2015, 280)];
+    const out = reconcileLiabilities(direct, [yr(2025, 400)], [yr(2025, 100)]);
+    expect(out).toEqual([yr(2025, 300)]);
+  });
+
+  it("replaces a degenerate series equal to total assets", () => {
+    const direct = [yr(2025, 100)];
+    const out = reconcileLiabilities(direct, [yr(2025, 100)], [yr(2025, 40)]);
+    expect(out).toEqual([yr(2025, 60)]);
+  });
+
+  it("keeps a healthy, current direct series", () => {
+    const direct = [yr(2024, 55), yr(2025, 61)];
+    const out = reconcileLiabilities(direct, [yr(2025, 100)], [yr(2025, 40)]);
+    expect(out).toBe(direct);
+  });
+});

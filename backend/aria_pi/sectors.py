@@ -128,23 +128,23 @@ SECTOR_SEEDS = {
     # Footwear — public SEC-filing companies only; Nike/Adidas are dual-listed
     # (both footwear + apparel). Skechers, Foot Locker, Deckers, Wolverine
     # World Wide, Caleres, Genesco, G-III Apparel are US-listed pure-plays.
-    "footwear": ["Nike", "Adidas", "Skechers", "Foot Locker", "Deckers Outdoor",
-                 "Wolverine World Wide", "Steve Madden", "Caleres", "Genesco", "G-III Apparel Group",
-                 "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "Vans"],
-    "shoes": ["Nike", "Adidas", "Skechers", "Foot Locker", "Deckers Outdoor",
-              "Wolverine World Wide", "Steve Madden", "Caleres", "Genesco", "G-III Apparel Group",
+    "footwear": ["Nike", "Birkenstock", "Skechers", "Foot Locker", "Deckers Outdoor",
+                 "Wolverine World Wide", "Steven Madden", "Caleres", "Genesco", "G-III Apparel Group",
+                 "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "VF Corporation"],
+    "shoes": ["Nike", "Birkenstock", "Skechers", "Foot Locker", "Deckers Outdoor",
+              "Wolverine World Wide", "Steven Madden", "Caleres", "Genesco", "G-III Apparel Group",
               "Columbia Sportswear", "Under Armour", "Crocs", "On Holding", "Levi Strauss"],
     # Laptops, phones, TVs, tablets — public SEC-filing hardware companies.
-    "consumer electronics": ["Apple", "HP", "Dell Technologies", "Lenovo", "Samsung Electronics",
-                             "Sony", "LG Electronics", "Microsoft", "ASUS", "Acer",
-                             "Logitech", "Corsair Gaming", "Turtle Beach", "Knowles Corporation", "Plantronics"],
+    "consumer electronics": ["Apple", "HP Inc", "Dell Technologies", "Sony", "Logitech",
+                             "Garmin", "Sonos", "GoPro", "Dolby Laboratories", "Universal Display",
+                             "Corsair Gaming", "Turtle Beach", "Knowles Corporation", "iRobot", "Vuzix"],
     # Video games, consoles, game engines — public companies only.
     "gaming": ["NVIDIA", "Advanced Micro Devices", "Microsoft", "Electronic Arts", "Take-Two Interactive",
                "Activision Blizzard", "Roblox", "Unity Software", "CD Projekt", "Ubisoft",
                "Sony", "Nintendo", "Corsair Gaming", "Turtle Beach", "SciPlay Corporation"],
     "streaming": ["Netflix", "Walt Disney", "Warner Bros Discovery", "Alphabet", "Amazon",
                   "Apple", "Comcast", "Paramount Global", "Spotify Technology", "Sirius XM Holdings",
-                  "FuboTV", "Roku", "LiveRamp Holdings", "The Trade Desk", "Digital Turbine"],
+                  "FuboTV", "Roku", "Fox Corporation", "AMC Networks", "Warner Music Group"],
     "consumer": ["Procter & Gamble", "Coca-Cola", "PepsiCo", "Nike", "Costco Wholesale",
                  "Unilever", "Colgate-Palmolive", "Kimberly-Clark", "Estee Lauder", "Church & Dwight",
                  "Clorox", "Hershey", "General Mills", "Hasbro", "Mattel"],
@@ -158,18 +158,48 @@ SECTOR_SEEDS = {
     # bucket (a "banking" query used to collapse onto the finance set).
     "banking": ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citigroup", "U.S. Bancorp",
                 "PNC Financial Services", "Truist Financial", "Fifth Third Bancorp", "M&T Bank", "KeyCorp",
-                "Regions Financial", "Citizens Financial Group", "Huntington Bancshares", "First Citizens BancShares", "Comerica"],
+                "Regions Financial", "Citizens Financial Group", "Huntington Bancshares", "First Citizens BancShares", "Zions Bancorporation"],
     # Asset management — asset/alternative managers and custodians, distinct
     # from the broad finance bucket (an "asset management" query collapsed onto it).
     "asset management": ["BlackRock", "Blackstone", "KKR", "Apollo Global Management", "Ares Management",
-                         "Carlyle Group", "T. Rowe Price", "Franklin Resources", "Invesco", "State Street",
-                         "Northern Trust", "Affiliated Managers Group", "Janus Henderson", "TPG", "Brookfield Asset Management"],
+                         "Carlyle Group", "T. Rowe Price Group", "Franklin Resources", "Invesco", "State Street",
+                         "Northern Trust", "Affiliated Managers Group", "Janus Henderson Group", "TPG", "Brookfield Asset Management"],
     "insurance": ["Berkshire Hathaway", "Progressive", "Allstate", "Travelers", "Chubb",
                   "MetLife", "Prudential Financial", "American International Group", "Aflac", "Marsh & McLennan",
                   "Unum Group", "Principal Financial Group", "Lincoln National", "Sun Life Financial", "Reinsurance Group of America"],
     "industrial": ["Caterpillar", "Honeywell International", "General Electric", "3M", "Emerson Electric",
                    "Parker Hannifin", "Eaton", "Illinois Tool Works", "Deere & Company", "Cummins",
                    "Rockwell Automation", "Dover Corporation", "Xylem", "IDEX Corporation", "Watts Water Technologies"],
+    # ── Niche sectors that used to fall to live discovery (junk sets) or to a
+    # wrong parent bucket. Every company below is a real, current SEC filer.
+    "railroads": ["Union Pacific", "CSX", "Norfolk Southern", "Canadian National Railway", "Canadian Pacific Kansas City",
+                  "Wabtec", "Trinity Industries", "Greenbrier Companies", "GATX", "FreightCar America",
+                  "L.B. Foster"],
+    "airlines": ["Delta Air Lines", "United Airlines", "American Airlines", "Southwest Airlines", "Alaska Air Group",
+                 "JetBlue Airways", "Allegiant Travel", "SkyWest", "Sun Country Airlines", "Frontier Group"],
+    "shipping": ["Matson", "Kirby", "Genco Shipping", "Star Bulk Carriers", "Frontline",
+                 "Scorpio Tankers", "International Seaways", "DHT Holdings", "Safe Bulkers", "Costamare",
+                 "Danaos", "Golden Ocean", "Tidewater", "Teekay Tankers", "ZIM Integrated Shipping"],
+    "e-commerce": ["Amazon", "Shopify", "eBay", "Etsy", "Wayfair",
+                   "Chewy", "MercadoLibre", "Coupang", "DoorDash", "Maplebear",
+                   "Global-e Online", "Beyond", "Revolve Group", "1stdibs", "ThredUp"],
+    "pet care": ["Zoetis", "Idexx Laboratories", "Chewy", "Freshpet", "Elanco Animal Health",
+                 "Central Garden & Pet", "Trupanion", "PetIQ", "Phibro Animal Health", "Petco Health and Wellness",
+                 "BARK", "Colgate-Palmolive", "General Mills"],
+    "cosmetics": ["Estee Lauder", "Coty", "e.l.f. Beauty", "Ulta Beauty", "Inter Parfums",
+                  "Edgewell Personal Care", "Olaplex", "Honest Company", "Sally Beauty", "Bath & Body Works",
+                  "Kenvue", "Procter & Gamble", "Helen of Troy"],
+    "food and beverage": ["PepsiCo", "Coca-Cola", "Mondelez International", "General Mills", "Kraft Heinz",
+                          "Hershey", "Conagra Brands", "Campbell's Company", "J.M. Smucker", "Hormel Foods",
+                          "Tyson Foods", "Archer-Daniels-Midland", "Constellation Brands", "Keurig Dr Pepper", "Celsius Holdings"],
+    "restaurants": ["McDonald's", "Starbucks", "Chipotle Mexican Grill", "Yum! Brands", "Darden Restaurants",
+                    "Domino's Pizza", "Texas Roadhouse", "Wingstop", "Shake Shack", "Cava Group",
+                    "Wendy's", "Cheesecake Factory", "Sweetgreen", "Dutch Bros", "Cracker Barrel"],
+    "waste management": ["Waste Management", "Republic Services", "Waste Connections", "Clean Harbors", "Casella Waste Systems",
+                         "GFL Environmental", "Montrose Environmental", "Enviri", "Perma-Fix Environmental", "Quest Resource Holding"],
+    "proptech": ["Zillow", "CoStar Group", "Opendoor Technologies", "Procore Technologies", "AppFolio",
+                 "Compass", "eXp World Holdings", "Offerpad Solutions", "Porch Group", "SmartRent",
+                 "Blend Labs", "Real Brokerage", "Rocket Companies"],
     # ── S&P 500 GICS sectors (the 11-sector taxonomy) ─────────────────────
     # Curated so every standard S&P sector resolves to on-topic, SEC-filing
     # public companies instead of falling to live discovery (which mismatches
@@ -265,10 +295,8 @@ SECTOR_SEEDS = {
     # Hospitals — pure hospital / facility / care-delivery operators (NOT the broad
     # "healthcare" umbrella of payers + pharma). Most large US hospital systems are
     # nonprofit and don't file with the SEC; this is the recognizable public set.
-    "hospitals": [
-        "HCA Healthcare", "Tenet Healthcare", "Universal Health Services", "Community Health Systems", "Encompass Health",
-        "Acadia Healthcare", "Select Medical Holdings", "Surgery Partners", "Ensign Group", "DaVita",
-        "Option Care Health", "Pediatrix Medical Group", "US Physical Therapy", "Brookdale Senior Living", "Addus HomeCare"],
+    "hospitals": ["HCA Healthcare", "Tenet Healthcare", "Universal Health Services", "Community Health Systems", "Ardent Health Partners",
+                  "Encompass Health", "Acadia Healthcare", "Surgery Partners", "Ensign Group", "National HealthCare Corporation"],
     # Educational Services — sector is mostly nonprofit/public, so SEC discovery is
     # structurally weak. Curated set of the real public education companies.
     "educational services": [
@@ -328,7 +356,7 @@ SECTOR_NC_SEEDS = {
     "aerospace": ["Spirit AeroSystems", "Triumph Group"],
     # NC energy / utilities
     "energy": ["Duke Energy", "Dominion Energy North Carolina"],
-    "climate tech": ["Duke Energy", "Dominion Energy North Carolina"],
+    "climate tech": ["Duke Energy"],
     "utilities": ["Duke Energy", "Dominion Energy North Carolina"],
     # Telecom
     "telecom": ["Bandwidth", "Limelight Networks"],
@@ -352,6 +380,10 @@ SECTOR_DOMAIN = {
     "consumer electronics": "tech", "gaming": "tech", "streaming": "tech",
     "fintech": "business", "finance": "business", "insurance": "business",
     "banking": "business", "asset management": "business",
+    "railroads": "business", "airlines": "business", "shipping": "business",
+    "e-commerce": "business", "pet care": "business", "cosmetics": "business",
+    "food and beverage": "business", "restaurants": "business",
+    "waste management": "business", "proptech": "tech",
     "consumer": "business", "retail": "business", "industrial": "business",
     "footwear": "business", "shoes": "business",
     "climate tech": "energy", "energy": "energy", "automotive": "energy",
@@ -394,8 +426,10 @@ _KEYWORD_ROUTES = [
       "waste collection"), "administrative and waste management services"),
     (("management of compan", "holding compan", "conglomerate"), "management of companies"),
     (("wholesale", "distributor"), "wholesale trade"),
+    # "railroad" now routes to the dedicated railroads sector, not this
+    # NAICS umbrella (which mixes airlines and couriers).
     (("transportation and warehous", "warehousing", "freight", "trucking",
-      "railroad", "logistics"), "transportation and warehousing"),
+      "logistics"), "transportation and warehousing"),
     (("construction", "homebuild", "home build", "civil engineering"), "construction"),
     (("accommodation", "food service", "hospitality", "lodging"), "accommodation and food services"),
     (("mining and oil", "oil and gas extraction", "oil extraction", "oil & gas",
@@ -461,7 +495,18 @@ _KEYWORD_ROUTES = [
     (("asset manage", "wealth manage", "private equity", "hedge fund"), "asset management"),
     (("bank",), "banking"),
     (("capital market", "invest", "credit card", "financial service"), "finance"),
-    (("retail", "ecommerce", "e-commerce", "store"), "retail"),
+    (("railroad", "railway", "rail freight"), "railroads"),
+    (("airline", "air carrier", "air travel"), "airlines"),
+    (("shipping", "maritime", "dry bulk", "tanker"), "shipping"),
+    (("ecommerce", "e-commerce", "online retail", "online shopping"), "e-commerce"),
+    (("pet care", "pet food", "pets", "veterinary"), "pet care"),
+    (("cosmetic", "beauty", "skincare", "makeup"), "cosmetics"),
+    (("food and beverage", "food & beverage", "packaged food", "beverages", "snacks"), "food and beverage"),
+    (("restaurant", "fast food", "quick service"), "restaurants"),
+    (("waste", "recycling", "environmental services"), "waste management"),
+    # proptech must precede the generic "tech" route.
+    (("proptech", "property tech", "real estate tech"), "proptech"),
+    (("retail", "store"), "retail"),
     (("shoe", "footwear", "sneaker", "boot", "sandal"), "footwear"),
     (("consumer", "cpg", "apparel", "food", "beverage"), "consumer"),
     (("industrial", "manufactur", "machinery", "logistics"), "industrial"),

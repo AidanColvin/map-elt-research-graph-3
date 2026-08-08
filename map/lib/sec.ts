@@ -1109,14 +1109,28 @@ const CATEGORY_KEYWORDS: Record<string, string[]> = {
   buybacks:    ['repurchase', 'buyback'],
 };
 
+// Concept-name fragments a category's fallback must NEVER match. Without this
+// the liabilities fallback picked LiabilitiesAndStockholdersEquity — the
+// balance-sheet TOTAL, numerically equal to total assets — and reports showed
+// "total liabilities" identical to total assets, which is impossible with
+// positive equity.
+const CATEGORY_EXCLUDES: Record<string, string[]> = {
+  liabilities: ['stockholdersequity', 'andequity', 'equityincluding'],
+};
+
 // XBRL concept candidates, in priority order
 // each metric lists candidate concepts in two taxonomies: US GAAP (domestic
 // filers) and IFRS (foreign private issuers filing 20-F under ifrs-full).
 const CONCEPTS = {
   revenue: {
+    // Order matters on recency ties (mergedAnnualNs is stable): "Revenues" is
+    // the true total and banks' "RevenuesNetOfInterestExpense" is their real
+    // top line — both must outrank the ASC-606 contract-revenue subset, which
+    // for a bank is fee income only (wrong magnitude).
     gaap: [
-      "RevenueFromContractWithCustomerExcludingAssessedTax",
       "Revenues",
+      "RevenuesNetOfInterestExpense",
+      "RevenueFromContractWithCustomerExcludingAssessedTax",
       "RevenueFromContractWithCustomerIncludingAssessedTax",
       "SalesRevenueNet",
     ],
@@ -1159,6 +1173,8 @@ function magnitudeFallback(
   for (const [conceptKey, conceptData] of Object.entries(root)) {
     const normalized = (conceptKey as string).replace(/[^a-zA-Z]/g, '').toLowerCase();
     if (!keywords.some(kw => normalized.includes(kw))) continue;
+    const excludes = CATEGORY_EXCLUDES[category];
+    if (excludes && excludes.some(kw => normalized.includes(kw))) continue;
     const units = (conceptData as any)?.units?.[currency];
     if (!Array.isArray(units)) continue;
     const series = toAnnual(units, instant, cik);
@@ -1341,6 +1357,8 @@ export async function fetchFinancials(cik: string): Promise<Financials | null> {
     return s.length ? s : magnitudeFallback(f, currency, cat, instant, cik);
   };
   const revenue = sf(CONCEPTS.revenue, false, 'revenue');
+  const assets = sf(CONCEPTS.assets, true, 'assets');
+  const equity = sf(CONCEPTS.equity, true, 'equity');
   return {
     currency,
     revenue,
@@ -1348,15 +1366,51 @@ export async function fetchFinancials(cik: string): Promise<Financials | null> {
     grossProfit: sf(CONCEPTS.grossProfit, false, 'grossProfit'),
     rnd:         sf(CONCEPTS.rnd,         false, 'rnd'),
     opIncome:    sf(CONCEPTS.opIncome,    false, 'opIncome'),
-    assets:      sf(CONCEPTS.assets,      true,  'assets'),
-    liabilities: sf(CONCEPTS.liabilities, true,  'liabilities'),
-    equity:      sf(CONCEPTS.equity,      true,  'equity'),
+    assets,
+    liabilities: reconcileLiabilities(
+      sf(CONCEPTS.liabilities, true, 'liabilities'), assets, equity),
+    equity,
     buybacks:    sf(CONCEPTS.buybacks,    false, 'buybacks'),
     // Only compute a quarterly fallback when there is no annual revenue at all,
     // so an established filer's report is never diluted by a stray quarter.
     latestQuarterRevenue: revenue.length ? undefined
       : latestQuarter(f, CONCEPTS.revenue, currency),
   };
+}
+
+// takes: the directly-tagged liabilities series plus the assets and equity series
+// does: replaces the direct series with assets − equity when the direct data is
+//       missing, stale (many filers stopped tagging us-gaap:Liabilities years
+//       ago — AT&T's last was FY2015), or degenerate (equal to total assets,
+//       the LiabilitiesAndStockholdersEquity artifact)
+// returns: the liabilities series safe to present
+export function reconcileLiabilities(
+  direct: YearValue[],
+  assets: YearValue[],
+  equity: YearValue[],
+): YearValue[] {
+  const equityByFy = new Map(equity.map((yv) => [yv.fy, yv.val]));
+  const derived: YearValue[] = assets
+    .filter((a) => equityByFy.has(a.fy))
+    .map((a) => ({ fy: a.fy, val: a.val - (equityByFy.get(a.fy) as number) }));
+  if (!derived.length) return direct;
+  if (!direct.length) return derived;
+
+  const latestDerived = derived[derived.length - 1];
+  const latestDirect = direct[direct.length - 1];
+  // Stale: the direct series ends more than a year before the derivable one.
+  if (latestDirect.fy < latestDerived.fy - 1) return derived;
+  // Degenerate: "liabilities" ≈ total assets while real equity is positive —
+  // the wrong-concept artifact, impossible on a real balance sheet.
+  const assetsSame = assets.find((a) => a.fy === latestDirect.fy);
+  const equitySame = equityByFy.get(latestDirect.fy);
+  if (
+    assetsSame && typeof equitySame === "number" && equitySame > 0 &&
+    Math.abs(latestDirect.val - assetsSame.val) < Math.abs(assetsSame.val) * 0.005
+  ) {
+    return derived;
+  }
+  return direct;
 }
 
 // takes: the XBRL facts object, the revenue concept, and the reporting currency

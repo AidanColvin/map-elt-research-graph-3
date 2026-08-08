@@ -220,7 +220,7 @@ def test_build_private_company_marks_not_public():
     report = builder.build("health it", {"sector": "health it",
                                          "companies": [private]})
     overview = report["section4_profiles"][0]["overview"]["text"]
-    assert "Privately held" in overview
+    assert "No SEC filings located" in overview
 
 
 def test_build_empty_companies_is_safe():

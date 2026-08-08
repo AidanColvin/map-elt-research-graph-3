@@ -47,6 +47,7 @@ def test_unc_grants_falls_back_to_contact_pi():
         "principal_investigators": [],
         "contact_pi_name": "Dr. Backup",
         "organization": {},
+        "fiscal_year": 2026,
     }]}
     with patch.object(client._session, "post", return_value=FakeResponse(results)):
         grants = client.unc_grants_mentioning("X")
@@ -60,7 +61,8 @@ def test_unc_grants_missing_project_num_uses_base_url():
     Returns: The bare reporter.nih.gov URL (no project path).
     """
     client = NIHReporterClient()
-    results = {"results": [{"project_title": "t", "organization": {}}]}
+    results = {"results": [{"project_title": "t", "organization": {},
+                            "fiscal_year": 2026}]}
     with patch.object(client._session, "post", return_value=FakeResponse(results)):
         grants = client.unc_grants_mentioning("X")
     assert grants[0]["url"] == "https://reporter.nih.gov"
@@ -124,3 +126,21 @@ def test_unc_grants_network_error_returns_empty():
     client = NIHReporterClient()
     with patch.object(client._session, "post", side_effect=RuntimeError("502")):
         assert client.unc_grants_mentioning("Pfizer") == []
+
+
+def test_unc_grants_drop_decade_old_awards():
+    """
+    takes: two grants — one funded this decade, one last funded in 2009
+    does: runs them through unc_grants_mentioning parsing
+    gives: only the recent grant (stale awards are not live UNC ties)
+    """
+    client = NIHReporterClient()
+    results = {"results": [
+        {"project_num": "5R01AA000001-01", "project_title": "old",
+         "organization": {}, "fiscal_year": 2009},
+        {"project_num": "5R01BB000002-01", "project_title": "new",
+         "organization": {}, "fiscal_year": 2026},
+    ]}
+    with patch.object(client._session, "post", return_value=FakeResponse(results)):
+        grants = client.unc_grants_mentioning("X")
+    assert [g["title"] for g in grants] == ["new"]
