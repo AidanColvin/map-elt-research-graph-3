@@ -269,3 +269,23 @@ def test_naics_supersector_robustness():
     assert canonical_sector("constuction") == "construction"
     assert canonical_sector("transporation") == "transportation and warehousing"
     assert canonical_sector("oil & gas") == "mining and oil extraction"
+
+
+def test_subsectors_distinct_from_parent_buckets():
+    """
+    takes: nothing
+    does: confirms defense/space, mining/chemicals, and banking/asset management
+          each resolve to their own seed set instead of a shared parent bucket
+    gives: no assertion error when every pair is distinct
+    """
+    for query, want in [("defense", "defense"), ("space", "space"),
+                        ("mining", "mining"), ("chemicals", "chemicals"),
+                        ("banking", "banking"), ("asset management", "asset management"),
+                        ("aerospace and defense", "aerospace"), ("banks", "banking"),
+                        ("private equity", "asset management"), ("metals", "mining")]:
+        assert canonical_sector(query) == want, query
+    pairs = [("defense", "space"), ("mining", "chemicals"),
+             ("banking", "asset management"), ("defense", "aerospace"),
+             ("mining", "materials"), ("banking", "finance")]
+    for a, b in pairs:
+        assert set(SECTOR_SEEDS[a]) != set(SECTOR_SEEDS[b]), (a, b)

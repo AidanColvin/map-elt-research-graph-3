@@ -114,6 +114,16 @@ SECTOR_SEEDS = {
     "aerospace": ["Boeing", "Lockheed Martin", "RTX", "Northrop Grumman", "General Dynamics",
                   "L3Harris Technologies", "Textron", "Leidos Holdings", "HEICO", "TransDigm Group",
                   "Spirit AeroSystems", "Moog", "Mercury Systems", "Curtiss-Wright", "Ducommun"],
+    # Defense — primes + defense-services/tech, distinct from civil aerospace
+    # (a "defense" query used to collapse onto the aerospace set).
+    "defense": ["Lockheed Martin", "RTX", "Northrop Grumman", "General Dynamics", "L3Harris Technologies",
+                "Huntington Ingalls Industries", "Leidos Holdings", "Booz Allen Hamilton", "CACI International", "Palantir Technologies",
+                "AeroVironment", "Kratos Defense", "Leonardo DRS", "Textron", "Curtiss-Wright"],
+    # Space — launch, satellites, and space infrastructure pure-plays plus the
+    # primes' space arms (a "space" query used to collapse onto aerospace).
+    "space": ["Rocket Lab", "Intuitive Machines", "Planet Labs", "AST SpaceMobile", "Iridium Communications",
+              "Viasat", "EchoStar", "Globalstar", "Redwire", "BlackSky Technology",
+              "Spire Global", "Virgin Galactic", "Boeing", "Lockheed Martin", "Northrop Grumman"],
     # ── Consumer / industrial / finance ───────────────────────────────────
     # Footwear — public SEC-filing companies only; Nike/Adidas are dual-listed
     # (both footwear + apparel). Skechers, Foot Locker, Deckers, Wolverine
@@ -144,6 +154,16 @@ SECTOR_SEEDS = {
     "finance": ["JPMorgan Chase", "Bank of America", "Goldman Sachs", "Morgan Stanley", "BlackRock",
                 "Wells Fargo", "Citigroup", "Charles Schwab", "American Express", "Berkshire Hathaway",
                 "U.S. Bancorp", "PNC Financial Services", "State Street", "T. Rowe Price", "Raymond James Financial"],
+    # Banking — deposit-taking banks only, distinct from the broad finance
+    # bucket (a "banking" query used to collapse onto the finance set).
+    "banking": ["JPMorgan Chase", "Bank of America", "Wells Fargo", "Citigroup", "U.S. Bancorp",
+                "PNC Financial Services", "Truist Financial", "Fifth Third Bancorp", "M&T Bank", "KeyCorp",
+                "Regions Financial", "Citizens Financial Group", "Huntington Bancshares", "First Citizens BancShares", "Comerica"],
+    # Asset management — asset/alternative managers and custodians, distinct
+    # from the broad finance bucket (an "asset management" query collapsed onto it).
+    "asset management": ["BlackRock", "Blackstone", "KKR", "Apollo Global Management", "Ares Management",
+                         "Carlyle Group", "T. Rowe Price", "Franklin Resources", "Invesco", "State Street",
+                         "Northern Trust", "Affiliated Managers Group", "Janus Henderson", "TPG", "Brookfield Asset Management"],
     "insurance": ["Berkshire Hathaway", "Progressive", "Allstate", "Travelers", "Chubb",
                   "MetLife", "Prudential Financial", "American International Group", "Aflac", "Marsh & McLennan",
                   "Unum Group", "Principal Financial Group", "Lincoln National", "Sun Life Financial", "Reinsurance Group of America"],
@@ -169,6 +189,16 @@ SECTOR_SEEDS = {
     "materials": ["Linde", "Sherwin-Williams", "Air Products and Chemicals", "Ecolab", "Freeport-McMoRan",
                   "Nucor", "Dow", "DuPont de Nemours", "Corteva", "Newmont",
                   "PPG Industries", "Vulcan Materials", "Nutrien", "International Paper", "Martin Marietta Materials"],
+    # Mining — miners and mineral producers, distinct from the broad materials
+    # bucket (a "mining" query used to collapse onto the materials set).
+    "mining": ["Freeport-McMoRan", "Newmont", "Southern Copper", "Alcoa", "Cleveland-Cliffs",
+               "MP Materials", "Albemarle", "Hecla Mining", "Coeur Mining", "Royal Gold",
+               "Peabody Energy", "Compass Minerals", "Materion", "Uranium Energy", "Lithium Americas"],
+    # Chemicals — chemical producers and specialty formulators, distinct from
+    # the broad materials bucket (a "chemicals" query used to collapse onto it).
+    "chemicals": ["Dow", "DuPont de Nemours", "LyondellBasell", "Linde", "Air Products and Chemicals",
+                  "Sherwin-Williams", "PPG Industries", "Ecolab", "Eastman Chemical", "Celanese",
+                  "Huntsman", "Westlake", "RPM International", "Axalta Coating Systems", "Olin"],
     "real estate": ["Prologis", "American Tower", "Equinix", "Welltower", "Public Storage",
                     "Simon Property Group", "Digital Realty Trust", "Realty Income", "CBRE Group", "Crown Castle",
                     "Extra Space Storage", "AvalonBay Communities", "VICI Properties", "Iron Mountain", "CoStar Group"],
@@ -321,14 +351,16 @@ SECTOR_DOMAIN = {
     "social media": "tech",
     "consumer electronics": "tech", "gaming": "tech", "streaming": "tech",
     "fintech": "business", "finance": "business", "insurance": "business",
+    "banking": "business", "asset management": "business",
     "consumer": "business", "retail": "business", "industrial": "business",
     "footwear": "business", "shoes": "business",
     "climate tech": "energy", "energy": "energy", "automotive": "energy",
-    "aerospace": "energy",
+    "aerospace": "energy", "defense": "energy", "space": "energy",
     # S&P GICS sectors
     "consumer discretionary": "business", "consumer staples": "business",
     "communication services": "tech", "real estate": "business",
     "utilities": "energy", "materials": "energy",
+    "mining": "energy", "chemicals": "energy",
     # NAICS supersectors — only "hospitals" is health (its clinical content is
     # legitimate); every other NAICS bucket is non-health so clinical-trial
     # content stays gated off.
@@ -420,10 +452,15 @@ _KEYWORD_ROUTES = [
     (("climate", "clean energy", "decarbon", "carbon", "solar", "renewable"), "climate tech"),
     (("energy", "utility", "power grid", "grid", "battery"), "energy"),
     (("automot", "electric vehicle", "mobility", "vehicle"), "automotive"),
-    (("aerospace", "defense", "defence", "aviation", "space"), "aerospace"),
+    # "aerospace" must precede "space" — the needle "space" is a substring of
+    # "aerospace", so a combined query ("aerospace and defense") stays aerospace.
+    (("aerospace", "aviation"), "aerospace"),
+    (("defense", "defence", "military"), "defense"),
+    (("space", "satellite", "launch provider"), "space"),
     (("insurance", "insurer", "reinsur", "underwrit", "actuar"), "insurance"),
-    (("bank", "asset manage", "capital market", "invest", "credit card",
-      "wealth manage", "financial service"), "finance"),
+    (("asset manage", "wealth manage", "private equity", "hedge fund"), "asset management"),
+    (("bank",), "banking"),
+    (("capital market", "invest", "credit card", "financial service"), "finance"),
     (("retail", "ecommerce", "e-commerce", "store"), "retail"),
     (("shoe", "footwear", "sneaker", "boot", "sandal"), "footwear"),
     (("consumer", "cpg", "apparel", "food", "beverage"), "consumer"),
@@ -530,7 +567,8 @@ _EXACT_ALIASES = {
     "financial service": "finance",
     "financial": "finance",
     "financials": "finance",
-    "banking": "finance",
+    "banking": "banking",
+    "banks": "banking",
     "information technology": "technology",
     "information tech": "technology",
     # Short, unambiguous shorthands.
@@ -555,10 +593,10 @@ _EXACT_ALIASES = {
     "utilities": "utilities",
     "utility": "utilities",
     "materials": "materials",
-    "chemicals": "materials",
-    "chemical": "materials",
-    "mining": "materials",
-    "metals": "materials",
+    "chemicals": "chemicals",
+    "chemical": "chemicals",
+    "mining": "mining",
+    "metals": "mining",
     "real estate": "real estate",
     "reit": "real estate",
     "reits": "real estate",

@@ -1117,14 +1117,209 @@
       }
     ]
   },
-  "banking": "alias:finance",
+  "banking": {
+    "definition": "The banking sector takes deposits and extends credit \u2014 consumer, commercial, and corporate lending \u2014 under Federal Reserve, OCC, and FDIC supervision, monetizing net interest margin and fee services.",
+    "definition_sources": [
+      "https://www.federalreserve.gov",
+      "https://www.fdic.gov"
+    ],
+    "scale": "FDIC-insured US commercial banks hold trillions of dollars in deposits and loans, with quarterly condition data published in the FDIC's Quarterly Banking Profile.",
+    "scale_sources": [
+      "https://www.fdic.gov",
+      "https://www.federalreserve.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Rate-cycle normalization is repricing deposits and loan books, separating banks by funding quality and credit discipline.",
+        "sources": [
+          "https://www.federalreserve.gov",
+          "https://www.fdic.gov"
+        ]
+      },
+      {
+        "signal": "Digital channels and bank-fintech partnerships are restructuring consumer banking economics and compliance obligations.",
+        "sources": [
+          "https://www.occ.gov",
+          "https://www.fdic.gov"
+        ]
+      }
+    ],
+    "nc_context": "Charlotte is the second-largest banking center in the United States \u2014 Bank of America and Truist are headquartered there, and First Citizens BancShares in Raleigh \u2014 making banking one of North Carolina's signature industries.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.fdic.gov"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC School of Law \u2014 Center for Banking and Finance",
+        "focus": "Banking law, regulation, and the Banking Institute.",
+        "url": "https://law.unc.edu"
+      },
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Financial institutions, credit, and risk research.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "Kenan Institute of Private Enterprise",
+        "focus": "Regional financial-services economy analysis.",
+        "url": "https://kenaninstitute.unc.edu"
+      }
+    ]
+  },
   "bank": "alias:finance",
   "insurance": "alias:finance",
   "investment": "alias:finance",
-  "asset management": "alias:finance",
+  "asset management": {
+    "definition": "The asset-management sector invests pooled capital \u2014 mutual funds, ETFs, pensions, and private funds \u2014 across public and private markets for institutional and retail clients, earning management and performance fees.",
+    "definition_sources": [
+      "https://www.sec.gov",
+      "https://www.ici.org"
+    ],
+    "scale": "US-registered investment companies manage tens of trillions of dollars, tracked in the Investment Company Institute's annual Fact Book and SEC filings; private-markets managers add trillions more.",
+    "scale_sources": [
+      "https://www.ici.org",
+      "https://www.sec.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Fee compression in passive strategies is pushing managers toward private credit, infrastructure, and other alternatives.",
+        "sources": [
+          "https://www.sec.gov",
+          "https://www.ici.org"
+        ]
+      },
+      {
+        "signal": "Retirement-system demand and ETF innovation keep shifting assets toward scaled, technology-enabled managers.",
+        "sources": [
+          "https://www.ici.org",
+          "https://www.dol.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's financial-services cluster centered on Charlotte extends into asset and wealth management, alongside the state treasurer's multi-hundred-billion-dollar public pension system.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.nctreasurer.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Investment management and capital-markets research.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      },
+      {
+        "unit": "Kenan Institute of Private Enterprise",
+        "focus": "Private capital and entrepreneurship economics.",
+        "url": "https://kenaninstitute.unc.edu"
+      },
+      {
+        "unit": "UNC School of Law \u2014 Center for Banking and Finance",
+        "focus": "Funds regulation and fiduciary law.",
+        "url": "https://law.unc.edu"
+      }
+    ]
+  },
   "manufacturing": "alias:industrial",
-  "defense": "alias:aerospace",
-  "space": "alias:aerospace",
+  "defense": {
+    "definition": "The defense sector develops and produces weapons systems, military platforms, C4ISR electronics, and national-security services for the US Department of Defense, allied governments, and the intelligence community.",
+    "definition_sources": [
+      "https://www.defense.gov",
+      "https://www.acq.osd.mil"
+    ],
+    "scale": "US national-defense discretionary spending runs to hundreds of billions of dollars annually, procured through DoD contracts that publicly traded prime contractors and services firms report in SEC filings.",
+    "scale_sources": [
+      "https://www.defense.gov",
+      "https://comptroller.defense.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Sustained DoD modernization budgets and allied rearmament are expanding demand across munitions, shipbuilding, autonomy, and space-based defense.",
+        "sources": [
+          "https://comptroller.defense.gov",
+          "https://www.defense.gov"
+        ]
+      },
+      {
+        "signal": "Software-defined and AI-enabled defense systems are pulling non-traditional and commercial technology firms into the defense industrial base.",
+        "sources": [
+          "https://www.diu.mil",
+          "https://www.defense.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina hosts one of the largest military footprints in the country \u2014 Fort Liberty, Camp Lejeune, and Seymour Johnson AFB \u2014 and a defense-industry supplier base concentrated around them.",
+    "nc_context_sources": [
+      "https://edpnc.com",
+      "https://www.ncmilitary.org"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Computer Science",
+        "focus": "Autonomy, simulation, and secure-systems research.",
+        "url": "https://cs.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Advanced materials and engineering science.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Kenan-Flagler Business School",
+        "focus": "Defense-industrial supply-chain and operations research.",
+        "url": "https://www.kenan-flagler.unc.edu"
+      }
+    ]
+  },
+  "space": {
+    "definition": "The space sector builds and operates launch vehicles, satellites, ground systems, and space-based communications, imaging, and navigation services for commercial, civil, and national-security customers.",
+    "definition_sources": [
+      "https://www.nasa.gov",
+      "https://www.faa.gov/space"
+    ],
+    "scale": "Commercial space activity \u2014 launch, satellite broadband, and Earth observation \u2014 is licensed and tracked by the FAA and FCC, with NASA and the Space Force as anchor government customers.",
+    "scale_sources": [
+      "https://www.faa.gov/space",
+      "https://www.nasa.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Falling launch costs and satellite miniaturization are moving connectivity, sensing, and in-space services from government programs to commercial markets.",
+        "sources": [
+          "https://www.faa.gov/space",
+          "https://www.nasa.gov"
+        ]
+      },
+      {
+        "signal": "Proliferated low-Earth-orbit constellations for communications and observation are driving recurring satellite manufacturing and launch demand.",
+        "sources": [
+          "https://www.fcc.gov",
+          "https://www.nasa.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's aerospace manufacturing corridor and research universities support space-adjacent work in materials, sensing, and analytics, alongside a growing aviation supplier base.",
+    "nc_context_sources": [
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Physics and Astronomy",
+        "focus": "Astrophysics, instrumentation, and Morehead Planetarium public science.",
+        "url": "https://physics.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Materials for extreme environments.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Geological Sciences",
+        "focus": "Remote sensing and planetary-surface science.",
+        "url": "https://geosciences.unc.edu"
+      }
+    ]
+  },
   "electric vehicle": "alias:automotive",
   "ev": "alias:automotive",
   "clean energy": "alias:climate tech",
@@ -1182,7 +1377,55 @@
   },
   "health tech": "alias:medtech",
   "biomedical": "alias:biotech",
-  "genomics": "alias:biotech",
+  "genomics": {
+    "definition": "The genomics sector develops sequencing platforms, genetic tests, and genomic-data services \u2014 from whole-genome sequencing and liquid biopsy to hereditary screening \u2014 for research and clinical use.",
+    "definition_sources": [
+      "https://www.genome.gov",
+      "https://www.fda.gov/medical-devices"
+    ],
+    "scale": "Sequencing cost declines tracked by the National Human Genome Research Institute have pushed genomics into routine clinical oncology, reproductive health, and population-scale research programs.",
+    "scale_sources": [
+      "https://www.genome.gov",
+      "https://allofus.nih.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Liquid-biopsy screening and minimal-residual-disease testing are moving genomic diagnostics into standard-of-care oncology.",
+        "sources": [
+          "https://www.cancer.gov",
+          "https://www.fda.gov"
+        ]
+      },
+      {
+        "signal": "Population genomics programs and falling sequencing costs are scaling demand for platforms, consumables, and interpretation software.",
+        "sources": [
+          "https://allofus.nih.gov",
+          "https://www.genome.gov"
+        ]
+      }
+    ],
+    "nc_context": "The Research Triangle hosts genomics and sequencing operations across CROs, diagnostics firms, and university cores, anchored by UNC's clinical and research sequencing capacity.",
+    "nc_context_sources": [
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Genetics",
+        "focus": "Human genetics and genome sciences.",
+        "url": "https://www.med.unc.edu/genetics"
+      },
+      {
+        "unit": "UNC Lineberger Comprehensive Cancer Center",
+        "focus": "Cancer genomics and precision oncology.",
+        "url": "https://unclineberger.org"
+      },
+      {
+        "unit": "UNC High-Throughput Sequencing Facility",
+        "focus": "Core sequencing services for research.",
+        "url": "https://www.med.unc.edu/genomics"
+      }
+    ]
+  },
   "data science": "alias:technology",
   "hardware": "alias:technology",
   "networking": "alias:telecom",
@@ -1231,6 +1474,105 @@
         "unit": "UNC School of Medicine",
         "focus": "Clinical informatics, EHR-based research, and digital health.",
         "url": "https://www.med.unc.edu"
+      }
+    ]
+  },
+  "mining": {
+    "definition": "The mining sector explores for and extracts metals and industrial minerals \u2014 copper, gold, iron ore, lithium, rare earths, and aggregates \u2014 and processes them into refined products for industry.",
+    "definition_sources": [
+      "https://www.usgs.gov/centers/national-minerals-information-center",
+      "https://www.msha.gov"
+    ],
+    "scale": "The US Geological Survey's annual Mineral Commodity Summaries track domestic non-fuel mineral production worth on the order of a hundred billion dollars per year, spanning thousands of active operations.",
+    "scale_sources": [
+      "https://www.usgs.gov/centers/national-minerals-information-center",
+      "https://www.census.gov"
+    ],
+    "why_now": [
+      {
+        "signal": "Electrification is concentrating demand on copper, lithium, nickel, and rare earths, with US policy pushing to onshore critical-mineral supply chains.",
+        "sources": [
+          "https://www.energy.gov",
+          "https://www.usgs.gov"
+        ]
+      },
+      {
+        "signal": "Permitting reform and Defense Production Act support are accelerating domestic critical-mineral projects.",
+        "sources": [
+          "https://www.doi.gov",
+          "https://www.energy.gov"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina sits on historically significant lithium deposits in the Kings Mountain belt \u2014 Albemarle is headquartered in Charlotte and Piedmont Lithium in Belmont \u2014 alongside the Aurora phosphate operation, one of the largest in the world.",
+    "nc_context_sources": [
+      "https://www.deq.nc.gov",
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Geological Sciences",
+        "focus": "Mineral resources, geochemistry, and hydrogeology.",
+        "url": "https://geosciences.unc.edu"
+      },
+      {
+        "unit": "UNC Institute for the Environment",
+        "focus": "Environmental impacts of extraction and remediation.",
+        "url": "https://ie.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Chemistry",
+        "focus": "Separations and materials chemistry for critical minerals.",
+        "url": "https://chem.unc.edu"
+      }
+    ]
+  },
+  "chemicals": {
+    "definition": "The chemicals sector converts raw materials into basic, specialty, and consumer chemistries \u2014 industrial gases, polymers, coatings, agricultural inputs, and formulated products used across manufacturing.",
+    "definition_sources": [
+      "https://www.americanchemistry.com",
+      "https://www.census.gov"
+    ],
+    "scale": "Chemical manufacturing is one of the largest US manufacturing industries by shipments and exports, tracked by the Census Bureau's Annual Survey of Manufactures and the American Chemistry Council.",
+    "scale_sources": [
+      "https://www.census.gov",
+      "https://www.americanchemistry.com"
+    ],
+    "why_now": [
+      {
+        "signal": "Reshoring, cheap US natural-gas feedstock, and battery/semiconductor supply chains are driving new domestic chemical capacity.",
+        "sources": [
+          "https://www.americanchemistry.com",
+          "https://www.energy.gov"
+        ]
+      },
+      {
+        "signal": "Decarbonization and PFAS regulation are forcing reformulation and opening markets for greener chemistries.",
+        "sources": [
+          "https://www.epa.gov",
+          "https://www.americanchemistry.com"
+        ]
+      }
+    ],
+    "nc_context": "North Carolina's chemical manufacturing base spans specialty chemicals and life-science inputs, with Albemarle headquartered in Charlotte and major production sites across the state.",
+    "nc_context_sources": [
+      "https://edpnc.com"
+    ],
+    "unc_units": [
+      {
+        "unit": "UNC Department of Chemistry",
+        "focus": "Catalysis, polymers, and materials chemistry.",
+        "url": "https://chem.unc.edu"
+      },
+      {
+        "unit": "UNC Department of Applied Physical Sciences",
+        "focus": "Soft materials and advanced manufacturing.",
+        "url": "https://aps.unc.edu"
+      },
+      {
+        "unit": "UNC Institute for the Environment",
+        "focus": "Chemical exposure, air quality, and environmental health.",
+        "url": "https://ie.unc.edu"
       }
     ]
   }
