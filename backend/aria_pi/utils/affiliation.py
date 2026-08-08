@@ -127,6 +127,12 @@ _COMPANY_ALIASES = {
     "progressive": ["Progressive Corporation", "Progressive Corp", "The Progressive Corporation"],
     "travelers": ["Travelers Companies", "The Travelers Companies", "Travelers Indemnity",
                   "Travelers Insurance"],
+    # "Aflac" the insurer collides with the "Aflac Cancer and Blood Disorders
+    # Center" (a pediatric-oncology center named after the company's giving) —
+    # so pediatric-cancer papers matched the insurer as a co-author. The insurer
+    # itself never appears as a publication affiliation, so anchor to its
+    # corporate name only.
+    "aflac": ["Aflac Incorporated", "Aflac Inc"],
     # "Mosaic" (the fertilizer company, ticker MOS) collides with "mosaic" /
     # "mosaicism" — a standard genetics term (chromosomal mosaicism, genetic
     # mosaic) — so neuroscience/developmental NIH grants about mosaicism
@@ -149,7 +155,7 @@ _AMBIGUOUS_TOKENS = {
     "amazon", "target", "shell", "stripe", "discover", "gap", "affirm",
     "oracle", "green dot", "tesla", "stem", "unity", "micron", "arm",
     "compass", "chewy", "pattern energy", "first solar", "progressive",
-    "travelers", "mosaic", "rtx", "moog",
+    "travelers", "mosaic", "rtx", "moog", "aflac",
 }
 
 _PARENS_RE = re.compile(r"\(.*?\)")

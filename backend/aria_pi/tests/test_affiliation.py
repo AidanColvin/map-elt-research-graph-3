@@ -142,3 +142,16 @@ def test_rtx_and_moog_never_match_unrelated_science():
     rx = company_affiliation_regex("Moog")
     assert not rx.search("Moog CM, Department of Otolaryngology, University of Iowa")
     assert rx.search("Moog Inc, East Aurora, NY")
+
+
+def test_aflac_never_matches_the_cancer_center():
+    """
+    takes: nothing
+    does: confirms the Aflac insurer regex rejects the pediatric cancer center
+          named after the company and accepts only the corporate affiliation
+    gives: no assertion error when the collision is blocked
+    """
+    rx = company_affiliation_regex("Aflac")
+    assert not rx.search("aflac cancer and blood disorders center, atlanta")
+    assert rx.search("Aflac Incorporated, Columbus, GA")
+    assert '"Aflac"[Affiliation]' not in company_query_clause("Aflac")
