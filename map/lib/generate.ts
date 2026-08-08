@@ -260,10 +260,17 @@ function execSummary(
   // absent (private companies / no recent 10-K), so the brief stays grounded
   // in primary filings when they exist.
   if (!overview && wiki?.description) lines.push(`It is ${withArticle(wiki.description)} [2].`);
-  if (lines.length === 1)
-    lines.push(
-      `Detailed financials for ${name} are not available through SEC EDGAR — it may be private, a subsidiary, or a foreign-listed filer (20-F/6-K) [1].`,
-    );
+  if (lines.length === 1) {
+    const q = fin?.latestQuarterRevenue;
+    if (q)
+      lines.push(
+        `${name} reported revenue of ${usd(q.val)} in its most recent quarter (${q.fp} FY${q.fy}); no full-year filing is on record yet [1].`,
+      );
+    else
+      lines.push(
+        `Detailed financials for ${name} are not available through SEC EDGAR — it may be private, a subsidiary, or a foreign-listed filer (20-F/6-K) [1].`,
+      );
+  }
   return lines.join(" ") + "\n";
 }
 
@@ -511,9 +518,19 @@ function strategicDirection(
 function businessModel(fin: Financials | null): string {
   const lines: string[] = ["## Business Model & Financial Performance\n"];
   if (!fin || !fin.revenue.length) {
-    lines.push(
-      "Multi-year financials are not available through SEC EDGAR for this company (typically because it is private or files under a foreign form). [1]",
-    );
+    const q = fin?.latestQuarterRevenue;
+    if (q) {
+      // No full-year frame yet (e.g. a newly reorganized holding company that
+      // has filed only 10-Qs), but a real quarterly figure exists — show it,
+      // clearly labeled, instead of reporting nothing.
+      lines.push(
+        `Full-year financials are not yet on file (no 10-K/20-F located). Most recent reported quarter (${q.fp} FY${q.fy}): revenue of ${usd(q.val)} [1].`,
+      );
+    } else {
+      lines.push(
+        "Multi-year financials are not available through SEC EDGAR for this company (it may be private, a subsidiary, or a foreign filer that reports on Form 20-F/6-K). [1]",
+      );
+    }
     return lines.join("\n") + "\n";
   }
 

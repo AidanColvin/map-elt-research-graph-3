@@ -47,6 +47,13 @@ export interface Financials {
   liabilities: YearValue[];
   equity: YearValue[];
   buybacks: YearValue[];
+  /**
+   * Latest single quarter's revenue, populated ONLY as a fallback for filers
+   * with no full-year (10-K/20-F) frame yet — e.g. a freshly reorganized
+   * holding company that has filed only 10-Qs. Lets a report still show a real,
+   * clearly-labeled figure instead of "financials not available".
+   */
+  latestQuarterRevenue?: { val: number; fy: number; fp: string };
 }
 
 export interface WikiSummary {

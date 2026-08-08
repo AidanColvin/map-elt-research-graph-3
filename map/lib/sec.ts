@@ -1327,9 +1327,10 @@ export async function fetchFinancials(cik: string): Promise<Financials | null> {
     const s = seriesFor(f, concept, currency, instant, cik);
     return s.length ? s : magnitudeFallback(f, currency, cat, instant, cik);
   };
+  const revenue = sf(CONCEPTS.revenue, false, 'revenue');
   return {
     currency,
-    revenue:     sf(CONCEPTS.revenue,     false, 'revenue'),
+    revenue,
     netIncome:   sf(CONCEPTS.netIncome,   false, 'netIncome'),
     grossProfit: sf(CONCEPTS.grossProfit, false, 'grossProfit'),
     rnd:         sf(CONCEPTS.rnd,         false, 'rnd'),
@@ -1338,5 +1339,34 @@ export async function fetchFinancials(cik: string): Promise<Financials | null> {
     liabilities: sf(CONCEPTS.liabilities, true,  'liabilities'),
     equity:      sf(CONCEPTS.equity,      true,  'equity'),
     buybacks:    sf(CONCEPTS.buybacks,    false, 'buybacks'),
+    // Only compute a quarterly fallback when there is no annual revenue at all,
+    // so an established filer's report is never diluted by a stray quarter.
+    latestQuarterRevenue: revenue.length ? undefined
+      : latestQuarter(f, CONCEPTS.revenue, currency),
   };
+}
+
+// takes: the XBRL facts object, the revenue concept, and the reporting currency
+// does: finds the most recent single-quarter (fp Q1–Q4, ~90-day) revenue value
+//       across the concept's us-gaap / ifrs tags
+// returns: {val, fy, fp} for the latest quarter, or undefined when none exists
+export function latestQuarter(
+  f: any,
+  concept: Concept,
+  currency: string,
+): { val: number; fy: number; fp: string } | undefined {
+  const names = [...concept.gaap.map((g) => ["us-gaap", g] as const),
+                 ...concept.ifrs.map((i) => ["ifrs-full", i] as const)];
+  let best: { val: number; fy: number; fp: string; end: string } | undefined;
+  for (const [ns, name] of names) {
+    const units = f?.[ns]?.[name]?.units?.[currency];
+    if (!Array.isArray(units)) continue;
+    for (const e of units) {
+      if (!/^Q[1-4]$/.test(e.fp || "") || !e.start || !e.end) continue;
+      const days = (new Date(e.end).getTime() - new Date(e.start).getTime()) / 86_400_000;
+      if (days < 80 || days > 100) continue; // a single quarter, not a YTD stub
+      if (!best || e.end > best.end) best = { val: e.val, fy: e.fy, fp: e.fp, end: e.end };
+    }
+  }
+  return best ? { val: best.val, fy: best.fy, fp: best.fp } : undefined;
 }
