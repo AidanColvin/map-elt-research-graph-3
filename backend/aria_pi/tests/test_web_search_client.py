@@ -9,18 +9,16 @@ from unittest.mock import MagicMock
 from aria_pi.clients.web_search_client import WebSearchClient
 
 
-def test_no_key_uses_mock_fallback(monkeypatch):
+def test_no_key_returns_nothing(monkeypatch):
     """
-    Takes: A client with no API key and no TAVILY_API_KEY env var.
-    Does: Searches company news.
-    Returns: A single deterministic mock result (no live client).
+    takes: a client with no API key and no TAVILY_API_KEY env var
+    does: searches company news without a real search backend
+    gives: an empty list — never a fabricated placeholder result
     """
     monkeypatch.delenv("TAVILY_API_KEY", raising=False)
     client = WebSearchClient(api_key=None)
     assert client.client is None
-    results = client.search_company_news("Moderna")
-    assert len(results) == 1
-    assert "Moderna" in results[0]["title"]
+    assert client.search_company_news("Moderna") == []
 
 
 def test_live_path_returns_results(monkeypatch):

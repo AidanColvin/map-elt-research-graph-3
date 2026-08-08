@@ -8,7 +8,7 @@ Amazon Web Services generated **$129B** in segment revenue in 2025, up **20%** y
 
 ## Company Overview
 
-Amazon Web Services is the cloud-computing segment of Amazon.com, Inc., offering compute, storage, databases, machine learning, and 200+ services [2]. Headquartered in Seattle, Washington, AWS is reported as a segment of Amazon (NASDAQ: AMZN; parent IPO 1997) rather than a separately listed company [1]. Amazon employs roughly **1.5 million** people company-wide; AWS headcount is not separately disclosed [3]. AWS is the highest-margin, highest-operating-income part of Amazon [1][3].
+Amazon Web Services is the cloud-computing segment of Amazon.com, Inc., offering compute, storage, databases, machine learning, and 200+ services [2]. Headquartered in Seattle, Washington, AWS is reported as a segment of Amazon (NASDAQ: AMZN; parent IPO 1997) rather than a separately listed company [1]. Amazon employs roughly **1.58 million** people company-wide (Dec 31, 2025, per 10-K); AWS headcount is not separately disclosed [3]. AWS is the highest-margin, highest-operating-income part of Amazon [1][3].
 
 ## Strategic Direction
 
@@ -38,13 +38,13 @@ AWS sells consumption-based cloud infrastructure at high operating margins, fund
 | 2021 | $62.2B | — |
 | 2022 | $80.1B | +28.8% |
 | 2023 | $90.8B | +13.4% |
-| 2024 | $108.0B | +18.9% |
-| 2025 | $129.0B | +19.4% |
+| 2024 | $107.6B | +18.5% |
+| 2025 | $128.7B | +19.7% |
 
 Source: Amazon Form 10-K segment disclosures, SEC EDGAR [1].
 
 ```chart
-{"type":"line","title":"AWS Segment Revenue ($B)","x":["2021","2022","2023","2024","2025"],"series":[{"name":"AWS Revenue","values":[62.2,80.1,90.8,108.0,129.0],"color":"#ff9900"}]}
+{"type":"line","title":"AWS Segment Revenue ($B)","x":["2021","2022","2023","2024","2025"],"series":[{"name":"AWS Revenue","values":[62.2,80.1,90.8,107.6,128.7],"color":"#ff9900"}]}
 ```
 
 ```chart

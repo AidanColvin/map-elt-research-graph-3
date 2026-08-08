@@ -8,7 +8,7 @@ OpenAI is the developer of the GPT/ChatGPT family and one of the most valuable p
 
 ## Company Overview
 
-OpenAI Group PBC is a Public Benefit Corporation controlled by the nonprofit OpenAI Foundation, headquartered in San Francisco, California [1]. It builds frontier models (the GPT family) and distributes them through ChatGPT, the API, and enterprise products [1]. The company is privately held with no public SEC financials yet, though it confidentially filed an S-1 in May 2026 [1]. Reported headcount is roughly **3,000+** [1]. Its capital structure is unusual: a capped-profit company under a nonprofit foundation, with Microsoft as the largest strategic shareholder [2].
+OpenAI Group PBC is a Public Benefit Corporation controlled by the nonprofit OpenAI Foundation, headquartered in San Francisco, California [1]. It builds frontier models (the GPT family) and distributes them through ChatGPT, the API, and enterprise products [1]. The company is privately held with no public SEC financials yet, though it confidentially filed an S-1 in May 2026 [1]. Reported headcount is roughly **4,500** as of March 2026, with plans to reach ~8,000 by year-end [1]. Its capital structure is unusual: a capped-profit company under a nonprofit foundation, with Microsoft as the largest strategic shareholder [2].
 
 ## Strategic Direction
 
@@ -34,7 +34,7 @@ OpenAI monetizes consumer subscriptions (ChatGPT), API usage, and enterprise con
 | Latest round | $122B committed [1] |
 | Notable investors | Amazon $50B · NVIDIA $30B · SoftBank $30B [1] |
 | Microsoft stake | ~27%, ~$135B (Oct 2025 recap) [2] |
-| Headcount | ~3,000+ [1] |
+| Headcount | ~4,500 (March 2026) [1] |
 | IPO status | Form S-1 confidentially filed, May 22, 2026 [1] |
 
 ```chart
@@ -59,7 +59,7 @@ OpenAI monetizes consumer subscriptions (ChatGPT), API usage, and enterprise con
 
 ## Hiring & Workforce Signals
 
-Against ~3,000+ employees, OpenAI hires across model research, product (ChatGPT and enterprise), safety, and new healthcare and life-sciences lines — consistent with a company broadening from a research lab into a multi-product platform [1][3].
+Against ~4,500 employees, OpenAI hires across model research, product (ChatGPT and enterprise), safety, and new healthcare and life-sciences lines — consistent with a company broadening from a research lab into a multi-product platform [1][3].
 
 ## Competitive Positioning
 

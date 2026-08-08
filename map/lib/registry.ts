@@ -24,7 +24,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Katherine Adams", title: "SVP & General Counsel" },
       { name: "Deirdre O'Brien", title: "SVP, Retail & People" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
   {
     slug: "nvidia",
@@ -43,7 +43,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Debora Shoquist", title: "EVP, Operations" },
       { name: "Tim Teter", title: "EVP & General Counsel" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
   {
     slug: "microsoft",
@@ -62,7 +62,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Brad Smith", title: "Vice Chair & President" },
       { name: "Judson Althoff", title: "EVP & Chief Commercial Officer" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
   {
     slug: "google",
@@ -82,7 +82,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Philipp Schindler", title: "SVP & Chief Business Officer" },
       { name: "Kent Walker", title: "President, Global Affairs" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
   {
     slug: "aws",
@@ -92,7 +92,7 @@ export const CURATED: CuratedMeta[] = [
     type: "Public",
     hq: "Seattle, WA",
     sector: "Cloud Infrastructure",
-    tagline: "The $129B cloud segment that funds Amazon's operating income.",
+    tagline: "The $128.7B cloud segment that funds Amazon's operating income.",
     accent: "#ff9900",
     domain: "aws.amazon.com",
     leaders: [
@@ -101,7 +101,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Brian Olsavsky", title: "SVP & Chief Financial Officer, Amazon.com" },
       { name: "Werner Vogels", title: "VP & Chief Technology Officer, Amazon.com" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
   {
     slug: "anthropic",
@@ -120,7 +120,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Krishna Rao", title: "Chief Financial Officer" },
       { name: "Mike Krieger", title: "Chief Product Officer" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
   {
     slug: "openai",
@@ -139,7 +139,7 @@ export const CURATED: CuratedMeta[] = [
       { name: "Sarah Friar", title: "Chief Financial Officer" },
       { name: "Jakub Pachocki", title: "Chief Scientist" },
     ],
-    updated: "June 2026",
+    updated: "August 2026",
   },
 ];
 

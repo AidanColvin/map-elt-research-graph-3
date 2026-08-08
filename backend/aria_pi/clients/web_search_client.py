@@ -30,13 +30,14 @@ class WebSearchClient:
 
     def search_company_news(self, company_name: str) -> list[dict]:
         """
-        Takes: company_name as a string.
-        Does: Searches the web for recent news and partnership announcements.
-        Returns: A list of result dictionaries with title and URL.
+        takes: company_name as a string
+        does: searches the web for recent news and partnership announcements;
+              with no real search key it returns NOTHING — never a fabricated
+              placeholder result, so no invented data can reach a report
+        gives: a list of result dictionaries with title and URL
         """
         if not self.client:
-            return [{"title": f"{company_name} Research Partnership",
-                     "url": "https://research.unc.edu"}]
+            return []
 
         try:
             query = f"{company_name} research agreement OR license agreement"

@@ -4,11 +4,11 @@
 
 ## Executive Summary
 
-Microsoft reported **$281.7B** in revenue in FY2025, up **14.9%** year-over-year, with net income of **$101.8B** at a ~69% gross margin [1]. It employs roughly **228,000** people and is, alongside Apple and NVIDIA, one of a handful of companies worth more than $3 trillion [1][2]. The strategy is to convert its enterprise distribution — Windows, Office, Azure, GitHub — into AI distribution through Copilot, underwritten by a multi-year, multi-billion-dollar partnership with OpenAI in which Microsoft holds an estimated ~27% economic stake [3]. Azure is the growth engine; clinical AI (Dragon Copilot) is an early vertical proof point [2][4].
+Microsoft reported **$331.8B** in revenue in FY2026, up **17.8%** year-over-year, with net income of **$133.7B** at a ~68% gross margin [1]. It employs roughly **223,000** people and is, alongside Apple and NVIDIA, one of a handful of companies worth more than $3 trillion [1][2]. The strategy is to convert its enterprise distribution — Windows, Office, Azure, GitHub — into AI distribution through Copilot, underwritten by a multi-year, multi-billion-dollar partnership with OpenAI in which Microsoft holds an estimated ~27% economic stake [3]. Azure is the growth engine; clinical AI (Dragon Copilot) is an early vertical proof point [2][4].
 
 ## Company Overview
 
-Microsoft Corporation develops software, cloud services, devices, and AI platforms [1]. Founded in 1975 and headquartered in Redmond, Washington, it has traded on NASDAQ as MSFT since its 1986 IPO and employs about 228,000 full-time staff [1]. It reports in three segments: Productivity & Business Processes (Microsoft 365, LinkedIn, Dynamics), Intelligent Cloud (Azure, server products), and More Personal Computing (Windows, gaming, devices) [1]. Azure and AI services are the primary growth drivers [1][2].
+Microsoft Corporation develops software, cloud services, devices, and AI platforms [1]. Founded in 1975 and headquartered in Redmond, Washington, it has traded on NASDAQ as MSFT since its 1986 IPO and employs about 223,000 full-time staff (as of June 30, 2026) [1]. It reports in three segments: Productivity & Business Processes (Microsoft 365, LinkedIn, Dynamics), Intelligent Cloud (Azure, server products), and More Personal Computing (Windows, gaming, devices) [1]. Azure and AI services are the primary growth drivers [1][2].
 
 ## Strategic Direction
 
@@ -29,7 +29,7 @@ Microsoft is scaling Dragon Copilot, its ambient clinical documentation assistan
 
 ## Business Model & Financial Performance
 
-Microsoft monetizes recurring enterprise software and cloud consumption at ~69% gross margin, with Azure driving incremental growth [1].
+Microsoft monetizes recurring enterprise software and cloud consumption at ~68% gross margin, with Azure driving incremental growth [1].
 
 **Revenue Trajectory**
 
@@ -40,25 +40,26 @@ Microsoft monetizes recurring enterprise software and cloud consumption at ~69% 
 | FY2023 | $211.9B | +6.9% |
 | FY2024 | $245.1B | +15.7% |
 | FY2025 | $281.7B | +14.9% |
+| FY2026 | $331.8B | +17.8% |
 
 Source: Microsoft Form 10-K filings, SEC EDGAR [1].
 
 ```chart
-{"type":"line","title":"Revenue by Fiscal Year ($B)","x":["FY21","FY22","FY23","FY24","FY25"],"series":[{"name":"Revenue","values":[168.1,198.3,211.9,245.1,281.7],"color":"#0078d4"}]}
+{"type":"line","title":"Revenue by Fiscal Year ($B)","x":["FY22","FY23","FY24","FY25","FY26"],"series":[{"name":"Revenue","values":[198.3,211.9,245.1,281.7,331.8],"color":"#0078d4"}]}
 ```
 
 ```chart
-{"type":"bar","title":"Revenue vs Net Income ($B)","x":["FY21","FY22","FY23","FY24","FY25"],"series":[{"name":"Revenue","values":[168.1,198.3,211.9,245.1,281.7],"color":"#0078d4"},{"name":"Net Income","values":[61.3,72.7,72.4,88.1,101.8],"color":"#10b981"}]}
+{"type":"bar","title":"Revenue vs Net Income ($B)","x":["FY22","FY23","FY24","FY25","FY26"],"series":[{"name":"Revenue","values":[198.3,211.9,245.1,281.7,331.8],"color":"#0078d4"},{"name":"Net Income","values":[72.7,72.4,88.1,101.8,133.7],"color":"#10b981"}]}
 ```
 
-**FY2025 Profitability** [1]
+**FY2026 Profitability** [1]
 
 | Metric | Value |
 |---|---|
-| Net income | $101.8B |
-| Gross margin | 68.8% |
-| Operating income | $128.5B |
-| R&D spend | $32.5B |
+| Net income | $133.7B |
+| Gross margin | 67.9% |
+| Operating income | $155.2B |
+| R&D spend | $35.6B |
 
 ## Recent Strategic Partnerships
 
@@ -76,7 +77,7 @@ Source: Microsoft Form 10-K filings, SEC EDGAR [1].
 
 ## Hiring & Workforce Signals
 
-Against ~228,000 employees, hiring concentrates in Azure infrastructure, AI platform and Copilot engineering, security, and healthcare AI — mapping directly to the segments Microsoft is investing behind [1][4].
+Against ~223,000 employees (down ~5,000 year-over-year), hiring concentrates in Azure infrastructure, AI platform and Copilot engineering, security, and healthcare AI — mapping directly to the segments Microsoft is investing behind [1][4].
 
 ## Competitive Positioning
 
@@ -108,11 +109,11 @@ Azure is the #2 cloud platform behind AWS, with Microsoft 365 Copilot giving it 
 
 ## Outlook
 
-Microsoft has the strongest enterprise distribution in AI and the financial base — $128.5B operating income — to fund the build-out [1]. The key questions are Azure's growth durability, Copilot seat attach and monetization, and how the OpenAI relationship settles as OpenAI diversifies [2][3]. The metrics to watch are Azure growth, Microsoft Cloud gross margin, and capex as a share of revenue [1].
+Microsoft has the strongest enterprise distribution in AI and the financial base — $155.2B operating income — to fund the build-out [1]. The key questions are Azure's growth durability, Copilot seat attach and monetization, and how the OpenAI relationship settles as OpenAI diversifies [2][3]. The metrics to watch are Azure growth, Microsoft Cloud gross margin, and capex as a share of revenue [1].
 
 ## Sources
 
-[1] Microsoft Corporation — Form 10-K (FY2025), U.S. SEC EDGAR. sec.gov
+[1] Microsoft Corporation — Form 10-K (FY2026, filed July 29, 2026), U.S. SEC EDGAR. sec.gov
 [2] Industry analysis — enterprise cloud and AI distribution (2025–2026).
 [3] OpenAI Foundation recapitalization disclosures and partnership coverage (October 2025–2026).
 [4] Microsoft Source — Dragon Copilot and Copilot Health announcements (2025–2026). news.microsoft.com

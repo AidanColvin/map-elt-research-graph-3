@@ -8,7 +8,7 @@ Apple generated **$416.2B** in revenue in FY2025, up 6% year-over-year, with net
 
 ## Company Overview
 
-Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and a fast-growing suite of services spanning the App Store, iCloud, Apple Music, Apple TV+, Apple Pay, and AppleCare [2]. Founded in 1976 by Steve Jobs, Steve Wozniak, and Ronald Wayne, it is headquartered at One Apple Park Way, Cupertino, California, and trades on NASDAQ under AAPL (IPO December 1980) [2]. Apple employs roughly **150,000** full-time staff and had 5,659 open positions as of April 2026 [1]. It has evolved from a hardware innovator into a tightly integrated ecosystem company, and its SEC filings show a deliberate, multi-year shift from hardware dependency toward a high-margin services ecosystem while expanding gross margins to record levels [2].
+Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and a fast-growing suite of services spanning the App Store, iCloud, Apple Music, Apple TV+, Apple Pay, and AppleCare [2]. Founded in 1976 by Steve Jobs, Steve Wozniak, and Ronald Wayne, it is headquartered at One Apple Park Way, Cupertino, California, and trades on NASDAQ under AAPL (IPO December 1980) [2]. Apple employs roughly **166,000** full-time-equivalent staff (per the FY2025 10-K) and had 5,659 open positions as of April 2026 [1]. It has evolved from a hardware innovator into a tightly integrated ecosystem company, and its SEC filings show a deliberate, multi-year shift from hardware dependency toward a high-margin services ecosystem while expanding gross margins to record levels [2].
 
 ## Strategic Direction
 
@@ -67,7 +67,7 @@ Source: Apple FY2025 results [1].
 | Metric | FY2024 | FY2025 |
 |---|---|---|
 | Gross margin | 46.2% | 46.9% |
-| Services gross margin | 74.1% | 75.4% |
+| Services gross margin | 73.9% | 75.4% |
 | Operating cash flow | $118.3B | $110B+ |
 | Share repurchases | $94.9B | $89.3B |
 
@@ -91,7 +91,7 @@ Source: Apple 10-K and FY2025 disclosures [2][4].
 
 ## Hiring & Workforce Signals
 
-Apple listed **5,659** open positions as of April 2026 against a base of ~150,000 employees, a significant share of them engineers [1]. The hiring and product pattern points to three priorities:
+Apple listed **5,659** open positions as of April 2026 against a base of ~166,000 employees, a significant share of them engineers [1]. The hiring and product pattern points to three priorities:
 
 - **Generative AI / ML** — staffing Apple Intelligence and on-device model work [5].
 - **Silicon** — sustaining the A-/M-series roadmap that underpins gross margin [2].

@@ -18,7 +18,7 @@ Anthropic positions Claude as the model for enterprises that prioritize reliabil
 
 ### Healthcare and Life Sciences
 
-Anthropic launched **Claude for Life Sciences** (October 2025) and **Claude for Healthcare** (January 2026) — a HIPAA-ready toolkit with native connectors to PubMed, ICD-10, ClinicalTrials.gov, Medidata, and other clinical and biomedical data sources [3]. Its pending **$400M acquisition of Coefficient Bio** deepens the bet on AI-accelerated biology [1][3].
+Anthropic launched **Claude for Life Sciences** (October 2025) and **Claude for Healthcare** (January 2026) — a HIPAA-ready toolkit with native connectors to PubMed, ICD-10, ClinicalTrials.gov, Medidata, and other clinical and biomedical data sources [3]. Its **$400M acquisition of Coefficient Bio** — closed April 2026, with the team joining Anthropic's Healthcare and Life Sciences group — deepens the bet on AI-accelerated biology [1][3].
 
 - Health systems such as Banner Health (55,000+ staff) use Claude operationally [1].
 - Pharma users include Sanofi, Novo Nordisk, and AbbVie [1].
@@ -56,7 +56,7 @@ Anthropic sells model access via API and enterprise products (Claude, Claude Cod
 
 | Company | Type | Strategic Rationale |
 |---|---|---|
-| Coefficient Bio | Acquisition (~$400M, pending) | AI-accelerated biological research [1][3] |
+| Coefficient Bio | Acquisition (~$400M, closed April 2026) | AI-accelerated biological research [1][3] |
 | (Inbound) Amazon, Google | Strategic investors | Capital plus multi-cloud compute [1] |
 
 ## Hiring & Workforce Signals
