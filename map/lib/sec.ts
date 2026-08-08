@@ -72,26 +72,39 @@ export async function resolveCik(
   const qSet = new Set(nq.split(" ").filter(Boolean));
   const word = new RegExp(`\\b${escapeRegExp(nq)}\\b`);
 
+  // SEC titles sometimes put the surname first ("SCHWAB CHARLES CORP"), so an
+  // ordered-phrase match alone misses "Charles Schwab" entirely. When every
+  // query token appears as a whole word in the title — any order — that's a
+  // strong match, ranked just below an ordered-phrase hit.
+  const tokenRes = [...qSet].map((t) => new RegExp(`\\b${escapeRegExp(t)}\\b`));
+  const allTokens = (nt: string) =>
+    qSet.size >= 2 && tokenRes.every((re) => re.test(nt));
+
   let best: TickerRow | null = null;
   let bestScore = -Infinity;
-  for (const r of rows) {
+  rows.forEach((r, idx) => {
     const nt = normalizeName(r.title);
     let tier = -1;
     if (nt === nq) tier = 4;
     else if (nt.startsWith(nq + " ")) tier = 3;
     else if (word.test(nt)) tier = 2;
+    else if (allTokens(nt)) tier = 1.5;
     else if (nt.includes(nq)) tier = 1;
-    if (tier < 0) continue;
+    if (tier < 0) return;
     const extra = nt
       .split(" ")
       .filter((w) => w && !qSet.has(w) && !CORP_SUFFIX.has(w)).length;
-    // tier dominates, then fewer extra descriptive tokens, then shorter title.
-    const score = tier * 1_000_000 - extra * 1000 - nt.length;
+    // tier dominates, then fewer extra descriptive tokens, then EARLIER
+    // position in SEC's cap-ranked ticker map — the flagship entity outranks a
+    // same-name spinoff ("Honeywell" → HON, not the HONA spinoff). Mirrors the
+    // Python resolver's (score, -extra, -idx) key; a shorter-title tiebreak
+    // picked the spinoff, so title length is deliberately not used.
+    const score = tier * 1_000_000_000 - extra * 1_000_000 - idx;
     if (score > bestScore) {
       bestScore = score;
       best = r;
     }
-  }
+  });
 
   if (!best) return null;
   return format(best);
