@@ -39,6 +39,7 @@ from aria_pi.utils.source_tagger import SourceTagger
 from aria_pi.sectors import (
     seeds_for as _seeds_for,
     canonical_sector,
+    is_health_sector,
     is_sector_query,
     SECTOR_SEEDS,
     SECTOR_NC_SEEDS,
@@ -203,6 +204,12 @@ async def run_pipeline(req: PipelineRequest):
         )
         _log.info("pipeline: fetch done in %.1fs companies=%d",
                   time.monotonic() - _t0, len(company_data))
+
+        # Non-health sectors: drop ClinicalTrials.gov sponsor-name collisions at
+        # the source so the whole report (structured sections + condensed brief)
+        # matches the frontend's visiblePipeline gate.
+        if not is_health_sector(req.sector):
+            _strip_trial_signals(company_data)
 
         # 2. Deterministic synthesis
         report = builder.build(req.sector, {"sector": req.sector, "companies": company_data})
@@ -383,6 +390,12 @@ async def run_pipeline_stream(req: PipelineRequest):
                     'stub' if comp.get('_sec_only_stub') else 'full'
                 )
 
+            # Non-health sectors: drop ClinicalTrials.gov sponsor-name
+            # collisions at the source (mirrors the frontend visiblePipeline
+            # gate) so structured sections and the condensed brief agree.
+            if not is_health_sector(req.sector):
+                _strip_trial_signals(company_data)
+
             yield _sse({"type": "stage", "key": "building"})
             report = builder.build(req.sector,
                                    {"sector": req.sector, "companies": company_data})
@@ -509,6 +522,20 @@ def _prefetch_facts(names: List[str], sec, deadline: float) -> dict:
             except Exception as e:
                 _log.warning("facts prefetch deadline for %s: %s", name, e)
     return out
+
+
+def _strip_trial_signals(company_data: list) -> None:
+    """
+    takes: the per-company data dicts from the fetch stage
+    does: clears each company's trial-derived signals in place, for a non-health
+          sector where every ClinicalTrials.gov sponsor match is a name collision
+          (a bank, retailer, or chipmaker does not run clinical trials)
+    gives: nothing (mutates each company dict so pipeline, UNC alignment, the
+           priority table, and the condensed brief all agree with the UI gate)
+    """
+    for c in company_data:
+        c["trials"] = []
+        c["unc_trials"] = []
 
 
 def _fetch_one_company(name: str, sec, trials, pubmed, nih,

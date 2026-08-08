@@ -800,6 +800,31 @@ def domain_for(sector: str) -> str:
     return SECTOR_DOMAIN.get(canon, "general") if canon else "general"
 
 
+# Health / life-science vocabulary, matched against the raw sector NAME. This is
+# a verbatim mirror of the frontend lib/domain.ts HEALTH_RE so the backend data
+# and the on-screen gate classify a sector identically — and, unlike domain_for,
+# it works for DISCOVERED health sectors that never resolve to a curated key
+# (e.g. "pediatric oncology"). `neuro(?!morphic)` keeps neuroscience but excludes
+# neuromorphic computing; `neural ?interface` catches BCIs without "neural network".
+_HEALTH_NAME_RE = re.compile(
+    r"health|medical|medicine|clinical|onco|cancer|tumou?r|carcinoma|leukem|"
+    r"lymphoma|melanoma|disease|therap|drug|pharma|\bbio|genom|\bgene\b|proteom|"
+    r"immun|diabet|cardio|neuro(?!morphic)|neural ?interface|vaccine|patient|"
+    r"\bdevice|diagnostic|surg|hospital|life ?scien|medtech|med ?tech",
+    re.IGNORECASE,
+)
+
+
+def is_health_sector(sector: str) -> bool:
+    """
+    takes: a raw sector name string
+    does: tests it against the health / life-science vocabulary (mirrors the
+          frontend lib/domain.ts so data-layer and UI gate identically)
+    gives: True when the sector is a health / life-science domain
+    """
+    return bool(_HEALTH_NAME_RE.search(sector or ""))
+
+
 def _word_match(needle: str, text: str) -> bool:
     """True only when `needle` appears in `text` on word boundaries.
 
