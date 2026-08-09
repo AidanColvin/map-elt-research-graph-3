@@ -7,7 +7,8 @@ const STAGGER_MS = 60;
 
 /**
  * takes a stagger position, an optional class name, and children
- * fades and lifts them into place the first time they scroll into view, once
+ * fades and lifts them into place the first time they scroll into view, once —
+ * or shows them outright if they were on screen before anyone scrolled
  * returns the wrapping element
  */
 export default function Reveal({
@@ -19,13 +20,14 @@ export default function Reveal({
   className?: string;
   children: React.ReactNode;
 }) {
-  const [ref, seen] = useSeenOnce();
+  const [ref, seen, immediate] = useSeenOnce();
   return (
     <div
       ref={ref}
       className={`v4-reveal${className ? ` ${className}` : ""}`}
       data-shown={seen}
-      style={{ transitionDelay: `${order * STAGGER_MS}ms` }}
+      data-immediate={immediate}
+      style={{ transitionDelay: immediate ? "0ms" : `${order * STAGGER_MS}ms` }}
     >
       {children}
     </div>

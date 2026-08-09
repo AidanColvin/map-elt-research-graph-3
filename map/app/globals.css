@@ -1518,7 +1518,13 @@ select.ws-input {
 
   /* Text ramp */
   --ink-2: #4a4a4e;
-  --ink-3: #77777c;
+  /* The spec sets this to #77777C. Measured against --paper that is 4.34:1 —
+     just under the 4.5:1 the page has to clear for normal text, and this token
+     carries real 14px copy (the hero microcopy, the format tile labels, the
+     footer's lead-in). Darkened by three steps to 4.94:1, which keeps it a
+     distinctly lighter third step while passing AA on both --paper and
+     --paper-sunk. */
+  --ink-3: #6e6e73;
 
   /* 1px hairlines */
   --rule: #e2e2dc;
@@ -2011,6 +2017,11 @@ select.ws-input {
 .v4-reveal[data-shown="true"] {
   opacity: 1;
   transform: none;
+}
+/* Already on screen at first paint: nothing scrolled it into view, so it simply
+   is there. This also keeps the fade from delaying the largest paint. */
+.v4-reveal[data-immediate="true"] {
+  transition: none;
 }
 
 /* Reduced motion shows every element in its final state and removes every

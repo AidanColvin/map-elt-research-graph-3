@@ -42,32 +42,70 @@ export function useScrolledPast(distance: number): boolean {
 }
 
 /**
- * takes nothing
- * watches an element and notes the first time it enters the viewport
- * returns a ref to attach and whether the element has been seen yet
+ * takes an element and the viewport height
+ * tests whether the element's top edge has reached the viewport or gone past it
+ * returns true once the element has been arrived at, or skipped over
  */
-export function useSeenOnce(): [React.RefObject<HTMLDivElement | null>, boolean] {
+export function hasReachedViewport(top: number, viewportHeight: number): boolean {
+  // Deliberately "top edge past the bottom of the screen", not "is currently
+  // intersecting": a jump to the end of the page, an anchor link, or a fast
+  // flick moves straight past a section without it ever intersecting, and
+  // content must never be left permanently invisible because of how someone
+  // scrolled.
+  return top < viewportHeight * 0.92;
+}
+
+/**
+ * takes nothing
+ * watches an element and notes the first time the page reaches or passes it,
+ * and whether that happened on the very first frame rather than on a scroll
+ * returns a ref to attach, whether it has been seen, and whether it was already there
+ */
+export function useSeenOnce(): [
+  React.RefObject<HTMLDivElement | null>,
+  boolean,
+  boolean,
+] {
   const ref = useRef<HTMLDivElement | null>(null);
   const [seen, setSeen] = useState(false);
+  // These are *scroll* reveals. Content that was on screen before anyone
+  // scrolled was never revealed by scrolling, so it simply appears — which also
+  // keeps a fade from delaying the page's largest paint.
+  const [immediate, setImmediate] = useState(false);
+  const mounting = useRef(true);
   useEffect(() => {
     const el = ref.current;
-    // No element, or an engine without the observer: show the content rather
-    // than leaving it permanently transparent.
-    if (!el || typeof IntersectionObserver === "undefined") {
+    // No element to watch: show the content rather than leaving it transparent.
+    if (!el) {
       setSeen(true);
+      setImmediate(true);
       return;
     }
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) {
-          setSeen(true);
-          io.disconnect();
-        }
-      },
-      { rootMargin: "0px 0px -10% 0px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    let frame = 0;
+    let done = false;
+    const check = () => {
+      frame = 0;
+      if (done) return;
+      if (!hasReachedViewport(el.getBoundingClientRect().top, window.innerHeight)) return;
+      done = true;
+      if (mounting.current) setImmediate(true);
+      setSeen(true);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
+    const schedule = () => {
+      if (frame || done) return;
+      frame = window.requestAnimationFrame(check);
+    };
+    check();
+    mounting.current = false;
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+    };
   }, []);
-  return [ref, seen];
+  return [ref, seen, immediate];
 }
