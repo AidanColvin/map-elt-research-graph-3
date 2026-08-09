@@ -83,6 +83,40 @@ That run also corrected two misrepresentations in the first draft of the panel:
    the exact failure the original code carried a comment warning about.
    Restored the function call and added a typing-focus regression check.
 
+---
+
+## Tier 2 — splash plays once, faster, with a readable caption
+
+`map/scripts/verify_intro.mjs`, each case in a brand-new browser context so
+storage starts empty.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Intro plays on a first visit | pass |
+| 2 | `map_seen_intro` set afterwards | pass — `"1"` |
+| 3 | Second visit in same browser skips it | pass |
+| 4 | Splash on screen within 900ms budget | pass — 797–811ms measured |
+| 5 | Caption text | pass — "Research, written for you." |
+| 6 | Caption contrast vs splash background | pass — **4.82:1** (`#6e6e73` on `#faf9f7`), clears AA 4.5:1. The previous `#bbb` did not. |
+| 7 | Click-to-skip still works | pass |
+| 8 | `?skipIntro=1` bypass | pass |
+| 9 | `?screenshot=1` bypass | pass |
+| 10 | Reduced motion: nothing animates, still hands off | pass — 0 animated nodes |
+| 11 | Tier 1 home checks still green | pass |
+
+Timing note: the splash is server-rendered, so it is painted before the bundle
+hydrates and its hold timer can start. The hold now counts from navigation
+rather than from the effect, so a slow load cannot stack a full hold on top of
+it. Wall-clock from navigation to workspace measured ~1.0s locally; the splash's
+own time on screen — the thing the budget governs — is ~800ms.
+
+### Bug found and fixed during Tier 2
+
+6. **Reduced motion had no effect.** The preference was read in JS, which
+   returns `false` during server rendering, so all 66 nodes still animated.
+   Moved the static end-state to a CSS `prefers-reduced-motion` rule, which
+   applies regardless of when the client resolves the preference.
+
 ### Still outstanding at end of Tier 1
 
 - Mobile nav overflows (tabs clipped past ~390px). Pre-existing; Tier 3 addresses it.

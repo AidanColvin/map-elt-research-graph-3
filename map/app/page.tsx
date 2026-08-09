@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Intro from "@/components/Intro";
+import Intro, { hasSeenIntro } from "@/components/Intro";
 import AuthGate, { clearSession, getSession, type MapUser } from "@/components/AuthGate";
 import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
@@ -287,6 +287,10 @@ export default function MapHome() {
       return;
     }
     if (params.has("skipIntro")) setShowIntro(false);
+    // The intro is a first-impression, not a toll booth: play it once per
+    // browser and never again. (This deliberately replaces the previous
+    // "shows on every hard refresh by design" behavior.)
+    else if (hasSeenIntro()) setShowIntro(false);
 
     // Restore a previous session. Without this the session was written on
     // sign-in but never read back, so every refresh silently signed the user

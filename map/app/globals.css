@@ -906,6 +906,19 @@ a {
   }
 }
 
+/* The intro draws itself with inline animation styles. Under reduced motion,
+   jump every one of them straight to the finished state — done in CSS rather
+   than JS so it holds no matter when the client decides the preference. */
+@media (prefers-reduced-motion: reduce) {
+  .intro-svg *,
+  .intro-caption {
+    animation: none !important;
+    opacity: 1 !important;
+    stroke-dashoffset: 0 !important;
+    transform: none !important;
+  }
+}
+
 /* ---- Homepage redesign: demo panel, placeholder cycling, replay control ---- */
 .demo-fade {
   transition: opacity 400ms var(--ease);

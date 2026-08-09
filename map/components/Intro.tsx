@@ -16,6 +16,52 @@ const INNER_N = 8;
 const INNER_R = 200;
 const LEAF_R = 150;
 
+const SEEN_KEY = 'map_seen_intro';
+// Every original delay and duration is multiplied by this, so the drawing keeps
+// its exact choreography while finishing inside the shorter hold below.
+const SPEED = 0.5;
+// Total time on screen before the fade begins, and the fade itself. Together
+// they stay under the 900ms budget for the whole first impression.
+const HOLD_MS = 520;
+const FADE_MS = 360;
+
+// takes: nothing
+// does: checks whether this browser has already been shown the intro
+// returns: true if the intro has played before
+export function hasSeenIntro(): boolean {
+  try {
+    return localStorage.getItem(SEEN_KEY) === '1';
+  } catch {
+    // Storage unavailable (private mode, blocked cookies) — treat as unseen
+    // and simply play the short intro again.
+    return false;
+  }
+}
+
+// takes: nothing
+// does: records that this browser has now been shown the intro
+// returns: nothing
+function markIntroSeen(): void {
+  try {
+    localStorage.setItem(SEEN_KEY, '1');
+  } catch {}
+}
+
+// takes: a number of seconds from the original choreography
+// does: scales it by SPEED and formats it for a CSS time value
+// returns: a CSS duration string, e.g. "0.28s"
+function t(seconds: number): string {
+  return `${(seconds * SPEED).toFixed(3)}s`;
+}
+
+// takes: nothing
+// does: reads the OS reduced-motion preference at call time
+// returns: true if the visitor asked for reduced motion
+function prefersReducedMotion(): boolean {
+  return typeof window !== 'undefined'
+    && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
+}
+
 type Node = { x: number; y: number; r: number; delay: number };
 type Edge = { x1: number; y1: number; x2: number; y2: number; delay: number };
 
@@ -61,17 +107,32 @@ function buildGraph() {
 export default function Intro({ onDone }: { onDone: () => void }) {
   const g = React.useMemo(buildGraph, []);
   const [fading, setFading] = React.useState(false);
+  const reduced = React.useMemo(prefersReducedMotion, []);
 
+  // takes: nothing (closure over onDone)
+  // does: records the intro as seen, fades it out, then hands off to the app
+  // returns: nothing
   const finish = React.useCallback(() => {
+    markIntroSeen();
     setFading(true);
-    window.setTimeout(onDone, 650);
+    window.setTimeout(onDone, FADE_MS);
   }, [onDone]);
 
   React.useEffect(() => {
-    // Show the graph briefly, then hand off to the app.
-    const t = window.setTimeout(finish, 1000);
-    return () => window.clearTimeout(t);
-  }, [finish]);
+    // Show the graph briefly, then hand off to the app. Under reduced motion
+    // the drawing animations are suppressed in CSS, so the completed graph is
+    // simply held for a beat instead.
+    //
+    // The hold counts from navigation, not from this effect: the splash is
+    // server-rendered and therefore already on screen while the bundle
+    // hydrates. Charging that wait against the hold keeps a slow load from
+    // stacking a full hold on top of it.
+    const target = reduced ? 600 : HOLD_MS;
+    const alreadyOnScreen = performance.now();
+    const remaining = Math.max(0, target - alreadyOnScreen);
+    const timer = window.setTimeout(finish, remaining);
+    return () => window.clearTimeout(timer);
+  }, [finish, reduced]);
 
   return (
     <main
@@ -79,7 +140,7 @@ export default function Intro({ onDone }: { onDone: () => void }) {
       onClick={finish}
       title="Click to skip"
     >
-      <svg viewBox="-90 -90 1180 980" style={styles.svg} role="img" aria-label="map">
+      <svg className="intro-svg" viewBox="-90 -90 1180 980" style={styles.svg} role="img" aria-label="map">
         {/* Faint orbital interconnections */}
         {g.orbits.map((o, i) => (
           <ellipse
@@ -92,7 +153,11 @@ export default function Intro({ onDone }: { onDone: () => void }) {
             fill="none"
             stroke="#c9c7c1"
             strokeWidth={1}
-            style={{ opacity: 0, animation: 'introFade 0.5s ease forwards', animationDelay: '0.3s' }}
+            style={reduced ? { opacity: 1 } : {
+              opacity: 0,
+              animation: `introFade ${t(0.5)} ease forwards`,
+              animationDelay: t(0.3),
+            }}
           />
         ))}
 
@@ -107,11 +172,11 @@ export default function Intro({ onDone }: { onDone: () => void }) {
             pathLength={1}
             stroke="#1a1a1a"
             strokeWidth={1.3}
-            style={{
+            style={reduced ? undefined : {
               strokeDasharray: 1,
               strokeDashoffset: 1,
-              animation: 'introDraw 0.55s ease forwards',
-              animationDelay: `${e.delay}s`,
+              animation: `introDraw ${t(0.55)} ease forwards`,
+              animationDelay: t(e.delay),
             }}
           />
         ))}
@@ -127,11 +192,11 @@ export default function Intro({ onDone }: { onDone: () => void }) {
             pathLength={1}
             stroke="#9a988f"
             strokeWidth={1}
-            style={{
+            style={reduced ? undefined : {
               strokeDasharray: 1,
               strokeDashoffset: 1,
-              animation: 'introDraw 0.5s ease forwards',
-              animationDelay: `${e.delay}s`,
+              animation: `introDraw ${t(0.5)} ease forwards`,
+              animationDelay: t(e.delay),
             }}
           />
         ))}
@@ -146,7 +211,7 @@ export default function Intro({ onDone }: { onDone: () => void }) {
             fill="#faf9f5"
             stroke="#2a2a2a"
             strokeWidth={1.2}
-            style={{ ...styles.popNode, animationDelay: `${n.delay}s` }}
+            style={reduced ? { opacity: 1 } : { ...styles.popNode, animationDelay: t(n.delay) }}
           />
         ))}
 
@@ -160,7 +225,7 @@ export default function Intro({ onDone }: { onDone: () => void }) {
             fill="#faf9f5"
             stroke="#1a1a1a"
             strokeWidth={2}
-            style={{ ...styles.popNode, animationDelay: `${n.delay}s` }}
+            style={reduced ? { opacity: 1 } : { ...styles.popNode, animationDelay: t(n.delay) }}
           />
         ))}
 
@@ -172,20 +237,22 @@ export default function Intro({ onDone }: { onDone: () => void }) {
           fill="#faf9f5"
           stroke="#0a0a0a"
           strokeWidth={3}
-          style={{ ...styles.popNode, animationDelay: '0.05s' }}
+          style={reduced ? { opacity: 1 } : { ...styles.popNode, animationDelay: t(0.05) }}
         />
         <text
           x={CX}
           y={CY}
           textAnchor="middle"
           dominantBaseline="central"
-          style={styles.centerText}
+          style={reduced ? { ...styles.centerText, opacity: 1, animation: 'none' } : styles.centerText}
         >
           map
         </text>
       </svg>
 
-      <div style={styles.footer}>mapping architecture platform</div>
+      <div className="intro-caption" style={styles.footer}>
+        Research, written for you.
+      </div>
     </main>
   );
 }
@@ -194,13 +261,15 @@ const styles: Record<string, React.CSSProperties> = {
   wrap: {
     minHeight: '100dvh',
     width: '100%',
-    background: '#f7f6f3',
+    // Same canvas as the workspace, so the hand-off is a dissolve with no
+    // colour jump.
+    background: 'var(--bg)',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     cursor: 'pointer',
-    transition: 'opacity 0.6s ease',
+    transition: `opacity ${FADE_MS}ms ease`,
     padding: '24px',
   },
   svg: {
@@ -212,7 +281,7 @@ const styles: Record<string, React.CSSProperties> = {
     opacity: 0,
     transformBox: 'fill-box',
     transformOrigin: 'center',
-    animation: 'introPop 0.3s cubic-bezier(0.34, 1.56, 0.64, 1) forwards',
+    animation: `introPop ${t(0.3)} cubic-bezier(0.34, 1.56, 0.64, 1) forwards`,
   },
   centerText: {
     fontSize: 40,
@@ -220,19 +289,20 @@ const styles: Record<string, React.CSSProperties> = {
     letterSpacing: '-0.02em',
     fill: '#0a0a0a',
     opacity: 0,
-    animation: 'introFade 0.4s ease forwards',
-    animationDelay: '0.08s',
+    animation: `introFade ${t(0.4)} ease forwards`,
+    animationDelay: t(0.08),
     fontFamily:
       "-apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Helvetica Neue', Helvetica, Arial, sans-serif",
   },
   footer: {
     marginTop: 36,
-    fontSize: 12,
-    letterSpacing: '0.35em',
-    color: '#bbb',
-    textTransform: 'uppercase',
+    fontSize: 13,
+    letterSpacing: '0.02em',
+    // The old #bbb failed contrast against the canvas; --ink-secondary
+    // (#6e6e73 on #faf9f7) clears AA for normal text.
+    color: 'var(--ink-secondary)',
     opacity: 0,
-    animation: 'introFade 0.5s ease forwards',
-    animationDelay: '0.45s',
+    animation: `introFade ${t(0.5)} ease forwards`,
+    animationDelay: t(0.45),
   },
 };
