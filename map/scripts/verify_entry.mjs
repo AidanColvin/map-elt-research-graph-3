@@ -1,7 +1,7 @@
 // takes: a base URL (argv[2]) and the expected GUEST_FIRST_ENTRY value
 //        (argv[3], "true" or "false")
 // does: checks the entry flow — guest-first landing, the sign-in modal and its
-//       focus trap, the guest tab set, and the phone menu — or, with the flag
+//       focus trap, the guest tab set, and the phone footer — or, with the flag
 //       off, that the original full-page auth screen is back
 // returns: prints a JSON result; exits non-zero if any check fails
 
@@ -9,14 +9,14 @@ import { chromium } from "playwright";
 
 const BASE = process.argv[2] || "http://localhost:3010";
 const FLAG_ON = (process.argv[3] ?? "true") === "true";
-const GUEST_TABS = ["Home", "Companies", "Sectors", "Projects"];
-const ACCOUNT_ONLY_TABS = ["Partnerships", "Directory"];
+const GUEST_TABS = ["Companies", "Sectors", "Accounts"];
+const ACCOUNT_ONLY_TABS = ["Partnerships"];
 
 // takes: a page on the workspace
 // does: reads the labels of the tabs the header is rendering
 // returns: a list of tab labels
 async function navLabels(page) {
-  return page.$$eval(".ws-nav .ws-nav-item", (els) => els.map((e) => e.textContent.trim()));
+  return page.$$eval(".v4-nav-links .v4-nav-link", (els) => els.map((e) => e.textContent.trim()));
 }
 
 const browser = await chromium.launch({ headless: false });
@@ -90,23 +90,17 @@ if (!FLAG_ON) {
     (await page.evaluate(() => !/sign in to/i.test(document.body.innerText.slice(0, 400))));
   if (!result.projectsOpenToGuest) failures.push("Projects blocked a guest");
 
-  // 5. Phone: the tab row collapses into a reachable menu.
+  // 5. Phone: the bar drops its links and the footer carries them instead.
   await page.setViewportSize({ width: 390, height: 844 });
   await page.waitForTimeout(400);
-  const navVisible = await page.locator(".ws-nav").isVisible();
+  const navVisible = await page.locator(".v4-nav-links").isVisible();
   result.tabRowHiddenOnPhone = !navVisible;
-  if (navVisible) failures.push("tab row did not collapse on a phone viewport");
-  const menuBtn = page.getByRole("button", { name: /^menu$/i });
-  result.menuButtonOnPhone = (await menuBtn.count()) > 0;
-  if (!result.menuButtonOnPhone) failures.push("no menu button on a phone viewport");
-  const box = await menuBtn.first().boundingBox();
-  result.menuTouchTarget = box ? Math.round(Math.min(box.width, box.height)) : 0;
-  if (result.menuTouchTarget < 44) failures.push(`menu touch target is ${result.menuTouchTarget}px, under 44px`);
-  await menuBtn.first().click();
-  await page.waitForTimeout(300);
-  result.menuItems = await page.$$eval('.ws-menu-sheet button', (els) => els.map((e) => e.textContent.trim()));
-  if (!result.menuItems.includes("Sectors")) failures.push("phone menu did not list the tabs");
-  await page.screenshot({ path: "/tmp/map-verify/entry-390-menu.png" });
+  if (navVisible) failures.push("the bar kept its links on a phone viewport");
+  result.menuItems = await page.$$eval(".v4-footer-links button", (els) =>
+    els.map((e) => e.textContent.trim()),
+  );
+  if (!result.menuItems.includes("Sectors")) failures.push("the footer did not list the destinations");
+  await page.screenshot({ path: "/tmp/map-verify/entry-390-footer.png" });
   const noHScroll = await page.evaluate(
     () => document.documentElement.scrollWidth <= window.innerWidth + 1,
   );
