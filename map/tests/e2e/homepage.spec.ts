@@ -356,18 +356,48 @@ test('every record highlights on keyboard focus and swaps the caption', async ({
   }
 });
 
-test('tapping a record highlights it on a touch device', async ({ page }) => {
+test('clicking a record selects it, and clicking it again keeps it selected', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 800 });
   await gotoWorkspace(page);
   await page.locator('#provenance').scrollIntoViewIfNeeded();
 
+  const caption = page.getByTestId('provenance-caption');
   await page.getByTestId('provenance-node-2').dispatchEvent('click');
-  await expect(page.getByTestId('provenance-caption')).toContainText('Publications co-authored');
+  await expect(caption).toContainText('Publications co-authored');
 
-  // Tapping again releases it, so touch is not a one-way door.
+  // Deliberately NOT a toggle. A tap on iOS sends pointerenter and focus before
+  // the click, and a toggle would read its own hover as the first press and
+  // clear the record straight back off — inert on every phone.
   await page.getByTestId('provenance-node-2').dispatchEvent('click');
-  await expect(page.getByTestId('provenance-caption')).toContainText('Every claim in the brief');
+  await expect(caption).toContainText('Publications co-authored');
+
+  // Another record takes over, so a visitor is never stuck on one.
+  await page.getByTestId('provenance-node-4').dispatchEvent('click');
+  await expect(caption).toContainText('Recent research output');
 });
+
+for (const width of [1024, 1440]) {
+  test(`the diagram fills its column at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await gotoWorkspace(page);
+    await page.locator('#provenance').scrollIntoViewIfNeeded();
+
+    const measured = await page.evaluate(() => {
+      const svg = document.querySelector('.v4-diagram') as SVGElement;
+      const column = svg.closest('.v4-container') as HTMLElement;
+      return {
+        mode: svg.getAttribute('data-layout'),
+        diagram: svg.getBoundingClientRect().width,
+        column: column.getBoundingClientRect().width,
+      };
+    });
+
+    // The overflow checks pass a diagram that is far too SMALL, which is how a
+    // stray max-width cap reached production unnoticed. This is the other bound.
+    expect(measured.mode).toBe('wide');
+    expect(measured.diagram / measured.column).toBeGreaterThanOrEqual(0.7);
+  });
+}
 
 // ───────────────────────────── navigation and footer ─────────────────────────────
 

@@ -119,6 +119,22 @@ describe("layouts", () => {
     });
   }
 
+  it("labels each arrangement, rather than leaving it to be guessed from geometry", () => {
+    expect(wideLayout().mode).toBe("wide");
+    expect(narrowLayout().mode).toBe("narrow");
+  });
+
+  it("does not let node width stand in for the arrangement", () => {
+    // Both arrangements use node widths under 260, so any threshold on width
+    // classifies them the same way. That mistake capped the wide diagram at the
+    // narrow arrangement's max-width in production.
+    const wide = wideLayout().nodes[0].w;
+    const narrow = narrowLayout().nodes[0].w;
+    expect(wide).toBeLessThan(260);
+    expect(narrow).toBeLessThan(260);
+    expect(wideLayout().mode).not.toBe(narrowLayout().mode);
+  });
+
   it("picks the narrow arrangement on a phone and the wide one otherwise", () => {
     expect(layoutFor(true).viewBox).toBe(narrowLayout().viewBox);
     expect(layoutFor(false).viewBox).toBe(wideLayout().viewBox);
