@@ -8,7 +8,8 @@ import CompanyCanvas from "@/components/workspace/CompanyCanvas";
 import SectorCanvas from "@/components/workspace/SectorCanvas";
 import AccountsCanvas from "@/components/workspace/AccountsCanvas";
 import AccountView from "@/components/workspace/AccountView";
-import DashboardHome from "@/components/workspace/DashboardHome";
+import HomePage from "@/components/home/HomePage";
+import SiteNav from "@/components/home/SiteNav";
 import PartnershipInventoryView from "@/components/workspace/PartnershipInventoryView";
 import SignInRequired from "@/components/workspace/SignInRequired";
 import PendingApproval from "@/components/workspace/PendingApproval";
@@ -23,9 +24,9 @@ import type { AccountProfile } from "@/components/workspace/accountProfile";
 import { getUniqueAccounts } from "@/components/workspace/accountsData";
 import { resolveSubjectKind } from "@/components/workspace/sectors";
 
-// Single Apple-style nav bar: the logo, the view tabs, and the Profile button
-// all sit on one horizontal axis (no separate stacked sub-nav).
-const HEADER_H = 54;
+// The fixed v4 bar's height (components/home/SiteNav.tsx). Every view below it
+// clears this much, and the homepage hero adds its own padding on top.
+const HEADER_H = 64;
 
 type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "projects" | "account";
 
@@ -48,13 +49,17 @@ type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "
 const GUEST_FIRST_ENTRY = true;
 
 const VIEWS: { key: View; label: string; requiresAccount?: boolean }[] = [
-  { key: "dashboard", label: "Home" },
   { key: "company", label: "Companies" },   // single-company report generator
   { key: "sector", label: "Sectors" },
+  { key: "accounts", label: "Accounts" },   // the big company table
   { key: "partnerships", label: "Partnerships", requiresAccount: true },
-  { key: "accounts", label: "Directory", requiresAccount: true },  // the big company table
   { key: "projects", label: "Projects" },
 ];
+
+// The three the top bar leads with. The rest of VIEWS is still reachable — the
+// footer lists every destination at every width — so a shorter bar costs the
+// visitor nothing.
+const BAR_KEYS: View[] = ["company", "sector", "accounts"];
 
 // Base document title (mirrors the static metadata in layout.tsx) and the
 // per-view suffix the active tab appends, so the browser tab reflects the page.
@@ -64,32 +69,10 @@ const VIEW_TITLES: Record<View, string> = {
   company: "Companies — Map",
   sector: "Sectors — Map",
   partnerships: "Partnerships — Map",
-  accounts: "Directory — Map",
+  accounts: "Accounts — Map",
   projects: "Projects — Map",
   account: "Account — Map",
 };
-
-// takes: an optional pixel size
-// does: draws the node-graph brand glyph used in the header
-// returns: the logo SVG element
-function LogoMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden style={{ flexShrink: 0 }}>
-      <circle cx="12" cy="12" r="3.2" fill="#1d1d1f" />
-      {[0, 60, 120, 180, 240, 300].map((deg) => {
-        const r = (deg * Math.PI) / 180;
-        const x = 12 + 8.5 * Math.cos(r);
-        const y = 12 + 8.5 * Math.sin(r);
-        return (
-          <g key={deg}>
-            <line x1="12" y1="12" x2={x} y2={y} stroke="#1d1d1f" strokeWidth="1.1" />
-            <circle cx={x} cy={y} r="1.9" fill="#1d1d1f" />
-          </g>
-        );
-      })}
-    </svg>
-  );
-}
 
 // takes: nothing
 // does: decides where signing out lands. With guest-first entry there is no
@@ -101,207 +84,20 @@ function signedOutUser(): MapUser | null {
 }
 
 // takes: the current user
-// does: keeps only the tabs this visitor can actually open — a guest is never
-//       shown a tab that would only turn them away
-// returns: the tabs to render
+// does: keeps only the destinations this visitor can actually open — a guest is
+//       never offered one that would only turn them away
+// returns: the destinations to list
 function visibleViews(user: MapUser | null) {
   if (!GUEST_FIRST_ENTRY) return VIEWS;
   const isGuest = !user || user.guest;
   return isGuest ? VIEWS.filter((v) => !v.requiresAccount) : VIEWS;
 }
 
-// takes: the current user, the active view, an onHome handler (logo → home),
-//        an onChange(view) for the inline tabs, an onProfile handler
-//        (Profile button → account view), and an onSignIn handler
-// does: renders the single fixed glassmorphism nav bar, Apple-style — the
-//       clickable logo + wordmark anchored left (returns to the Dashboard),
-//       the view tabs centered on the SAME horizontal axis, and either a quiet
-//       Sign in or the Profile button anchored right. Left and right zones are
-//       equal-width so the tab group stays optically centered like apple.com.
-//       Below 768px the tab row collapses into a menu.
-// returns: the global header element
-function GlobalHeader({
-  user,
-  view,
-  onHome,
-  onChange,
-  onProfile,
-  onSignIn,
-}: {
-  user: MapUser | null;
-  view: View;
-  onHome: () => void;
-  onChange: (v: View) => void;
-  onProfile: () => void;
-  onSignIn: () => void;
-}) {
-  const [menuOpen, setMenuOpen] = useState(false);
-  const tabs = visibleViews(user);
-  const isGuest = GUEST_FIRST_ENTRY && (!user || user.guest);
-  // Equal-width flank zones keep the centered tab group from drifting when the
-  // logo and Profile button differ in width.
-  const flank = {
-    flex: 1,
-    display: "flex",
-    alignItems: "center",
-    minWidth: 0,
-  } as const;
-  return (
-    <header
-      className="ws-header"
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        height: HEADER_H,
-        zIndex: 100,
-        display: "flex",
-        alignItems: "center",
-        // Pad the flanks past the notch / Dynamic Island in landscape; the
-        // base 22px still applies on every non-notched device.
-        paddingTop: 0,
-        paddingBottom: 0,
-        paddingLeft: "max(22px, env(safe-area-inset-left))",
-        paddingRight: "max(22px, env(safe-area-inset-right))",
-        // Frosted system chrome: the tinted page washes show faintly through the
-        // bar and blur as content scrolls beneath it, exactly like macOS/iOS.
-        background: "rgba(255,255,255,0.72)",
-        backdropFilter: "saturate(180%) blur(20px)",
-        WebkitBackdropFilter: "saturate(180%) blur(20px)",
-        borderBottom: "1px solid var(--line)",
-        fontFamily: FONT,
-      }}
-    >
-      {/* Left zone — logo + wordmark is the home link. It uses in-app
-          navigation (no full reload) so the session and intro aren't
-          re-triggered, and lands on the Dashboard. */}
-      <div style={{ ...flank, justifyContent: "flex-start" }}>
-        <button
-          onClick={onHome}
-          aria-label="Map home — Dashboard"
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            border: "none",
-            background: "none",
-            cursor: "pointer",
-            padding: 0,
-          }}
-        >
-          <LogoMark />
-          <span
-            className="ws-wordmark"
-            style={{
-              fontSize: 15,
-              fontWeight: 600,
-              letterSpacing: 0,
-              color: "var(--ink)",
-              userSelect: "none",
-            }}
-          >
-            Map
-          </span>
-        </button>
-      </div>
-
-      {/* Center zone — view tabs on the same axis as the logo. */}
-      <nav
-        className="ws-nav"
-        aria-label="Workspace views"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          flexShrink: 0,
-        }}
-      >
-        {tabs.map((v) => (
-          <button
-            key={v.key}
-            className={`ws-nav-item ${view === v.key ? "active" : ""}`}
-            onClick={() => onChange(v.key)}
-            aria-current={view === v.key ? "page" : undefined}
-          >
-            {v.label}
-          </button>
-        ))}
-      </nav>
-
-      {/* Right zone — a quiet Sign in for guests, the Account pill once there
-          is an account to show. */}
-      <div style={{ ...flank, justifyContent: "flex-end", gap: 6 }}>
-        <button
-          className="ws-menu-btn"
-          aria-label="Menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((o) => !o)}
-          style={{
-            alignItems: "center", justifyContent: "center",
-            width: 44, height: 44, border: "none", background: "none",
-            cursor: "pointer", color: "var(--ink)", fontSize: 18,
-          }}
-        >
-          ☰
-        </button>
-        {menuOpen && (
-          <div className="ws-menu-sheet" role="menu">
-            {tabs.map((v) => (
-              <button
-                key={v.key}
-                role="menuitem"
-                aria-current={view === v.key ? "page" : undefined}
-                onClick={() => {
-                  onChange(v.key);
-                  setMenuOpen(false);
-                }}
-              >
-                {v.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {isGuest ? (
-          <button
-            onClick={onSignIn}
-            style={{
-              border: "none", background: "none", cursor: "pointer",
-              padding: "0 10px", minHeight: 44, fontSize: 13.5, fontWeight: 500,
-              color: "var(--ink-secondary)", fontFamily: FONT,
-            }}
-          >
-            Sign in
-          </button>
-        ) : (
-        <button
-          onClick={onProfile}
-          className="ws-account-btn ws-fade-in"
-          aria-label="Account"
-          aria-current={view === "account" ? "page" : undefined}
-          style={{
-            display: "flex", alignItems: "center", gap: 7,
-            border: "1px solid var(--line)", borderRadius: 999,
-            padding: "5px 14px 5px 8px", fontSize: 13.5,
-            color: view === "account" ? "var(--accent)" : "var(--ink)",
-            background: "var(--panel)", cursor: "pointer",
-            fontFamily: FONT, fontWeight: 500,
-          }}
-        >
-          <span style={{
-            width: 22, height: 22, borderRadius: "50%",
-            background: view === "account" ? "var(--accent)" : "var(--ink)",
-            color: "var(--panel)", display: "flex", alignItems: "center",
-            justifyContent: "center", fontSize: 12, fontWeight: 600,
-            flexShrink: 0,
-          }}>A</span>
-          <span className="ws-account-label">Account</span>
-        </button>
-        )}
-      </div>
-    </header>
-  );
+// takes: the current user
+// does: narrows the visible destinations to the three the top bar leads with
+// returns: the bar's links
+function barViews(user: MapUser | null) {
+  return visibleViews(user).filter((v) => BAR_KEYS.includes(v.key));
 }
 
 // takes: nothing (page component)
@@ -519,16 +315,20 @@ export default function MapHome() {
         fontFamily: FONT,
         minHeight: "100dvh",
         color: "var(--ink)",
-        background: "var(--bg)",
+        background: view === "dashboard" ? "var(--paper)" : "var(--bg)",
       }}
     >
-      <GlobalHeader
-        user={user}
-        view={view}
+      <SiteNav
+        links={barViews(user)}
+        active={view}
+        // Only the homepage has a hero for the bar to sit over transparently;
+        // every other view starts with content, so the bar keeps its surface.
+        alwaysSolid={view !== "dashboard"}
+        signedIn={!user.guest}
         onHome={() => setView("dashboard")}
-        onChange={setView}
-        onProfile={() => setView("account")}
+        onNavigate={(key) => setView(key as View)}
         onSignIn={() => setAuthContext("header")}
+        onAccount={() => setView("account")}
       />
 
       {authContext && (
@@ -539,12 +339,26 @@ export default function MapHome() {
         />
       )}
 
-      {/* All three views stay mounted; toggling display from none re-runs the
+      {/* The homepage is the page: full-bleed paper, its own rhythm, no gutter
+          from the workspace shell and no card floating on a tinted backdrop.
+          That is why it sits outside <main> rather than inside its padding. */}
+      <div style={{ display: view === "dashboard" ? "block" : "none" }}>
+        <HomePage
+          onSubmit={runFromDashboard}
+          links={visibleViews(user)}
+          onNavigate={(key) => setView(key as View)}
+        />
+      </div>
+
+      {/* Every other view stays mounted; toggling display from none re-runs the
           .ws-view opacity/transform entrance without unmounting anything, so
           component state and scroll positions survive every switch. */}
       <main
         className="ws-main"
         style={{
+          // Nothing in here is active on the homepage, and an empty <main> would
+          // still contribute its padding as blank space under the footer.
+          display: view === "dashboard" ? "none" : "block",
           // Top clears the fixed header; bottom adds the home-indicator inset
           // so content isn't hidden behind it on gesture-nav iPhones.
           paddingTop: HEADER_H + 24,
@@ -553,21 +367,6 @@ export default function MapHome() {
           paddingLeft: "max(28px, env(safe-area-inset-left))",
         }}
       >
-        <div
-          className="ws-view"
-          style={{ display: view === "dashboard" ? "block" : "none" }}
-        >
-          <DashboardHome
-            onRunProject={runFromDashboard}
-            onOpenCompanyView={() => setView("company")}
-            onOpenSectorView={() => setView("sector")}
-            onPrefillSector={(name) => {
-              setSectorDraft(name);
-              setView("sector");
-            }}
-          />
-        </div>
-
         <div
           className="ws-view"
           style={{

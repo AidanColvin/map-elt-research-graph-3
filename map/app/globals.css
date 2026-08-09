@@ -951,192 +951,6 @@ a {
   }
 }
 
-/* Header nav — the tab row collapses into a menu on phones, where six tabs
-   previously ran off the edge with no way to reach the rest. */
-.ws-menu-btn {
-  display: none;
-}
-@media (max-width: 767px) {
-  .ws-nav {
-    display: none !important;
-  }
-  .ws-menu-btn {
-    display: flex !important;
-  }
-  .ws-account-label {
-    display: none;
-  }
-}
-.ws-menu-sheet {
-  position: absolute;
-  top: 100%;
-  right: max(12px, env(safe-area-inset-right));
-  min-width: 200px;
-  padding: 6px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: var(--r-card);
-  box-shadow: var(--shadow-2);
-  display: flex;
-  flex-direction: column;
-}
-.ws-menu-sheet button {
-  min-height: 44px;
-  padding: 0 14px;
-  text-align: left;
-  border: none;
-  background: none;
-  border-radius: var(--r-sm);
-  font: inherit;
-  font-size: 15px;
-  color: var(--ink);
-  cursor: pointer;
-}
-.ws-menu-sheet button[aria-current="page"] {
-  color: var(--accent);
-  font-weight: 600;
-}
-
-/* ---- Homepage redesign: demo panel, placeholder cycling, replay control ---- */
-.demo-fade {
-  transition: opacity 400ms var(--ease);
-}
-.demo-rise {
-  transition: opacity 400ms var(--ease), transform 400ms var(--ease);
-}
-.demo-caret {
-  display: inline-block;
-  margin-left: 1px;
-  animation: demoCaretBlink 0.9s steps(1) infinite;
-}
-@keyframes demoCaretBlink {
-  50% { opacity: 0; }
-}
-[role="group"]:hover .demo-replay,
-[role="group"]:focus-visible .demo-replay {
-  opacity: 1 !important;
-}
-.home-placeholder-cycle {
-  transition: opacity 200ms var(--ease);
-}
-@media (prefers-reduced-motion: reduce) {
-  .demo-fade,
-  .demo-rise,
-  .home-placeholder-cycle {
-    transition: none !important;
-  }
-  .demo-caret {
-    animation: none;
-  }
-}
-
-/* ---------------------------- homepage hero ----------------------------- */
-/* The hero owns the first viewport: header, headline, one sentence, one field,
-   whitespace. The demo panel begins below the fold, so the empty space at the
-   bottom of the screen is the only scroll cue the page needs. 78px is the fixed
-   header plus the workspace's top gutter. */
-.home-hero {
-  min-height: calc(100dvh - 78px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
-}
-.home-h1 {
-  letter-spacing: -0.04em;
-}
-.home-sub {
-  font-size: 20px;
-}
-.home-field {
-  height: 60px;
-}
-/* The input and the two overlays drawn behind it (ghost completion, cycling
-   placeholder) must share one font size or the gray prediction stops lining up
-   with the typed text. */
-.home-field input,
-.home-field-text {
-  font-size: 19px;
-}
-.home-cta {
-  height: 44px;
-}
-/* Air below the fold: the demo panel gets a wide gap above it, and the closing
-   captions get one below them. */
-.home-demo-gap {
-  margin-top: 96px;
-}
-.home-footer-gap {
-  margin-top: 96px;
-}
-
-@media (max-width: 767px) {
-  /* A phone gets natural flow instead of a full-screen hero — the field should
-     be reachable without the headline pushing it to the bottom of the screen. */
-  .home-hero {
-    min-height: 70svh;
-  }
-  .home-h1 {
-    letter-spacing: -0.03em;
-  }
-  .home-sub {
-    font-size: 18px;
-  }
-  /* The field grows a second row so the button can span the full width beneath
-     the input rather than squeezing the typing space. */
-  .home-field {
-    height: auto;
-    flex-wrap: wrap;
-    padding: 8px !important;
-  }
-  /* 17px, comfortably over the 16px floor below which iOS Safari zooms the page
-     in when the field takes focus. */
-  .home-field input,
-  .home-field-text {
-    font-size: 17px;
-  }
-  .home-cta {
-    flex: 0 0 100%;
-    order: 3;
-  }
-  .home-demo-gap {
-    margin-top: 64px;
-  }
-  .home-footer-gap {
-    margin-top: 64px;
-  }
-}
-
-/* First paint, once per load: the three hero elements rise into place. Only
-   opacity and transform move, so nothing reflows and the layout never shifts.
-   The finished state is each element's natural state — the animation adds a
-   beginning, it does not decide whether the content is visible. */
-@keyframes homeEnter {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-.home-enter {
-  animation: homeEnter 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.home-enter-2 {
-  animation-delay: 80ms;
-}
-.home-enter-3 {
-  animation-delay: 160ms;
-}
-@media (prefers-reduced-motion: reduce) {
-  .home-enter {
-    animation: none;
-  }
-}
-
 /* leadership org chart */
 .org {
   display: flex;
@@ -1654,33 +1468,7 @@ select.ws-input {
 /* ----------------------------- mobile (phones) ----------------------------- */
 /* iPads (>= 768px) keep the full desktop layout; these target phone widths. */
 @media (max-width: 640px) {
-  .ws-header {
-    padding: 0 12px !important;
-    /* Clear the notch when the phone is held in landscape. */
-    padding-left: max(12px, env(safe-area-inset-left)) !important;
-    padding-right: max(12px, env(safe-area-inset-right)) !important;
-    gap: 8px;
-  }
-  .ws-wordmark { display: none; }
-  /* The logo / account flanks carry inline flex:1 + minWidth:0, so on a phone
-     they shrink below the logo's own width and it bleeds into the nav. Pin them
-     to their content width and let only the nav shrink + scroll. */
-  .ws-header > div { flex: 0 0 auto !important; }
-  /* The six tabs can't all fit a phone's width, so let the nav itself shrink
-     and scroll horizontally (flex-shrink:0 inline would otherwise force the
-     whole page to scroll sideways). The scrollbar is hidden — it's a swipe. */
-  .ws-nav {
-    gap: 2px !important;
-    flex-shrink: 1 !important;
-    min-width: 0;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-  }
-  .ws-nav::-webkit-scrollbar { display: none; }
   .ws-nav-item { padding: 6px 9px !important; font-size: 13px !important; white-space: nowrap; }
-  .ws-account-label { display: none; }
-  .ws-account-btn { padding: 5px !important; }
   /* Tighten the workspace gutter so cards aren't squeezed. */
   .ws-main {
     padding-left: 12px !important;
@@ -1688,8 +1476,6 @@ select.ws-input {
     padding-left: max(12px, env(safe-area-inset-left)) !important;
     padding-right: max(12px, env(safe-area-inset-right)) !important;
   }
-  /* No top padding: the hero's own min-height governs the first screen. */
-  .dash-home { padding: 0 18px 28px !important; }
 }
 
 /* Inline company autocomplete ghost — mirrors .ws-input metrics exactly so the
@@ -2202,19 +1988,17 @@ select.ws-input {
   padding-top: 48px;
   padding-bottom: 64px;
 }
+/* Every destination lives here at every width. The bar carries only the three
+   the homepage leads with, so the routes it leaves out are still one click
+   away rather than unreachable — and below 768px, where the bar drops its
+   links entirely, this is the only way to them. */
 .v4-footer-links {
-  display: none;
+  display: flex;
   flex-wrap: wrap;
   gap: 20px;
   padding: 0;
   margin: 0;
   list-style: none;
-}
-/* The three nav links land here once the bar drops them. */
-@media (max-width: 767px) {
-  .v4-footer-links {
-    display: flex;
-  }
 }
 
 /* ------------------------------- reveals ---------------------------------- */
@@ -2244,4 +2028,17 @@ select.ws-input {
     transition: none !important;
     animation: none !important;
   }
+}
+
+/* Visible to assistive tech only — used for the label the spinner replaces. */
+.v4-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
