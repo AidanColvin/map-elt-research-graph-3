@@ -44,6 +44,9 @@ page.on("console", (m) => {
 await page.goto(`${BASE}/?skipIntro=1`, { waitUntil: "domcontentloaded" });
 await page.getByRole("button", { name: /continue as guest/i }).click();
 await page.waitForSelector('[role="group"]');
+// The cursor lands where the demo panel now sits, and hovering it pauses the
+// sequence by design. Park the pointer out of the way before timing anything.
+await page.mouse.move(5, 5);
 
 const h1 = await page.locator("h1").first().textContent();
 const sub = await page.locator("h1 + p").first().textContent();

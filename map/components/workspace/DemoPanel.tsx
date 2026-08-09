@@ -10,10 +10,8 @@ import { PFIZER_DEMO as D } from "./pfizerDemoData";
 const T_TITLE = 0;
 const T_TYPE_START = 400;
 const T_TYPE_END = 2400;
-const T_FINANCIALS = 2800;
-const T_RESEARCH = 3200;
-const T_TRIALS = 3600;
-const T_GRANTS = 4000;
+// One threshold per report line, in the order they appear in PFIZER_DEMO.lines.
+const LINE_TIMES = [2800, 3200, 3600, 4000];
 const T_FORMATS = 4400;
 const T_FADE_START = 8600;
 const T_LOOP = 9000;
@@ -43,40 +41,25 @@ export default function DemoPanel({ onFocusSearch }: { onFocusSearch: () => void
   const reducedMotion = useReducedMotion();
   const [elapsed, setElapsed] = useState(0);
   const [paused, setPaused] = useState(false);
-  // Starts true so the sequence fails OPEN: if IntersectionObserver never
-  // reports (or isn't supported), the panel still plays rather than sitting
-  // permanently blank. The observer only ever pauses it once scrolled away.
-  const [onScreen, setOnScreen] = useState(true);
   const elapsedRef = useRef(0);
-  const rootRef = useRef<HTMLDivElement>(null);
 
-  // takes: nothing (closure over rootRef)
-  // does: tracks whether the panel is actually in the viewport, so the
-  //       animation never burns a timer while the visitor has scrolled past it.
-  //       Background tabs need no handling here — browsers already throttle
-  //       interval timers in hidden documents.
-  // returns: nothing (sets onScreen state)
-  useEffect(() => {
-    const node = rootRef.current;
-    if (!node) return;
-    const io = new IntersectionObserver(([e]) => setOnScreen(e.isIntersecting), { threshold: 0.2 });
-    io.observe(node);
-    return () => io.disconnect();
-  }, []);
-
-  // takes: nothing (closure over paused/reducedMotion/onScreen)
+  // takes: nothing (closure over paused/reducedMotion)
   // does: ticks a single elapsed-time counter forward on an interval, looping
-  //       back to 0 once the sequence's hold finishes; frozen while paused,
-  //       off-screen, or under reduced motion
+  //       back to 0 once the sequence's hold finishes; frozen while paused or
+  //       under reduced motion. Deliberately NOT gated on viewport
+  //       intersection: an IntersectionObserver here reported a stale
+  //       "off-screen" during hydration and never fired again, leaving the
+  //       panel permanently blank. Browsers already throttle interval timers
+  //       in background tabs, which is the case that actually matters.
   // returns: nothing
   useEffect(() => {
-    if (reducedMotion || paused || !onScreen) return;
+    if (reducedMotion || paused) return;
     const id = window.setInterval(() => {
       elapsedRef.current = elapsedRef.current + TICK_MS >= T_LOOP ? 0 : elapsedRef.current + TICK_MS;
       setElapsed(elapsedRef.current);
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [paused, reducedMotion, onScreen]);
+  }, [paused, reducedMotion]);
 
   // takes: nothing (closure over setElapsed)
   // does: resets the panel to the beginning of the sequence
@@ -98,7 +81,6 @@ export default function DemoPanel({ onFocusSearch }: { onFocusSearch: () => void
 
   return (
     <div
-      ref={rootRef}
       role="group"
       aria-label="Sample company brief for Pfizer assembling with cited sources."
       onClick={onFocusSearch}
@@ -151,7 +133,7 @@ export default function DemoPanel({ onFocusSearch }: { onFocusSearch: () => void
           className="demo-fade"
           style={{ opacity: show(T_TITLE) ? 1 : 0, fontSize: 13, fontWeight: 600, color: "var(--ink-tertiary)", marginBottom: 10, letterSpacing: "0.02em" }}
         >
-          {D.name} — Company Profile
+          {D.title}
         </p>
 
         <p data-demo-overview style={{ fontSize: "var(--text-body)", color: "var(--ink)", lineHeight: 1.6, marginBottom: 16, minHeight: reducedMotion ? undefined : 66 }}>
@@ -161,10 +143,15 @@ export default function DemoPanel({ onFocusSearch }: { onFocusSearch: () => void
           )}
         </p>
 
-        <DemoLine visible={show(T_FINANCIALS)} text={D.financials} chip={D.financialsChip} />
-        <DemoLine visible={show(T_RESEARCH)} text={D.researchLine} chip={D.researchChip} />
-        <DemoLine visible={show(T_TRIALS)} text={D.trialsLine} chip={D.trialsChip} />
-        <DemoLine visible={show(T_GRANTS)} text={D.grantsLine} chip={D.grantsChip} last />
+        {D.lines.map((line, i) => (
+          <DemoLine
+            key={line.chip}
+            visible={show(LINE_TIMES[i])}
+            text={line.text}
+            chip={line.chip}
+            last={i === D.lines.length - 1}
+          />
+        ))}
 
         <div
           data-demo-formats

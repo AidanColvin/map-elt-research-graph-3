@@ -13,7 +13,7 @@ const PLACEHOLDER_PHRASES = [
   'Try "medical devices"',
 ];
 const REDUCED_MOTION_PLACEHOLDER = 'Try "Pfizer" — or any company or topic';
-const CTA_PLACEHOLDER = "Your turn — try any company or topic";
+const HERO_PLACEHOLDER = "Start a project, e.g. Pfizer or oncology";
 
 export default function DashboardHome({
   onRunProject,
@@ -27,9 +27,7 @@ export default function DashboardHome({
   onPrefillSector:   (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  // Which of the two bars (hero / closing CTA) currently has focus. A single
-  // boolean would ring BOTH bars at once, since they share this state.
-  const [focusedBar, setFocusedBar] = useState<"hero" | "cta" | null>(null);
+  const [focused, setFocused] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [hasTyped, setHasTyped] = useState(false);
@@ -107,6 +105,21 @@ export default function DashboardHome({
     setQuery(v);
   }
 
+  // takes: nothing (closure over heroRef/inputRef/reducedMotion)
+  // does: brings the hero search bar back into view and hands it focus, so the
+  //       closing call-to-action leads somewhere instead of dead-ending. On a
+  //       phone it only scrolls — focusing there would throw the keyboard up
+  //       over the page before the visitor has chosen to type.
+  // returns: nothing
+  function jumpToSearch() {
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    heroRef.current?.scrollIntoView({
+      behavior: reducedMotion ? "auto" : "smooth",
+      block: "center",
+    });
+    if (isDesktop) inputRef.current?.focus();
+  }
+
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if ((e.key === "Tab" || e.key === "ArrowRight") && ghost) {
       e.preventDefault();
@@ -117,22 +130,14 @@ export default function DashboardHome({
     }
   }
 
-  // takes: whether to attach the autofocus ref, the static placeholder to
-  //        fall back to, and whether the cycling hero phrases should show
-  // does: renders the controlled search bar — extracted so the hero and the
-  //       closing CTA render the SAME bar bound to the same query state and
-  //       submit() handler (no duplicated state, no second handler); only one
-  //       instance ever carries the ref so autofocus can't jump between them
+  // takes: nothing (closure over query/ghost/refs/handlers above)
+  // does: renders the page's single search bar — the one input on the
+  //       homepage, which routes a company or a sector query through the same
+  //       untouched submit handler
   // returns: the search bar element
-  function SearchBar({ id, withRef, placeholder, cyclePlaceholder }: {
-    id: "hero" | "cta";
-    withRef: boolean;
-    placeholder: string;
-    cyclePlaceholder?: boolean;
-  }) {
-    const showOverlay = cyclePlaceholder && !query;
+  function SearchBar() {
+    const showOverlay = !query;
     const overlayText = reducedMotion ? REDUCED_MOTION_PLACEHOLDER : PLACEHOLDER_PHRASES[placeholderIdx];
-    const focused = focusedBar === id;
     return (
       <div>
         <div style={{
@@ -179,13 +184,13 @@ export default function DashboardHome({
               </div>
             )}
             <input
-              ref={withRef ? inputRef : undefined}
+              ref={inputRef}
               value={query}
               onChange={(e) => handleChange(e.target.value)}
               onKeyDown={handleKeyDown}
-              onFocus={() => setFocusedBar(id)}
-              onBlur={() => setFocusedBar((f) => (f === id ? null : f))}
-              placeholder={showOverlay ? "" : placeholder}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setFocused(false)}
+              placeholder={showOverlay ? "" : HERO_PLACEHOLDER}
               aria-label="Search for a company or research area"
               autoComplete="off"
               spellCheck={false}
@@ -235,9 +240,13 @@ export default function DashboardHome({
         Type a company or a research area. Map reads the public record — SEC filings, grants, papers, trials — and writes you a cited brief.
       </p>
 
-      {/* Search */}
+      {/* Search — the page's one input; it takes a company or a sector and
+          the untouched submit handler routes to the right report. */}
       <div ref={heroRef} style={{ marginBottom: 64 }}>
-        <SearchBar id="hero" withRef placeholder='Start a project, e.g. Pfizer or oncology' cyclePlaceholder />
+        {/* Called as a function, NOT <SearchBar />, so it does not become a
+            separate component instance that React would remount on every
+            render — that remount steals focus from the input. */}
+        {SearchBar()}
       </div>
 
       {/* Show, don't tell: a sample brief assembling itself in place of the
@@ -253,7 +262,15 @@ export default function DashboardHome({
         </p>
       </div>
 
-      <SearchBar id="cta" withRef={false} placeholder={CTA_PLACEHOLDER} />
+      <button onClick={jumpToSearch} style={{
+        alignSelf: "flex-start",
+        border: "none", background: "none", padding: "12px 0",
+        minHeight: 44, cursor: "pointer",
+        color: "var(--accent)", fontSize: "var(--text-body)",
+        fontFamily: "inherit", textAlign: "left",
+      }}>
+        Your turn — try any company or topic →
+      </button>
 
       <HomeFooter />
     </div>

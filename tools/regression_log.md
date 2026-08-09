@@ -48,6 +48,41 @@ Run against the production build on `http://localhost:3010`.
    was shared by the hero bar and the closing CTA bar. Replaced with a
    `focusedBar` discriminator.
 
+---
+
+## Tier 1 amendment — one search bar, real demo data
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Exactly one search input on the homepage | pass |
+| 2 | At most one focus ring ever visible | pass |
+| 3 | Typing does not steal focus (4 chars, 60ms apart) | pass |
+| 4 | Closing CTA returns focus to the one field | pass |
+| 5 | "Pfizer" from that field routes to Companies | pass |
+| 6 | "oncology" from that field routes to Sectors | pass |
+| 7 | Demo panel still assembles, console clean | pass |
+
+Demo data provenance: a real Pfizer company report was generated through the
+app (guest path, production build) on 2026-08-08 and every value in
+`pfizerDemoData.ts` was taken from that output unedited. No number is invented,
+so no line needed the qualitative fallback.
+
+That run also corrected two misrepresentations in the first draft of the panel:
+
+- A **company** report cites SEC EDGAR and OpenAlex. It does not cite PubMed,
+  ClinicalTrials.gov, or NIH RePORTER — those feed sector scans and the
+  partnership views. Those three chips were removed.
+- A company report offers **PDF, Word (DOCX), and Markdown**. There is no Excel
+  export on that report type; the Excel chip was removed.
+
+### Bugs found and fixed during the amendment
+
+5. **Search bar remounted on every render.** Rewriting the hero to render
+   `<SearchBar />` (JSX) instead of calling `{SearchBar()}` gave React a new
+   component identity each render, remounting the input and dropping focus —
+   the exact failure the original code carried a comment warning about.
+   Restored the function call and added a typing-focus regression check.
+
 ### Still outstanding at end of Tier 1
 
 - Mobile nav overflows (tabs clipped past ~390px). Pre-existing; Tier 3 addresses it.
