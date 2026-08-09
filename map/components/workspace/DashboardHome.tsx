@@ -28,6 +28,7 @@ export default function DashboardHome({
 }) {
   const [query, setQuery] = useState("");
   const [focused, setFocused] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [hasTyped, setHasTyped] = useState(false);
@@ -140,13 +141,19 @@ export default function DashboardHome({
     const overlayText = reducedMotion ? REDUCED_MOTION_PLACEHOLDER : PLACEHOLDER_PHRASES[placeholderIdx];
     return (
       <div>
-        <div style={{
-          display: "flex", alignItems: "center", gap: 10,
+        <div className="home-field" style={{
+          display: "flex", alignItems: "center", gap: 12,
           background: "var(--panel)", borderRadius: "var(--r-card)",
-          border: `1.5px solid ${focused ? "var(--accent)" : "var(--line)"}`,
-          boxShadow: focused ? "var(--ring)" : "none",
-          padding: "4px 4px 4px 16px", transition: "all 150ms var(--ease)",
-        }}>
+          border: `1px solid ${focused ? "var(--accent)" : "var(--line)"}`,
+          // The one shadowed object above the fold; it lifts on hover and focus.
+          boxShadow: focused
+            ? "var(--shadow-lift), var(--ring)"
+            : hovered ? "var(--shadow-lift)" : "var(--shadow-rest)",
+          padding: "0 8px 0 24px", transition: "all 150ms var(--ease)",
+        }}
+          onMouseEnter={() => setHovered(true)}
+          onMouseLeave={() => setHovered(false)}
+        >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
             <circle cx="11" cy="11" r="7" stroke="var(--ink-tertiary)" strokeWidth="2" />
             <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="var(--ink-tertiary)" strokeWidth="2" strokeLinecap="round" />
@@ -155,12 +162,12 @@ export default function DashboardHome({
             {ghost && (
               <div
                 aria-hidden="true"
+                className="home-field-text"
                 style={{
                   position: "absolute", inset: 0,
                   display: "flex", alignItems: "center",
-                  fontSize: 16, fontFamily: "inherit",
+                  fontFamily: "inherit",
                   whiteSpace: "pre", pointerEvents: "none", overflow: "hidden",
-                  padding: "10px 0",
                 }}
               >
                 <span style={{ color: "transparent" }}>{query}</span>
@@ -170,13 +177,12 @@ export default function DashboardHome({
             {showOverlay && (
               <div
                 aria-hidden="true"
-                className="home-placeholder-cycle"
+                className="home-placeholder-cycle home-field-text"
                 style={{
                   position: "absolute", inset: 0,
                   display: "flex", alignItems: "center",
-                  fontSize: 16, fontFamily: "inherit", color: "var(--ink-tertiary)",
+                  fontFamily: "inherit", color: "var(--ink-tertiary)",
                   whiteSpace: "pre", pointerEvents: "none", overflow: "hidden",
-                  padding: "10px 0",
                   opacity: reducedMotion || placeholderVisible ? 1 : 0,
                 }}
               >
@@ -197,13 +203,13 @@ export default function DashboardHome({
               style={{
                 width: "100%", border: "none", outline: "none",
                 background: "transparent", position: "relative",
-                fontSize: 16, color: "var(--ink)", padding: "10px 0",
+                color: "var(--ink)", padding: "14px 0",
               }}
             />
           </div>
-          <button onClick={submit} disabled={!query.trim() || submitting} style={{
-            padding: "10px 22px", fontSize: 14.5, fontWeight: 500,
-            border: "none", borderRadius: "var(--r-control)",
+          <button className="home-cta" onClick={submit} disabled={!query.trim() || submitting} style={{
+            padding: "0 22px", fontSize: 15, fontWeight: 500,
+            border: "none", borderRadius: "var(--r-pill)",
             cursor: query.trim() && !submitting ? "pointer" : "default",
             background: query.trim() ? "var(--accent)" : "var(--line)",
             color: query.trim() ? "var(--accent-ink)" : "var(--ink-tertiary)",
@@ -225,54 +231,60 @@ export default function DashboardHome({
     <div className="dash-home" style={{
       maxWidth: 720,
       margin: "0 auto",
-      padding: "48px 32px 64px",
-      minHeight: "calc(100dvh - 54px)",
+      padding: "0 32px 64px",
       display: "flex",
       flexDirection: "column",
       background: "var(--panel)",
     }}>
 
-      {/* Hero — one idea, flat color */}
-      <h1 style={{ fontSize: "var(--text-hero)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.06, color: "var(--ink)", marginBottom: 16 }}>
-        Research, written for you.
-      </h1>
-      <p style={{ fontSize: "var(--text-sub)", fontWeight: 400, color: "var(--ink-secondary)", lineHeight: 1.55, marginBottom: 32, maxWidth: 540 }}>
-        Type a company or a research area. Map reads the public record — SEC filings, grants, papers, trials — and writes you a cited brief.
-      </p>
+      {/* Hero — one idea, flat color, and the whole first screen to itself. */}
+      <section className="home-hero">
+        <h1 className="home-h1 home-enter" style={{ fontSize: "var(--text-hero)", fontWeight: 700, lineHeight: 1.06, color: "var(--ink)", margin: 0 }}>
+          Research, written for you.
+        </h1>
+        <p className="home-sub home-enter home-enter-2" style={{ fontWeight: 400, color: "var(--ink-secondary)", lineHeight: 1.55, maxWidth: 560, margin: "20px 0 0" }}>
+          Type a company or a research area. Map reads the public record — SEC filings, grants, papers, trials — and writes you a cited brief.
+        </p>
 
-      {/* Search — the page's one input; it takes a company or a sector and
-          the untouched submit handler routes to the right report. */}
-      <div ref={heroRef} style={{ marginBottom: 64 }}>
-        {/* Called as a function, NOT <SearchBar />, so it does not become a
-            separate component instance that React would remount on every
-            render — that remount steals focus from the input. */}
-        {SearchBar()}
-      </div>
+        {/* Search — the page's one input; it takes a company or a sector and
+            the untouched submit handler routes to the right report. */}
+        <div ref={heroRef} className="home-enter home-enter-3" style={{ width: "100%", maxWidth: 640, marginTop: 36, textAlign: "left" }}>
+          {/* Called as a function, NOT <SearchBar />, so it does not become a
+              separate component instance that React would remount on every
+              render — that remount steals focus from the input. */}
+          {SearchBar()}
+        </div>
+      </section>
 
       {/* Show, don't tell: a sample brief assembling itself in place of the
-          old "problem" / "how it works" marketing copy. */}
-      <DemoPanel onFocusSearch={() => inputRef.current?.focus()} />
+          old "problem" / "how it works" marketing copy. Below the fold, so the
+          first screen stays a headline and a field. */}
+      <div className="home-demo-gap">
+        <DemoPanel onFocusSearch={() => inputRef.current?.focus()} />
+      </div>
 
-      <div style={{ marginTop: 28, marginBottom: 48 }}>
-        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--ink)", marginBottom: 8 }}>
+      <div style={{ marginTop: 20 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--ink)", marginBottom: 20 }}>
           Partnership research takes days. Map takes 60 seconds.
         </h2>
         <p style={{ fontSize: "var(--text-sub)", color: "var(--ink-secondary)", lineHeight: 1.55 }}>
           No AI-generated facts — every sentence traces to a primary source, and the sources come with it.
         </p>
+
+        <button onClick={jumpToSearch} style={{
+          alignSelf: "flex-start",
+          border: "none", background: "none", padding: "12px 0",
+          minHeight: 44, cursor: "pointer",
+          color: "var(--accent)", fontSize: "var(--text-body)",
+          fontFamily: "inherit", textAlign: "left",
+        }}>
+          Your turn — try any company or topic →
+        </button>
       </div>
 
-      <button onClick={jumpToSearch} style={{
-        alignSelf: "flex-start",
-        border: "none", background: "none", padding: "12px 0",
-        minHeight: 44, cursor: "pointer",
-        color: "var(--accent)", fontSize: "var(--text-body)",
-        fontFamily: "inherit", textAlign: "left",
-      }}>
-        Your turn — try any company or topic →
-      </button>
-
-      <HomeFooter />
+      <div className="home-footer-gap">
+        <HomeFooter />
+      </div>
     </div>
   );
 }

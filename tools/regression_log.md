@@ -192,6 +192,35 @@ screen or Home, whichever renders first.
 
 ---
 
+## Tier 4 — visual scale-up (hero, field, demo panel, entrance motion)
+
+`map/scripts/verify_hero.mjs`, headed Chromium + one WebKit iPhone pass,
+against a fresh production build. Six reference viewports (390/430 phone,
+768/834 tablet, 1180/1440 desktop) plus CLS, keyboard, reduced-motion, and
+routing checks.
+
+| Area | Result |
+|---|---|
+| First viewport = header + headline + sub + field only (desktop/tablet) | pass, all 4 viewports |
+| Mobile hero occupies ~70% of the screen, natural flow below | pass, both phone widths |
+| Field 60px desktop/tablet, two-row layout + full-width button on phone | pass |
+| Input font ≥16px everywhere (no iOS zoom) | pass, including real WebKit | 
+| Ghost-completion overlay font matches the input at the new scale | pass |
+| Field + demo panel share the same rest shadow; field lifts on hover/focus | pass |
+| Entrance animation (opacity/transform only) causes zero layout shift | pass — CLS 0.0000 |
+| Reduced motion: hero renders fully visible, no animation runs | pass |
+| Single search bar, focus never stolen, Tab-accept still works | pass |
+| Company query ("Pfizer") and sector query ("oncology") still route correctly | pass |
+| Keyboard-only reach to field and to Generate report, focus ring visible | pass |
+| No horizontal scroll, any viewport including real WebKit iPhone | pass |
+| Console clean (gstatic favicon noise whitelisted, same filter as verify_home.mjs) | pass |
+
+**85/85 checks passed.**
+
+Work paused here, uncommitted-WIP committed as-is, pending an owner decision on
+whether to keep building the homepage redesign or roll it back to pre-change
+`main`. See `RESUME.local.md` for the rollback-mission state.
+
 ### Still outstanding at end of Tier 1
 
 - Mobile nav overflows (tabs clipped past ~390px). Pre-existing; Tier 3 addresses it.

@@ -95,9 +95,12 @@ export default function DemoPanel({ onFocusSearch }: { onFocusSearch: () => void
         background: "var(--panel)",
         border: "1px solid var(--line)",
         borderRadius: "var(--r-card)",
-        padding: "28px 28px 24px",
+        padding: 24,
         cursor: "pointer",
         position: "relative",
+        // Same rest elevation as the search field, so the two objects on the
+        // page read as the same material.
+        boxShadow: "var(--shadow-rest)",
       }}
     >
       {!reducedMotion && (
@@ -131,7 +134,7 @@ export default function DemoPanel({ onFocusSearch }: { onFocusSearch: () => void
       <div aria-hidden="true" className="demo-fade" style={{ opacity: restarting ? 0 : 1 }}>
         <p
           className="demo-fade"
-          style={{ opacity: show(T_TITLE) ? 1 : 0, fontSize: 13, fontWeight: 600, color: "var(--ink-tertiary)", marginBottom: 10, letterSpacing: "0.02em" }}
+          style={{ opacity: show(T_TITLE) ? 1 : 0, fontSize: 17, fontWeight: 600, color: "var(--ink-secondary)", marginBottom: 12, letterSpacing: "-0.01em" }}
         >
           {D.title}
         </p>

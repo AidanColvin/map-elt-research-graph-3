@@ -52,7 +52,7 @@
   --ink-tertiary: var(--faint);
   --accent-ink: #ffffff;
   --danger: var(--neg);
-  --text-hero: clamp(34px, 6vw, 54px);
+  --text-hero: clamp(44px, 7.5vw, 76px);
   --text-sub: 18px;
   --text-body: 15px;
   --text-caption: 12px;
@@ -61,6 +61,10 @@
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
   --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.05);
   --shadow-3: 0 1px 1px rgba(0, 0, 0, 0.03), 0 16px 48px rgba(0, 0, 0, 0.07);
+  /* The homepage's two lifted objects — the search field and the demo panel.
+     Nothing else above the fold carries a shadow. */
+  --shadow-rest: 0 8px 30px rgba(0, 0, 0, 0.06);
+  --shadow-lift: 0 12px 40px rgba(0, 0, 0, 0.09);
   --ring: 0 0 0 4px var(--accent-tint);
 
   /* Motion — Apple's standard ease + a gentle spring for interactive lifts. */
@@ -1026,6 +1030,113 @@ a {
   }
 }
 
+/* ---------------------------- homepage hero ----------------------------- */
+/* The hero owns the first viewport: header, headline, one sentence, one field,
+   whitespace. The demo panel begins below the fold, so the empty space at the
+   bottom of the screen is the only scroll cue the page needs. 78px is the fixed
+   header plus the workspace's top gutter. */
+.home-hero {
+  min-height: calc(100dvh - 78px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+.home-h1 {
+  letter-spacing: -0.04em;
+}
+.home-sub {
+  font-size: 20px;
+}
+.home-field {
+  height: 60px;
+}
+/* The input and the two overlays drawn behind it (ghost completion, cycling
+   placeholder) must share one font size or the gray prediction stops lining up
+   with the typed text. */
+.home-field input,
+.home-field-text {
+  font-size: 19px;
+}
+.home-cta {
+  height: 44px;
+}
+/* Air below the fold: the demo panel gets a wide gap above it, and the closing
+   captions get one below them. */
+.home-demo-gap {
+  margin-top: 96px;
+}
+.home-footer-gap {
+  margin-top: 96px;
+}
+
+@media (max-width: 767px) {
+  /* A phone gets natural flow instead of a full-screen hero — the field should
+     be reachable without the headline pushing it to the bottom of the screen. */
+  .home-hero {
+    min-height: 70svh;
+  }
+  .home-h1 {
+    letter-spacing: -0.03em;
+  }
+  .home-sub {
+    font-size: 18px;
+  }
+  /* The field grows a second row so the button can span the full width beneath
+     the input rather than squeezing the typing space. */
+  .home-field {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px !important;
+  }
+  /* 17px, comfortably over the 16px floor below which iOS Safari zooms the page
+     in when the field takes focus. */
+  .home-field input,
+  .home-field-text {
+    font-size: 17px;
+  }
+  .home-cta {
+    flex: 0 0 100%;
+    order: 3;
+  }
+  .home-demo-gap {
+    margin-top: 64px;
+  }
+  .home-footer-gap {
+    margin-top: 64px;
+  }
+}
+
+/* First paint, once per load: the three hero elements rise into place. Only
+   opacity and transform move, so nothing reflows and the layout never shifts.
+   The finished state is each element's natural state — the animation adds a
+   beginning, it does not decide whether the content is visible. */
+@keyframes homeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.home-enter {
+  animation: homeEnter 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.home-enter-2 {
+  animation-delay: 80ms;
+}
+.home-enter-3 {
+  animation-delay: 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-enter {
+    animation: none;
+  }
+}
+
 /* leadership org chart */
 .org {
   display: flex;
@@ -1577,7 +1688,8 @@ select.ws-input {
     padding-left: max(12px, env(safe-area-inset-left)) !important;
     padding-right: max(12px, env(safe-area-inset-right)) !important;
   }
-  .dash-home { padding: 32px 18px 28px !important; }
+  /* No top padding: the hero's own min-height governs the first screen. */
+  .dash-home { padding: 0 18px 28px !important; }
 }
 
 /* Inline company autocomplete ghost — mirrors .ws-input metrics exactly so the
