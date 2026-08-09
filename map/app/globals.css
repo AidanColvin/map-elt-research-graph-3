@@ -1711,3 +1711,537 @@ select.ws-input {
   display: flex;
   align-items: center;
 }
+
+/* ==========================================================================
+   Homepage v4 — design tokens
+   --------------------------------------------------------------------------
+   One token layer for the public homepage. Every v4 component derives its
+   color, type, and spacing from these; no component sets a raw hex.
+
+   These live at :root because they are all NEW names that cannot collide with
+   the workspace's existing tokens — with one exception. `--ink` is already
+   defined above as the workspace's #1d1d1f and is read by every other view, so
+   v4's darker #0B0B0C is scoped to `.v4` instead of overriding it globally.
+   The homepage root and the header carry that class; nothing else does, which
+   keeps this change to one page as intended.
+   ========================================================================== */
+:root {
+  /* Surfaces */
+  --paper: #fcfcfa;
+  --paper-sunk: #f2f2ee;
+
+  /* Text ramp */
+  --ink-2: #4a4a4e;
+  --ink-3: #77777c;
+
+  /* 1px hairlines */
+  --rule: #e2e2dc;
+
+  /* Citations and source links ONLY — never buttons, never decoration. */
+  --cite: #1b3ac7;
+
+  /* Focus ring color (2px ring at 2px offset). */
+  --focus: #0b0b0c;
+
+  /* Type scale — desktop values; the mobile overrides live in the media query
+     at the bottom of this block. No v4 component sets a size outside these. */
+  --v4-display-1: 88px;
+  --v4-display-2: 52px;
+  --v4-title: 32px;
+  --v4-lead: 21px;
+  --v4-body: 17px;
+  --v4-small: 14px;
+  --v4-label: 12px;
+  --v4-mono: 14px;
+
+  /* Tracking, paired with the display sizes above. */
+  --v4-track-1: -0.035em;
+  --v4-track-2: -0.028em;
+
+  /* Layout — 4px base unit. */
+  --v4-container: 1200px;
+  --v4-gutter: 48px;
+  --v4-measure: 68ch;
+  --v4-rhythm: 128px;
+
+  /* Radii — fields and buttons 8px, chips 4px, 0 elsewhere. */
+  --v4-r-field: 8px;
+  --v4-r-chip: 4px;
+
+  /* Motion */
+  --v4-ease: cubic-bezier(0.2, 0, 0, 1);
+  --v4-dur: 180ms;
+
+  /* Faces. Both are self-hosted by next/font at build time (layout.tsx), so the
+     page makes no runtime font request. The system stack stays behind each as a
+     fallback for the first paint and for engines that reject the woff2. */
+  --v4-font-sans: var(--font-inter), -apple-system, BlinkMacSystemFont,
+    "SF Pro Display", "SF Pro Text", "Helvetica Neue", Helvetica, Arial,
+    sans-serif;
+  --v4-font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", Menlo,
+    Consolas, monospace;
+}
+
+@media (max-width: 767px) {
+  :root {
+    --v4-display-1: 44px;
+    --v4-display-2: 32px;
+    --v4-title: 24px;
+    --v4-lead: 18px;
+    --v4-body: 16px;
+    --v4-mono: 13px;
+    --v4-gutter: 24px;
+    --v4-rhythm: 80px;
+  }
+}
+
+/* The one scoped override: v4's near-black, applied only inside v4 surfaces so
+   the workspace's own --ink is untouched. */
+.v4 {
+  --ink: #0b0b0c;
+}
+
+/* ==========================================================================
+   Homepage v4 — components
+   Every rule below derives from the token block above. Section spacing is owned
+   by .v4-section alone, so no two selectors can fight over the rhythm.
+   ========================================================================== */
+
+/* Full-bleed paper. The homepage is the page — there is no card floating on a
+   tinted backdrop, so nothing here sets its own background but the two
+   deliberately recessed panels (`--paper-sunk`). */
+.v4-page {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--v4-font-sans);
+  min-height: 100dvh;
+}
+
+.v4-container {
+  max-width: var(--v4-container);
+  margin: 0 auto;
+  padding-left: var(--v4-gutter);
+  padding-right: var(--v4-gutter);
+  padding-left: max(var(--v4-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--v4-gutter), env(safe-area-inset-right));
+}
+
+/* The single source of vertical rhythm between sections. */
+.v4-section {
+  padding-top: var(--v4-rhythm);
+  padding-bottom: var(--v4-rhythm);
+}
+.v4-section-first {
+  padding-top: 0;
+}
+
+/* --------------------------------- type ---------------------------------- */
+.v4-display-1 {
+  font-size: var(--v4-display-1);
+  letter-spacing: var(--v4-track-1);
+  font-weight: 700;
+  line-height: 1.02;
+  margin: 0;
+}
+.v4-display-2 {
+  font-size: var(--v4-display-2);
+  letter-spacing: var(--v4-track-2);
+  font-weight: 700;
+  line-height: 1.06;
+  margin: 0;
+}
+.v4-lead {
+  font-size: var(--v4-lead);
+  line-height: 1.5;
+  color: var(--ink-2);
+  margin: 0;
+}
+.v4-body {
+  font-size: var(--v4-body);
+  line-height: 1.6;
+  margin: 0;
+}
+.v4-small {
+  font-size: var(--v4-small);
+  line-height: 1.5;
+  margin: 0;
+}
+.v4-label {
+  font-size: var(--v4-label);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin: 0;
+}
+.v4-mono {
+  font-family: var(--v4-font-mono);
+  font-size: var(--v4-mono);
+}
+.v4-measure {
+  max-width: var(--v4-measure);
+}
+
+/* Citations and source links are the only place --cite appears. */
+.v4-cite-link {
+  color: var(--cite);
+  text-underline-offset: 2px;
+}
+
+/* ------------------------------ focus ring -------------------------------- */
+/* 2px ring at 2px offset, on the element itself. Declared with `outline` so it
+   tracks the element's own box and never needs a wrapper. */
+.v4 :focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  box-shadow: none;
+}
+
+/* --------------------------------- nav ------------------------------------ */
+.v4-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  height: 64px;
+  padding-left: max(var(--v4-gutter), env(safe-area-inset-left));
+  padding-right: max(var(--v4-gutter), env(safe-area-inset-right));
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  font-family: var(--v4-font-sans);
+  transition: background var(--v4-dur) var(--v4-ease),
+    border-color var(--v4-dur) var(--v4-ease);
+}
+/* Past 40px of scroll the bar earns its surface, so nav text never sits on top
+   of body copy scrolling underneath it. */
+.v4-nav-stuck {
+  background: var(--paper);
+  border-bottom-color: var(--rule);
+}
+.v4-nav-wordmark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 0;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  font-family: inherit;
+}
+.v4-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex: 1;
+}
+.v4-nav-link {
+  border: 0;
+  background: none;
+  padding: 6px 0;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: var(--v4-small);
+  font-family: inherit;
+  transition: color var(--v4-dur) var(--v4-ease);
+}
+.v4-nav-link:hover,
+.v4-nav-link[aria-current="page"] {
+  color: var(--ink);
+}
+.v4-nav-signin {
+  border: 0;
+  background: none;
+  padding: 6px 0;
+  cursor: pointer;
+  color: var(--ink-2);
+  font-size: var(--v4-small);
+  font-family: inherit;
+}
+.v4-nav-signin:hover {
+  color: var(--ink);
+}
+/* Under 768px the three links move to the footer, leaving wordmark + Sign in. */
+@media (max-width: 767px) {
+  .v4-nav {
+    height: 56px;
+  }
+  .v4-nav-links {
+    display: none;
+  }
+}
+
+/* --------------------------------- hero ----------------------------------- */
+.v4-hero {
+  padding-top: 152px;
+}
+@media (max-width: 767px) {
+  .v4-hero {
+    padding-top: 104px;
+  }
+}
+
+/* One element, not nested boxes: the border, the radius, and the focus ring all
+   belong to this row, and the <input> inside it is chrome-free. */
+.v4-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 560px;
+  height: 60px;
+  padding: 0 8px 0 16px;
+  border: 1px solid var(--rule);
+  border-radius: var(--v4-r-field);
+  background: var(--paper);
+  transition: border-color var(--v4-dur) var(--v4-ease);
+}
+.v4-field:hover {
+  border-color: var(--ink-3);
+}
+.v4-field:focus-within {
+  border-color: var(--ink);
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+.v4-field input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--v4-body);
+}
+.v4-field input::placeholder {
+  color: var(--ink-3);
+}
+/* Solid ink, never a grey button on a grey field. */
+.v4-field-submit {
+  flex-shrink: 0;
+  height: 44px;
+  min-width: 84px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: var(--v4-r-field);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: inherit;
+  font-size: var(--v4-small);
+  font-weight: 500;
+  cursor: pointer;
+}
+.v4-field-submit[disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+@media (max-width: 767px) {
+  .v4-field {
+    height: 54px;
+  }
+  /* 16px is the floor below which iOS Safari zooms the page on focus. */
+  .v4-field input {
+    font-size: 16px;
+  }
+  .v4-field-submit {
+    height: 40px;
+    min-width: 72px;
+    padding: 0 14px;
+  }
+}
+
+.v4-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, var(--paper) 45%, transparent);
+  border-top-color: var(--paper);
+  border-radius: 50%;
+  animation: v4Spin 700ms linear infinite;
+}
+@keyframes v4Spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* --------------------------------- chips ---------------------------------- */
+.v4-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.v4-chip {
+  font-family: var(--v4-font-mono);
+  font-size: var(--v4-small);
+  padding: 6px 12px;
+  border: 1px solid var(--rule);
+  border-radius: var(--v4-r-chip);
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: border-color var(--v4-dur) var(--v4-ease),
+    color var(--v4-dur) var(--v4-ease);
+}
+.v4-chip:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+}
+
+/* ------------------------------- diagram ---------------------------------- */
+/* The SVG scales to its container and never forces the page sideways. */
+.v4-diagram {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+.v4-node-box {
+  fill: var(--paper-sunk);
+  stroke: var(--rule);
+  stroke-width: 1;
+  transition: fill var(--v4-dur) var(--v4-ease),
+    stroke var(--v4-dur) var(--v4-ease);
+}
+.v4-node[data-active="true"] .v4-node-box {
+  fill: color-mix(in srgb, var(--cite) 8%, var(--paper));
+  stroke: var(--cite);
+}
+.v4-node-label {
+  font-family: var(--v4-font-mono);
+  font-size: 13px;
+  fill: var(--ink-2);
+  transition: fill var(--v4-dur) var(--v4-ease);
+}
+.v4-node[data-active="true"] .v4-node-label {
+  fill: var(--cite);
+}
+.v4-node {
+  cursor: pointer;
+}
+.v4-path {
+  fill: none;
+  stroke: var(--rule);
+  stroke-width: 1;
+  transition: opacity var(--v4-dur) var(--v4-ease),
+    stroke var(--v4-dur) var(--v4-ease);
+}
+.v4-path[data-state="active"] {
+  stroke: var(--cite);
+  opacity: 1;
+}
+.v4-path[data-state="dimmed"] {
+  opacity: 0.35;
+}
+.v4-doc-box {
+  fill: var(--paper);
+  stroke: var(--rule);
+  stroke-width: 1;
+}
+.v4-doc-bar {
+  fill: var(--rule);
+}
+.v4-doc-label {
+  font-family: var(--v4-font-sans);
+  font-size: 13px;
+  fill: var(--ink-2);
+}
+.v4-trace-line {
+  stroke: var(--cite);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  fill: none;
+}
+.v4-trace-label {
+  font-family: var(--v4-font-mono);
+  font-size: 12px;
+  fill: var(--cite);
+}
+.v4-cite-mark {
+  font-family: var(--v4-font-mono);
+  font-size: 10px;
+  fill: var(--cite);
+}
+
+/* ------------------------------- formats ---------------------------------- */
+.v4-formats {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.v4-format-tile {
+  border: 1px solid var(--rule);
+  padding: 24px 20px;
+}
+@media (max-width: 900px) {
+  .v4-formats {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+@media (max-width: 520px) {
+  .v4-formats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* -------------------------------- footer ---------------------------------- */
+.v4-footer {
+  border-top: 1px solid var(--rule);
+  padding-top: 48px;
+  padding-bottom: 64px;
+}
+.v4-footer-links {
+  display: none;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+/* The three nav links land here once the bar drops them. */
+@media (max-width: 767px) {
+  .v4-footer-links {
+    display: flex;
+  }
+}
+
+/* ------------------------------- reveals ---------------------------------- */
+/* Opacity + 8px translate, once, staggered by 60ms via an inline delay. */
+.v4-reveal {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 420ms var(--v4-ease), transform 420ms var(--v4-ease);
+}
+.v4-reveal[data-shown="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Reduced motion shows every element in its final state and removes every
+   transition on the page — including the diagram highlight, which becomes an
+   instant state change. */
+@media (prefers-reduced-motion: reduce) {
+  .v4-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .v4 *,
+  .v4 *::before,
+  .v4 *::after {
+    transition: none !important;
+    animation: none !important;
+  }
+}

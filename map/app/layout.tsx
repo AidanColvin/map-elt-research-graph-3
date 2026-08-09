@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, IBM_Plex_Mono } from "next/font/google";
 import "./globals.css";
 
 // Inter, loaded and self-hosted by Next at build time (no runtime network, no
@@ -9,6 +9,16 @@ const inter = Inter({
   subsets: ["latin"],
   display: "swap",
   variable: "--font-inter",
+});
+
+// IBM Plex Mono, self-hosted the same way. The homepage uses it for tickers,
+// CIKs, dollar figures, dates, citation numerals, and file extensions — the
+// values a reader checks — and for nothing else.
+const plexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  display: "swap",
+  variable: "--font-plex-mono",
 });
 
 export const metadata: Metadata = {
@@ -43,7 +53,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={inter.variable}>
+    <html lang="en" className={`${inter.variable} ${plexMono.variable}`}>
       <body>{children}</body>
     </html>
   );
