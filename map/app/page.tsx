@@ -1,19 +1,14 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import Intro, { hasSeenIntro } from "@/components/Intro";
 import AuthModal, { type AuthContext } from "@/components/workspace/AuthModal";
 import AuthGate, { clearSession, getSession, type MapUser } from "@/components/AuthGate";
-import CompanyCanvas from "@/components/workspace/CompanyCanvas";
-import SectorCanvas from "@/components/workspace/SectorCanvas";
-import AccountsCanvas from "@/components/workspace/AccountsCanvas";
-import AccountView from "@/components/workspace/AccountView";
 import HomePage from "@/components/home/HomePage";
 import SiteNav from "@/components/home/SiteNav";
-import PartnershipInventoryView from "@/components/workspace/PartnershipInventoryView";
 import SignInRequired from "@/components/workspace/SignInRequired";
 import PendingApproval from "@/components/workspace/PendingApproval";
-import ProjectsCanvas from "@/components/workspace/ProjectsCanvas";
 import { useDeepDive } from "@/components/workspace/useDeepDive";
 import { useSectorScan } from "@/components/workspace/useSectorScan";
 import { useSavedReports } from "@/components/workspace/useSavedReports";
@@ -24,18 +19,32 @@ import type { AccountProfile } from "@/components/workspace/accountProfile";
 import { getUniqueAccounts } from "@/components/workspace/accountsData";
 import { resolveSubjectKind } from "@/components/workspace/sectors";
 
+// The workspace canvases carry the report renderer and every export format —
+// xlsx, pptx, pdf, docx. A visitor who only reads the homepage should never
+// download any of it, so each one is fetched on the first visit to its view and
+// stays mounted from then on (see `visited` below), which keeps the "state
+// survives switching views" behaviour intact.
+const CompanyCanvas = dynamic(() => import("@/components/workspace/CompanyCanvas"), { ssr: false });
+const SectorCanvas = dynamic(() => import("@/components/workspace/SectorCanvas"), { ssr: false });
+const AccountsCanvas = dynamic(() => import("@/components/workspace/AccountsCanvas"), { ssr: false });
+const AccountView = dynamic(() => import("@/components/workspace/AccountView"), { ssr: false });
+const PartnershipInventoryView = dynamic(
+  () => import("@/components/workspace/PartnershipInventoryView"),
+  { ssr: false },
+);
+const ProjectsCanvas = dynamic(() => import("@/components/workspace/ProjectsCanvas"), { ssr: false });
+
 // The fixed v4 bar's height (components/home/SiteNav.tsx). Every view below it
 // clears this much, and the homepage hero adds its own padding on top.
 const HEADER_H = 64;
 
 type View = "dashboard" | "company" | "sector" | "accounts" | "partnerships" | "projects" | "account";
 
-// The sub-nav routes (the "account" view is reached via the Profile button,
-// not the sub-nav, so it's intentionally not listed here). The "accounts"
-// route shows the big company table and reads "Directory"; the singular
-// "company" route is the one-company report generator and reads "Companies".
-// The view keys stay "accounts" and "company" so nothing that references the
-// routes breaks.
+// The nav routes (the "account" view is reached from the bar's right-hand
+// button, so it's intentionally not listed here). The "accounts" route shows
+// the big company table; the singular "company" route is the one-company
+// report generator and reads "Companies". The view keys stay "accounts" and
+// "company" so nothing that references the routes breaks.
 //
 // `requiresAccount` marks the views whose contents name real people or list the
 // full partner table. With GUEST_FIRST_ENTRY on, these tabs are simply not
@@ -56,14 +65,14 @@ const VIEWS: { key: View; label: string; requiresAccount?: boolean }[] = [
   { key: "projects", label: "Projects" },
 ];
 
-// The three the top bar leads with. The rest of VIEWS is still reachable — the
-// footer lists every destination at every width — so a shorter bar costs the
-// visitor nothing.
+// The three the homepage's bar leads with. Everywhere else the bar carries the
+// full set (see barViews), and the homepage's own footer lists them all, so a
+// shorter bar there costs the visitor nothing.
 const BAR_KEYS: View[] = ["company", "sector", "accounts"];
 
 // Base document title (mirrors the static metadata in layout.tsx) and the
 // per-view suffix the active tab appends, so the browser tab reflects the page.
-const BASE_TITLE = "Map — Research & Company Intelligence";
+const BASE_TITLE = "Map — Every sentence has a source.";
 const VIEW_TITLES: Record<View, string> = {
   dashboard: BASE_TITLE,
   company: "Companies — Map",
@@ -93,11 +102,16 @@ function visibleViews(user: MapUser | null) {
   return isGuest ? VIEWS.filter((v) => !v.requiresAccount) : VIEWS;
 }
 
-// takes: the current user
-// does: narrows the visible destinations to the three the top bar leads with
+// takes: the current user and the active view
+// does: picks what the top bar carries. The homepage leads with three
+//       destinations and nothing else, because its footer lists them all a
+//       screen below. Every other view has no such footer, so the bar there
+//       carries the full set and stays the way back to any of them.
 // returns: the bar's links
-function barViews(user: MapUser | null) {
-  return visibleViews(user).filter((v) => BAR_KEYS.includes(v.key));
+function barViews(user: MapUser | null, view: View) {
+  const visible = visibleViews(user);
+  if (view === "dashboard") return visible.filter((v) => BAR_KEYS.includes(v.key));
+  return [{ key: "dashboard" as View, label: "Home" }, ...visible];
 }
 
 // takes: nothing (page component)
@@ -111,6 +125,11 @@ export default function MapHome() {
   const [showIntro, setShowIntro] = useState(true);
   const [user, setUser] = useState<MapUser | null>(null);
   const [view, setView] = useState<View>("dashboard");
+  // Which views have been opened at least once. A canvas is not rendered until
+  // its view is first visited — that is what keeps its bundle off the
+  // homepage's critical path — and once rendered it stays mounted, so reports,
+  // drafts, exports, and scroll positions still survive every later switch.
+  const [visited, setVisited] = useState<Set<View>>(() => new Set<View>(["dashboard"]));
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
   const [projectsQuery, setProjectsQuery] = useState("");
@@ -212,6 +231,20 @@ export default function MapHome() {
   // there is one document; the title is updated client-side per tab).
   useEffect(() => {
     document.title = VIEW_TITLES[view];
+  }, [view]);
+
+  // Note the view as opened, so its canvas mounts and then stays mounted.
+  useEffect(() => {
+    setVisited((prev) => (prev.has(view) ? prev : new Set(prev).add(view)));
+  }, [view]);
+
+  // The homepage is full-bleed paper, so the document behind it has to be paper
+  // too — otherwise an overscroll bounce reveals the workspace's warmer canvas
+  // as a band at the top or bottom, which is exactly the floating-card edge the
+  // redesign removes.
+  useEffect(() => {
+    document.body.style.background =
+      view === "dashboard" ? "var(--paper)" : "var(--bg)";
   }, [view]);
 
   // takes: a company name selected from a sector ticker card
@@ -319,7 +352,7 @@ export default function MapHome() {
       }}
     >
       <SiteNav
-        links={barViews(user)}
+        links={barViews(user, view)}
         active={view}
         // Only the homepage has a hero for the bar to sit over transparently;
         // every other view starts with content, so the bar keeps its surface.
@@ -376,7 +409,9 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <CompanyCanvas dive={dive} draft={companyDraft} onDraftChange={setCompanyDraft} saved={saved} />
+          {visited.has("company") && (
+            <CompanyCanvas dive={dive} draft={companyDraft} onDraftChange={setCompanyDraft} saved={saved} />
+          )}
         </div>
 
         <div
@@ -388,6 +423,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
+          {visited.has("sector") && (
           <SectorCanvas
             scan={scan}
             draft={sectorDraft}
@@ -397,6 +433,7 @@ export default function MapHome() {
             saved={saved}
             onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))}
           />
+          )}
         </div>
 
         <div
@@ -408,9 +445,9 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {user.guest && !pwToken ? (
+          {!visited.has("accounts") ? null : user.guest && !pwToken ? (
             <SignInRequired
-              viewLabel="Directory"
+              viewLabel="Accounts"
               onSignIn={handleSignInFromGuest}
               onUnlock={handlePasswordUnlock}
             />
@@ -443,7 +480,7 @@ export default function MapHome() {
           {/* White canvas panel — matches the Company view so the UNC page reads
               on white, not the grey page background. */}
           <section style={{ ...cardStyle, padding: "26px 28px 36px" }}>
-            {user.guest && !pwToken ? (
+            {!visited.has("partnerships") ? null : user.guest && !pwToken ? (
               <SignInRequired
                 viewLabel="Partnerships"
                 onSignIn={handleSignInFromGuest}
@@ -468,11 +505,13 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <ProjectsCanvas
-            onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))}
-            initialQuery={projectsQuery}
-            onQueryConsumed={() => setProjectsQuery("")}
-          />
+          {visited.has("projects") && (
+            <ProjectsCanvas
+              onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))}
+              initialQuery={projectsQuery}
+              onQueryConsumed={() => setProjectsQuery("")}
+            />
+          )}
         </div>
 
         <div
@@ -483,16 +522,18 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          <AccountView
-            user={user}
-            saved={saved}
-            onOpenProject={openProject}
-            onSignOut={() => {
-              clearSession();
-              setUser(signedOutUser());
-              setView("dashboard");
-            }}
-          />
+          {visited.has("account") && (
+            <AccountView
+              user={user}
+              saved={saved}
+              onOpenProject={openProject}
+              onSignOut={() => {
+                clearSession();
+                setUser(signedOutUser());
+                setView("dashboard");
+              }}
+            />
+          )}
         </div>
       </main>
     </div>
