@@ -2,6 +2,18 @@
 
 import { useState, useRef, useEffect } from "react";
 import { getCompanySuggestion } from "./companySuggestions";
+import DemoPanel from "./DemoPanel";
+import HomeFooter from "./HomeFooter";
+
+const PLACEHOLDER_PHRASES = [
+  'Try "Pfizer"',
+  'Try "oncology"',
+  'Try "gene therapy"',
+  'Try "Duke Energy"',
+  'Try "medical devices"',
+];
+const REDUCED_MOTION_PLACEHOLDER = 'Try "Pfizer" — or any company or topic';
+const CTA_PLACEHOLDER = "Your turn — try any company or topic";
 
 export default function DashboardHome({
   onRunProject,
@@ -15,15 +27,55 @@ export default function DashboardHome({
   onPrefillSector:   (name: string) => void;
 }) {
   const [query, setQuery] = useState("");
-  const [focused, setFocused] = useState(false);
+  // Which of the two bars (hero / closing CTA) currently has focus. A single
+  // boolean would ring BOTH bars at once, since they share this state.
+  const [focusedBar, setFocusedBar] = useState<"hero" | "cta" | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const [hasTyped, setHasTyped] = useState(false);
+  const [placeholderIdx, setPlaceholderIdx] = useState(0);
+  const [placeholderVisible, setPlaceholderVisible] = useState(true);
   const inputRef = useRef<HTMLInputElement>(null);
+  const heroRef = useRef<HTMLDivElement>(null);
 
-  // Autofocus the search bar when the home page mounts so the user can start
-  // typing immediately — no click required. (Mobile keyboards stay closed until
-  // tap, so this is a no-op there.)
+  // Autofocus the search bar on desktop only when the home page mounts, so a
+  // mouse-and-keyboard visitor can start typing immediately. Mobile keyboards
+  // popping open unprompted is disorienting, so guests on a narrow viewport
+  // get no autofocus at all.
   useEffect(() => {
-    inputRef.current?.focus();
+    const isDesktop = window.matchMedia("(min-width: 768px)").matches;
+    if (isDesktop) inputRef.current?.focus();
   }, []);
+
+  // takes: nothing
+  // does: reads the reduced-motion preference once and stays in sync with it
+  // returns: nothing (sets reducedMotion state)
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(mq.matches);
+    const onChange = () => setReducedMotion(mq.matches);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+
+  // takes: nothing (closure over hasTyped/reducedMotion)
+  // does: cycles the hero placeholder phrase every 3.5s until the visitor
+  //       types their first character, permanently stopping after that. The
+  //       crossfade dips opacity to 0, swaps the text, then restores it —
+  //       driven by state (not a CSS animation) so the phrase always ends up
+  //       visible even if the transition never runs.
+  // returns: nothing
+  useEffect(() => {
+    if (reducedMotion || hasTyped) return;
+    const t = window.setInterval(() => {
+      setPlaceholderVisible(false);
+      window.setTimeout(() => {
+        setPlaceholderIdx((i) => (i + 1) % PLACEHOLDER_PHRASES.length);
+        setPlaceholderVisible(true);
+      }, 200);
+    }, 3500);
+    return () => window.clearInterval(t);
+  }, [reducedMotion, hasTyped]);
 
   const suggestion = query.trim() ? getCompanySuggestion(query) : null;
   const ghost = suggestion && suggestion.toLowerCase().startsWith(query.toLowerCase())
@@ -34,10 +86,25 @@ export default function DashboardHome({
     if (suggestion) setQuery(suggestion);
   }
 
+  // takes: nothing (closure over query/onRunProject)
+  // does: submits whatever text is in the field — arbitrary input included,
+  //       not only autocomplete matches — and flips a brief local "generating"
+  //       state; the destination view takes over from there
+  // returns: nothing
   function submit() {
     const q = query.trim();
     if (!q) return;
+    setSubmitting(true);
     onRunProject(q);
+    // Home stays mounted (display:none) behind the destination view, so clear
+    // the local loading flag on a timer rather than leaving it stuck for
+    // whenever the visitor navigates back here.
+    window.setTimeout(() => setSubmitting(false), 2000);
+  }
+
+  function handleChange(v: string) {
+    if (!hasTyped && v.length > 0) setHasTyped(true);
+    setQuery(v);
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -50,66 +117,101 @@ export default function DashboardHome({
     }
   }
 
-  // takes: nothing (closure over query/ghost/refs/handlers above)
-  // does: renders the existing controlled search bar — extracted so the hero and
-  //       the bottom CTA render the IDENTICAL bar bound to the same query state
-  //       and submit() handler (no duplicated state, no second handler)
+  // takes: whether to attach the autofocus ref, the static placeholder to
+  //        fall back to, and whether the cycling hero phrases should show
+  // does: renders the controlled search bar — extracted so the hero and the
+  //       closing CTA render the SAME bar bound to the same query state and
+  //       submit() handler (no duplicated state, no second handler); only one
+  //       instance ever carries the ref so autofocus can't jump between them
   // returns: the search bar element
-  function SearchBar() {
+  function SearchBar({ id, withRef, placeholder, cyclePlaceholder }: {
+    id: "hero" | "cta";
+    withRef: boolean;
+    placeholder: string;
+    cyclePlaceholder?: boolean;
+  }) {
+    const showOverlay = cyclePlaceholder && !query;
+    const overlayText = reducedMotion ? REDUCED_MOTION_PLACEHOLDER : PLACEHOLDER_PHRASES[placeholderIdx];
+    const focused = focusedBar === id;
     return (
-      <div style={{
-        display: "flex", alignItems: "center", gap: 10,
-        background: "#fff", borderRadius: 14,
-        border: `1.5px solid ${focused ? "#0071e3" : "#e5e5ea"}`,
-        boxShadow: focused ? "0 0 0 4px rgba(0,113,227,0.1)" : "none",
-        padding: "4px 4px 4px 16px", transition: "all 0.15s",
-      }}>
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-          <circle cx="11" cy="11" r="7" stroke="#86868b" strokeWidth="2" />
-          <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="#86868b" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-        <div style={{ flex: 1, position: "relative" }}>
-          {ghost && (
-            <div
-              aria-hidden="true"
-              style={{
-                position: "absolute", inset: 0,
-                display: "flex", alignItems: "center",
-                fontSize: 16, fontFamily: "inherit",
-                whiteSpace: "pre", pointerEvents: "none", overflow: "hidden",
-                padding: "10px 0",
-              }}
-            >
-              <span style={{ color: "transparent" }}>{query}</span>
-              <span style={{ color: "#b0b0b8" }}>{ghost}</span>
-            </div>
-          )}
-          <input
-            ref={inputRef}
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setFocused(true)}
-            onBlur={() => setFocused(false)}
-            placeholder="Start a project, e.g. Pfizer or oncology"
-            autoComplete="off"
-            spellCheck={false}
-            style={{
-              width: "100%", border: "none", outline: "none",
-              background: "transparent", position: "relative",
-              fontSize: 16, color: "#1d1d1f", padding: "10px 0",
-            }}
-          />
-        </div>
-        <button onClick={submit} disabled={!query.trim()} style={{
-          padding: "10px 22px", fontSize: 14.5, fontWeight: 500,
-          border: "none", borderRadius: 11, cursor: query.trim() ? "pointer" : "default",
-          background: query.trim() ? "#0071e3" : "#e5e5ea",
-          color: query.trim() ? "#fff" : "#a0a0a5",
-          transition: "background 0.15s", flexShrink: 0,
+      <div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 10,
+          background: "var(--panel)", borderRadius: "var(--r-card)",
+          border: `1.5px solid ${focused ? "var(--accent)" : "var(--line)"}`,
+          boxShadow: focused ? "var(--ring)" : "none",
+          padding: "4px 4px 4px 16px", transition: "all 150ms var(--ease)",
         }}>
-          Search
-        </button>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+            <circle cx="11" cy="11" r="7" stroke="var(--ink-tertiary)" strokeWidth="2" />
+            <line x1="16.5" y1="16.5" x2="21" y2="21" stroke="var(--ink-tertiary)" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <div style={{ flex: 1, position: "relative" }}>
+            {ghost && (
+              <div
+                aria-hidden="true"
+                style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", alignItems: "center",
+                  fontSize: 16, fontFamily: "inherit",
+                  whiteSpace: "pre", pointerEvents: "none", overflow: "hidden",
+                  padding: "10px 0",
+                }}
+              >
+                <span style={{ color: "transparent" }}>{query}</span>
+                <span style={{ color: "var(--ink-tertiary)" }}>{ghost}</span>
+              </div>
+            )}
+            {showOverlay && (
+              <div
+                aria-hidden="true"
+                className="home-placeholder-cycle"
+                style={{
+                  position: "absolute", inset: 0,
+                  display: "flex", alignItems: "center",
+                  fontSize: 16, fontFamily: "inherit", color: "var(--ink-tertiary)",
+                  whiteSpace: "pre", pointerEvents: "none", overflow: "hidden",
+                  padding: "10px 0",
+                  opacity: reducedMotion || placeholderVisible ? 1 : 0,
+                }}
+              >
+                {overlayText}
+              </div>
+            )}
+            <input
+              ref={withRef ? inputRef : undefined}
+              value={query}
+              onChange={(e) => handleChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setFocusedBar(id)}
+              onBlur={() => setFocusedBar((f) => (f === id ? null : f))}
+              placeholder={showOverlay ? "" : placeholder}
+              aria-label="Search for a company or research area"
+              autoComplete="off"
+              spellCheck={false}
+              style={{
+                width: "100%", border: "none", outline: "none",
+                background: "transparent", position: "relative",
+                fontSize: 16, color: "var(--ink)", padding: "10px 0",
+              }}
+            />
+          </div>
+          <button onClick={submit} disabled={!query.trim() || submitting} style={{
+            padding: "10px 22px", fontSize: 14.5, fontWeight: 500,
+            border: "none", borderRadius: "var(--r-control)",
+            cursor: query.trim() && !submitting ? "pointer" : "default",
+            background: query.trim() ? "var(--accent)" : "var(--line)",
+            color: query.trim() ? "var(--accent-ink)" : "var(--ink-tertiary)",
+            transition: "background 150ms var(--ease)", flexShrink: 0,
+          }}>
+            {submitting ? "Generating…" : "Generate report"}
+          </button>
+        </div>
+        {ghost && (
+          <p style={{ fontSize: "var(--text-caption)", color: "var(--ink-tertiary)", marginTop: 6, marginLeft: 4 }}>
+            press Tab to complete · Enter to generate
+          </p>
+        )}
       </div>
     );
   }
@@ -122,121 +224,38 @@ export default function DashboardHome({
       minHeight: "calc(100dvh - 54px)",
       display: "flex",
       flexDirection: "column",
-      background: "#ffffff",
+      background: "var(--panel)",
     }}>
 
       {/* Hero — one idea, flat color */}
-      <h1 style={{ fontSize: "clamp(34px,4.8vw,54px)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.06, color: "#1d1d1f", marginBottom: 16 }}>
+      <h1 style={{ fontSize: "var(--text-hero)", fontWeight: 700, letterSpacing: "-0.03em", lineHeight: 1.06, color: "var(--ink)", marginBottom: 16 }}>
         Research, written for you.
       </h1>
-      <p style={{ fontSize: 18, fontWeight: 400, color: "#6e6e73", lineHeight: 1.55, marginBottom: 32, maxWidth: 540 }}>
-        Curious about a company, sector, or partnership with UNC? MAP is a tool that reads the research and generates a report.
+      <p style={{ fontSize: "var(--text-sub)", fontWeight: 400, color: "var(--ink-secondary)", lineHeight: 1.55, marginBottom: 32, maxWidth: 540 }}>
+        Type a company or a research area. Map reads the public record — SEC filings, grants, papers, trials — and writes you a cited brief.
       </p>
 
       {/* Search */}
-      <div style={{ marginBottom: 64 }}>
-        {/* Called as a function, NOT <SearchBar />, so it does not become a
-            separate component instance that React would remount on every
-            keystroke — that remount was stealing focus after each letter. */}
-        {SearchBar()}
+      <div ref={heroRef} style={{ marginBottom: 64 }}>
+        <SearchBar id="hero" withRef placeholder='Start a project, e.g. Pfizer or oncology' cyclePlaceholder />
       </div>
 
-      {/* The problem */}
-      <section>
-        <p className="text-xs uppercase tracking-widest text-neutral-400 mb-3">The problem</p>
-        <h2 className="text-xl font-semibold tracking-tight text-neutral-900 mb-2">
-          Partnership research takes days. MAP takes 60 seconds.
-        </h2>
-        <p className="text-sm text-neutral-500 leading-relaxed mb-5">
-          Before any outreach, someone has to read the filings, check the trials, pull the grants, and find the researchers. That&apos;s hours of work per company — and it still might miss something.
-        </p>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <div className="bg-white border border-neutral-200 rounded-xl p-5">
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="mb-3">
-              <circle cx="12" cy="12" r="9" />
-              <polyline points="12 7 12 12 15 14" />
-            </svg>
-            <h3 className="text-sm font-medium text-neutral-900">Hours per company</h3>
-            <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-              Manual research across SEC, PubMed, NIH, and ClinicalTrials takes a full day per target.
-            </p>
-          </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-5">
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="mb-3">
-              <path d="m18.84 12.25 1.72-1.71a5.004 5.004 0 0 0-.12-7.07 5.006 5.006 0 0 0-6.95 0l-1.72 1.71" />
-              <path d="m5.17 11.75-1.71 1.71a5.004 5.004 0 0 0 .12 7.07 5.006 5.006 0 0 0 6.95 0l1.71-1.71" />
-              <line x1="8" y1="2" x2="8" y2="5" />
-              <line x1="2" y1="8" x2="5" y2="8" />
-              <line x1="16" y1="19" x2="16" y2="22" />
-              <line x1="19" y1="16" x2="22" y2="16" />
-            </svg>
-            <h3 className="text-sm font-medium text-neutral-900">Sources are scattered</h3>
-            <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-              Every data point lives in a different database, in a different format, with no single view.
-            </p>
-          </div>
-          <div className="bg-white border border-neutral-200 rounded-xl p-5">
-            <svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1d1d1f" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" className="mb-3">
-              <circle cx="12" cy="12" r="9" />
-              <line x1="12" y1="8" x2="12" y2="13" />
-              <line x1="12" y1="16.5" x2="12.01" y2="16.5" />
-            </svg>
-            <h3 className="text-sm font-medium text-neutral-900">Numbers go stale</h3>
-            <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-              Revenue, trial status, and leadership change constantly. Saved decks go out of date.
-            </p>
-          </div>
-        </div>
-      </section>
+      {/* Show, don't tell: a sample brief assembling itself in place of the
+          old "problem" / "how it works" marketing copy. */}
+      <DemoPanel onFocusSearch={() => inputRef.current?.focus()} />
 
-      {/* How it works */}
-      <section className="mt-12">
-        <p className="text-xs uppercase tracking-widest text-neutral-400 mb-3">How it works</p>
-        <h2 className="text-xl font-semibold tracking-tight text-neutral-900 mb-2">
-          Four steps. No guesswork.
+      <div style={{ marginTop: 28, marginBottom: 48 }}>
+        <h2 style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.01em", color: "var(--ink)", marginBottom: 8 }}>
+          Partnership research takes days. Map takes 60 seconds.
         </h2>
-        <div className="divide-y divide-neutral-100">
-          <div className="flex items-start gap-4 py-5">
-            <div className="w-7 h-7 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0 mt-0.5">1</div>
-            <div>
-              <h3 className="text-sm font-medium text-neutral-900">You type a name or topic</h3>
-              <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-                Enter a company (like &quot;Pfizer&quot;), a sector (like &quot;oncology&quot;), or a research area. No account needed to try it.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-4 py-5">
-            <div className="w-7 h-7 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0 mt-0.5">2</div>
-            <div>
-              <h3 className="text-sm font-medium text-neutral-900">MAP reads the public record</h3>
-              <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-                In parallel, MAP checks SEC EDGAR for financials and filings, NIH RePORTER for active grants, PubMed for UNC co-authored research, and ClinicalTrials.gov for active trials.
-              </p>
-              <p className="text-xs text-neutral-400 mt-1">
-                No AI generating text. Every sentence traces to a primary source.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-4 py-5">
-            <div className="w-7 h-7 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0 mt-0.5">3</div>
-            <div>
-              <h3 className="text-sm font-medium text-neutral-900">A sourced brief assembles</h3>
-              <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-                MAP drafts a structured report — company overview, financials, research alignment, partnership signals, and citations. You watch it build in real time.
-              </p>
-            </div>
-          </div>
-          <div className="flex items-start gap-4 py-5">
-            <div className="w-7 h-7 rounded-full bg-neutral-900 text-white text-xs font-semibold flex items-center justify-center flex-shrink-0 mt-0.5">4</div>
-            <div>
-              <h3 className="text-sm font-medium text-neutral-900">You get a brief you can use</h3>
-              <p className="text-xs text-neutral-500 leading-relaxed mt-1">
-                Download as PDF, Word, Excel, or Markdown. Take it into the meeting, share it with leadership, or use it to draft outreach.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+        <p style={{ fontSize: "var(--text-sub)", color: "var(--ink-secondary)", lineHeight: 1.55 }}>
+          No AI-generated facts — every sentence traces to a primary source, and the sources come with it.
+        </p>
+      </div>
+
+      <SearchBar id="cta" withRef={false} placeholder={CTA_PLACEHOLDER} />
+
+      <HomeFooter />
     </div>
   );
 }

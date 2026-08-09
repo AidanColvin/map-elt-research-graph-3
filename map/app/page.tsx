@@ -134,7 +134,7 @@ function GlobalHeader({
         background: "rgba(255,255,255,0.72)",
         backdropFilter: "saturate(180%) blur(20px)",
         WebkitBackdropFilter: "saturate(180%) blur(20px)",
-        borderBottom: "1px solid rgba(0,0,0,0.07)",
+        borderBottom: "1px solid var(--line)",
         fontFamily: FONT,
       }}
     >
@@ -162,7 +162,7 @@ function GlobalHeader({
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: 0,
-              color: "#1d1d1f",
+              color: "var(--ink)",
               userSelect: "none",
             }}
           >
@@ -203,17 +203,17 @@ function GlobalHeader({
           aria-current={view === "account" ? "page" : undefined}
           style={{
             display: "flex", alignItems: "center", gap: 7,
-            border: "1px solid #e5e5ea", borderRadius: 999,
+            border: "1px solid var(--line)", borderRadius: 999,
             padding: "5px 14px 5px 8px", fontSize: 13.5,
-            color: view === "account" ? "#007aff" : "#1d1d1f",
-            background: "#fff", cursor: "pointer",
+            color: view === "account" ? "var(--accent)" : "var(--ink)",
+            background: "var(--panel)", cursor: "pointer",
             fontFamily: FONT, fontWeight: 500,
           }}
         >
           <span style={{
             width: 22, height: 22, borderRadius: "50%",
-            background: view === "account" ? "#007aff" : "#1d1d1f",
-            color: "#fff", display: "flex", alignItems: "center",
+            background: view === "account" ? "var(--accent)" : "var(--ink)",
+            color: "var(--panel)", display: "flex", alignItems: "center",
             justifyContent: "center", fontSize: 12, fontWeight: 600,
             flexShrink: 0,
           }}>A</span>
@@ -413,12 +413,8 @@ export default function MapHome() {
       style={{
         fontFamily: FONT,
         minHeight: "100dvh",
-        color: "#1d1d1f",
-        // Ultra-soft tinted washes give the glass panels something to refract.
-        background:
-          "radial-gradient(1100px 520px at 12% -8%, rgba(120,140,255,0.07), transparent 60%)," +
-          "radial-gradient(900px 480px at 95% 4%, rgba(255,150,120,0.05), transparent 55%)," +
-          "#f5f5f7",
+        color: "var(--ink)",
+        background: "var(--bg)",
       }}
     >
       <GlobalHeader
