@@ -919,6 +919,80 @@ a {
   }
 }
 
+/* The auth card is written to fill the page. Inside the sign-in modal it has
+   to sit in a panel instead — framing only, so the card's own behaviour is
+   untouched. */
+.auth-in-modal > main {
+  min-height: auto !important;
+  padding: 8px 20px 22px !important;
+  background: transparent !important;
+}
+.auth-in-modal > main > * {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* The account controls appear once someone signs in; fade them in so the
+   header does not visibly snap. */
+.ws-fade-in {
+  animation: wsFadeIn 400ms var(--ease) both;
+}
+@keyframes wsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-fade-in {
+    animation: none;
+  }
+}
+
+/* Header nav — the tab row collapses into a menu on phones, where six tabs
+   previously ran off the edge with no way to reach the rest. */
+.ws-menu-btn {
+  display: none;
+}
+@media (max-width: 767px) {
+  .ws-nav {
+    display: none !important;
+  }
+  .ws-menu-btn {
+    display: flex !important;
+  }
+  .ws-account-label {
+    display: none;
+  }
+}
+.ws-menu-sheet {
+  position: absolute;
+  top: 100%;
+  right: max(12px, env(safe-area-inset-right));
+  min-width: 200px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+}
+.ws-menu-sheet button {
+  min-height: 44px;
+  padding: 0 14px;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ws-menu-sheet button[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ---- Homepage redesign: demo panel, placeholder cycling, replay control ---- */
 .demo-fade {
   transition: opacity 400ms var(--ease);

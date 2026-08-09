@@ -42,7 +42,10 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
 const failures = [];
 
 await page.goto(`${BASE}/?skipIntro=1`, { waitUntil: "domcontentloaded" });
-await page.getByRole("button", { name: /continue as guest/i }).click();
+// With guest-first entry the workspace is already there; with the flag off an
+// auth screen stands in front of it. Handle both.
+const guestButton = page.getByRole("button", { name: /continue as guest/i });
+if (await guestButton.count()) await guestButton.click();
 await page.waitForSelector(SEARCH);
 await page.mouse.move(5, 5);
 

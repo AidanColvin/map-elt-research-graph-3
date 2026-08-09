@@ -117,6 +117,62 @@ own time on screen — the thing the budget governs — is ~800ms.
    Moved the static end-state to a CSS `prefers-reduced-motion` rule, which
    applies regardless of when the client resolves the preference.
 
+---
+
+## Tier 3 — guest-first entry, sign-in modal, trimmed nav
+
+`map/scripts/verify_entry.mjs`, run once with the flag on and once with it off.
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Guest lands in the workspace, no auth screen | pass |
+| 2 | Search focused on arrival (desktop) | pass |
+| 3 | Guest nav = Home, Companies, Sectors, Projects | pass |
+| 4 | Partnerships / Directory absent for a guest | pass |
+| 5 | Quiet "Sign in" shown, no Account pill | pass |
+| 6 | Header modal carries the guest line + reason line | pass |
+| 7 | Focus moves into the modal | pass |
+| 8 | Escape closes it and the workspace survives | pass |
+| 9 | Projects stays open to guests | pass |
+| 10 | Phone (390px): tab row collapses to a menu | pass |
+| 11 | Menu touch target ≥ 44px | pass — exactly 44px |
+| 12 | Menu lists every guest tab | pass |
+| 13 | No horizontal scroll at 390px | pass |
+| 14 | **Flag off restores the original flow** | pass — full-page auth screen on arrival, all six tabs after continuing as guest |
+
+## Part 3 — abuse and craft pass
+
+`map/scripts/verify_abuse.mjs`
+
+| # | Check | Result |
+|---|---|---|
+| 1 | Empty submit | pass — Generate stays disabled |
+| 2 | `<script>alert(1)</script>` in the field | pass — echoed as inert text, no dialog, no script node |
+| 3 | "asdf" | pass — warm not-found voice: "No SEC filings located — the company may be private, a subsidiary, or a foreign filer (20-F/6-K). Profile assembled from public web sources." |
+| 4 | Double-click Generate | pass — 1 pipeline run, not 2 |
+| 5 | Refresh mid-generation | pass — returns to a usable page |
+| 6 | Reduced motion: placeholder static | pass |
+| 7 | Reduced motion: demo shown complete | pass |
+| 8 | Keyboard-only reach to search | pass |
+
+## Part 3 — exports (guest path)
+
+`map/scripts/verify_exports.mjs` — real Pfizer report, every offered format
+downloaded and inspected.
+
+| File | Size | Verdict |
+|---|---|---|
+| `pfizer-deep-dive.pdf` | 29,625 B | valid `%PDF-` header |
+| `pfizer-deep-dive.docx` | 13,312 B | valid zip container |
+| `pfizer-deep-dive.md` | 11,096 B | 14 headings, 3 source URLs, complete |
+
+### Test bug found (not an app bug)
+
+An earlier version of the abuse script flagged the "asdf" run as surfacing a raw
+value. The regex was at fault: a case-insensitive `/NaN/` matches inside
+ordinary words such as "finance" and "governance". Tightened to a word-bounded,
+case-sensitive check; the app's handling was correct all along.
+
 ### Still outstanding at end of Tier 1
 
 - Mobile nav overflows (tabs clipped past ~390px). Pre-existing; Tier 3 addresses it.
