@@ -173,6 +173,25 @@ value. The regex was at fault: a case-insensitive `/NaN/` matches inside
 ordinary words such as "finance" and "governance". Tightened to a word-bounded,
 case-sensitive check; the app's handling was correct all along.
 
+## Before/after captures (pre-change main vs. Tiers 1–3)
+
+`map/scripts/shoot_viewports.mjs`, headed Chromium, full-page, 390/768/1440.
+BEFORE from a worktree of pre-change `main` (6cefc11) served at :3011; AFTER
+from the branch production build at :3010. Worktree removed afterwards.
+
+Artifacts (untracked, repo root): `qa-viewports/before-{390,768,1440}.png`,
+`qa-viewports/after-{390,768,1440}.png`. Both sets visually confirmed: BEFORE
+shows the marketing sections, Search button, six-tab signed-in nav; AFTER shows
+the guest nav, Generate report, demo panel with the real Pfizer numbers.
+
+One harness fix while recovering this step: the script checked for the
+pre-change auth screen's "Continue as guest" button immediately at
+`domcontentloaded`, before hydration had rendered it, so the click never
+happened and the Home selector timed out. It now waits for either the auth
+screen or Home, whichever renders first.
+
+---
+
 ### Still outstanding at end of Tier 1
 
 - Mobile nav overflows (tabs clipped past ~390px). Pre-existing; Tier 3 addresses it.
