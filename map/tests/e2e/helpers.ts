@@ -400,7 +400,10 @@ function readSector(postData: string | null): string {
  * on screen, so every spec can start from a known, authenticated state.
  */
 
-export const BASE = 'http://localhost:3000';
+// Mirrors playwright.config.ts: PLAYWRIGHT_BASE_URL points the suite at a
+// server that is already running (a production build on :3010, say), and the
+// dev server on :3000 is the default when it is unset.
+export const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 
 /**
  * Navigate to the app, skip the intro splash, sign in as a guest, and wait for
@@ -413,7 +416,10 @@ export async function gotoWorkspace(page: Page): Promise<void> {
 
   const intro = page.locator('main[title="Click to skip"]');
   const guest = page.getByRole('button', { name: /continue as guest/i });
-  const nav = page.locator('nav').first();
+  // The top bar itself, not its link list: below 768px the bar drops its links
+  // (they move to the footer), so a <nav> locator resolves to a hidden element
+  // and never becomes visible on a phone viewport.
+  const nav = page.locator('header.v4-nav, header.ws-header, nav').first();
 
   // The intro splash auto-advances ~1s after React hydrates, and is also
   // click-to-skip. Against a cold dev server the page can be served as static
@@ -444,20 +450,43 @@ export async function gotoWorkspace(page: Page): Promise<void> {
  * interactions to the currently-visible `.ws-view` to avoid that.
  */
 export function visibleView(page: Page) {
-  return page.locator('.ws-view:visible');
+  // The homepage is not a `.ws-view` — it renders full-bleed outside the
+  // workspace shell — so it is matched separately. Only one of the two is ever
+  // visible, so this still resolves to exactly one element.
+  return page.locator('.ws-view:visible, .v4-page:visible');
 }
 
 /**
- * Click a top-nav tab by its visible label (e.g. "Home", "Companies",
- * "Sectors", "Directory"). The tabs are buttons inside the
- * "Workspace views" <nav>.
+ * Click a destination by its visible label (e.g. "Home", "Companies",
+ * "Sectors", "Accounts").
  */
 export async function clickNav(page: Page, label: string): Promise<void> {
-  await page.locator('nav[aria-label="Workspace views"]').getByRole('button', { name: label, exact: true }).click();
+  // A destination can be reached from the top bar, or — on the homepage and on
+  // any phone viewport, where the bar carries only three links — from the
+  // footer's full list. "Home" is the wordmark rather than a link. Try each in
+  // turn so a spec names a destination without caring which surface offers it.
+  const inBar = page
+    .locator('nav[aria-label="Workspace views"]')
+    .getByRole('button', { name: label, exact: true });
+  if (await inBar.isVisible().catch(() => false)) return inBar.click();
+
+  const inFooter = page
+    .locator('.v4-footer-links')
+    .getByRole('button', { name: label, exact: true });
+  if (await inFooter.isVisible().catch(() => false)) {
+    await inFooter.scrollIntoViewIfNeeded();
+    return inFooter.click();
+  }
+
+  if (label === 'Home') return page.locator('.v4-nav-wordmark').click();
+
+  // Nothing offers it yet — wait on the bar, so the failure names the
+  // destination that could not be reached.
+  await inBar.click();
 }
 
 /**
- * The gated views (Partnerships / Directory) turn a guest away until the
+ * The gated views (Partnerships / Accounts) turn a guest away until the
  * shared access password is entered. Drive the real dialog: Password button →
  * type the code → Go. The server mints a token, the view fetches its data.
  * No-op when the view is already unlocked (token persisted from a prior test).

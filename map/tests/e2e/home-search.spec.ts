@@ -7,15 +7,15 @@ test.beforeEach(async ({ page }) => {
   await mockBackend(page);
 });
 
-// The Dashboard (Home) hero search bar. Its placeholder is
-// "Start a project, e.g. Pfizer or oncology".
+// The homepage hero search field.
+// Its placeholder is "Pfizer".
 function homeSearch(page: Page) {
-  return visibleView(page).locator('input[placeholder*="Start a project" i]').first();
+  return visibleView(page).locator('input[placeholder="Pfizer"]').first();
 }
 
 // The label of the currently-active workspace nav tab.
 function activeNavTab(page: Page) {
-  return page.locator('nav[aria-label="Workspace views"] .ws-nav-item.active');
+  return page.locator('nav[aria-label="Workspace views"] .v4-nav-link[aria-current="page"]');
 }
 
 test('home search runs a COMPANY report in the Companies view — not a Projects redirect', async ({ page }) => {

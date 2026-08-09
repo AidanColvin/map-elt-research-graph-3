@@ -11,7 +11,7 @@ test.describe('Data tab — interactive database', () => {
   test.beforeEach(async ({ page }) => {
     await mockBackend(page);
     await gotoWorkspace(page);
-    await clickNav(page, 'Directory');
+    await clickNav(page, 'Accounts');
     // The Directory is behind the server-side access gate for guests; enter
     // the shared password so the workbook rows load from /api/inventory/data.
     await unlockWithPassword(page);

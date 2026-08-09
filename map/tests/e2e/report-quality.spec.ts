@@ -136,13 +136,14 @@ test('mobile: report has no horizontal overflow and the nav does not overlap', a
   });
   expect(overflow).toBeLessThanOrEqual(1);
 
-  // The logo must not overlap the nav. (The nav scrolls internally, so the
-  // first tab can be scrolled off-screen — measure the nav CONTAINER, whose box
-  // is fixed, against the logo's right edge.)
+  // The logo must not overlap whatever the bar puts beside it. Below 768px the
+  // bar drops its links entirely (the footer carries them), so the neighbour is
+  // the Sign in / Account control rather than the link row.
   const logo = page.getByRole('button', { name: /Map home/i });
   const nav = page.locator('nav[aria-label="Workspace views"]');
+  const neighbour = (await nav.isVisible()) ? nav : page.locator('.v4-nav-signin');
   const lb = await logo.boundingBox();
-  const nb = await nav.boundingBox();
+  const nb = await neighbour.boundingBox();
   expect(lb && nb).toBeTruthy();
   if (lb && nb) expect(lb.x + lb.width).toBeLessThanOrEqual(nb.x + 1);
 });

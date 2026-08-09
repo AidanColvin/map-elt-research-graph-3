@@ -45,29 +45,29 @@ test('dashboard hero renders correctly', async ({ page }) => {
   const view = visibleView(page);
   // Current dashboard headline + value-prop copy.
   await expect(
-    view.getByRole('heading', { name: /research, written for you/i }),
+    view.getByRole('heading', { name: /every sentence has a source/i }),
   ).toBeVisible({ timeout: 8000 });
   const body = await view.innerText();
-  // Primary-source provenance still named (in the how-it-works diagram).
+  // The five records the brief is allowed to cite are still named on the page.
   expect(body).toContain('SEC EDGAR');
-  // The reduced dashboard keeps only the "How it works" explainer.
-  expect(body).toContain('How it works');
+  // …under the provenance headline that replaced the how-it-works explainer.
+  expect(body).toContain('Five public records. One document.');
 });
 
-test('dashboard shows the project search and the how-it-works flow', async ({ page }) => {
+test('homepage shows the one search field and the provenance diagram', async ({ page }) => {
   await signIn(page);
   const view = visibleView(page);
-  // The Dashboard leads with a single project search…
-  await expect(view.locator('input[placeholder*="project" i]').first()).toBeVisible({ timeout: 8000 });
-  // …and the "How it works" four-stage process rail (You type → MAP reads →
-  // MAP drafts → You get); assert the eyebrow plus one distinct diagram step.
-  await expect(view.getByText('How it works', { exact: false }).first()).toBeVisible();
-  await expect(view.getByText('MAP drafts', { exact: false }).first()).toBeVisible();
+  // The homepage leads with a single search field…
+  await expect(view.locator('input[placeholder="Pfizer"]').first()).toBeVisible({ timeout: 8000 });
+  // …and the provenance diagram beneath it, which carries its own accessible
+  // name and names each of the five records.
+  await expect(view.locator('.v4-diagram')).toBeVisible();
+  await expect(view.getByText('NIH RePORTER', { exact: true }).first()).toBeVisible();
 });
 
 test('all nav tabs load without a not-found page', async ({ page }) => {
   await signIn(page);
-  for (const label of ['Home', 'Companies', 'Sectors', 'Directory']) {
+  for (const label of ['Home', 'Companies', 'Sectors', 'Accounts']) {
     await clickNav(page, label);
     await page.waitForTimeout(800);
     const body = await page.locator('body').innerText();

@@ -35,7 +35,7 @@ test.describe('owner approval gate', () => {
     await expect(page.getByText(/Waiting on approval/i)).toBeVisible();
 
     // The workspace chrome must not be reachable behind the waiting screen.
-    await expect(page.getByRole('button', { name: 'Directory' })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Accounts' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Partnerships' })).toHaveCount(0);
 
     // The roster is keyed by fingerprint, so find the single record rather
@@ -99,7 +99,7 @@ test.describe('owner approval gate', () => {
     });
     await page.goto('/?skipIntro=1');
 
-    await expect(page.getByRole('button', { name: 'Directory' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Accounts' })).toBeVisible();
     await expect(page.getByText(/Waiting on approval/i)).toHaveCount(0);
   });
 
@@ -130,14 +130,14 @@ test.describe('owner approval gate', () => {
 });
 
 test.describe('guest access to identifiable data', () => {
-  test('a guest is asked to sign in for Directory and Partnerships', async ({ page }) => {
+  test('a guest is asked to sign in for Accounts and Partnerships', async ({ page }) => {
     await page.goto('/?skipIntro=1');
     await page.evaluate(() => localStorage.clear());
     await page.goto('/?skipIntro=1');
     await page.getByRole('button', { name: /Continue as guest/ }).click();
 
-    await page.getByRole('button', { name: 'Directory' }).click();
-    await expect(page.getByText(/Directory needs an account/i)).toBeVisible();
+    await page.getByRole('button', { name: 'Accounts' }).click();
+    await expect(page.getByText(/Accounts needs an account/i)).toBeVisible();
 
     await page.getByRole('button', { name: 'Partnerships' }).click();
     await expect(page.getByText(/Partnerships needs an account/i)).toBeVisible();

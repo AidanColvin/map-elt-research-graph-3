@@ -59,7 +59,7 @@ test.describe('Map workspace — interactive flows', () => {
     await gotoWorkspace(page);
     // Default landing view is the Dashboard.
     const view = visibleView(page);
-    const search = view.locator('input[placeholder*="project" i]').first();
+    const search = view.locator('input[placeholder="Pfizer"]').first();
     await expect(search).toBeVisible({ timeout: 8000 });
     await expect(search).toHaveValue('');
 
@@ -78,14 +78,14 @@ test.describe('Map workspace — interactive flows', () => {
     await gotoWorkspace(page);
 
     const dash = visibleView(page);
-    const search = dash.locator('input[placeholder*="project" i]').first();
+    const search = dash.locator('input[placeholder="Pfizer"]').first();
     await expect(search).toBeVisible({ timeout: 8000 });
     await search.fill('Apple');
     await search.press('Enter');
 
     // We land on the Companies tab with the streamed Apple report.
     await expect(
-      page.locator('nav[aria-label="Workspace views"] .ws-nav-item.active'),
+      page.locator('nav[aria-label="Workspace views"] .v4-nav-link[aria-current="page"]'),
     ).toHaveText('Companies', { timeout: 15000 });
     await expect(
       visibleView(page).getByRole('heading', { name: 'Apple', exact: true }),
@@ -102,10 +102,10 @@ test.describe('Map workspace — interactive flows', () => {
   test('top nav switches between Home, Companies, Sectors and Account views', async ({ page }) => {
     await gotoWorkspace(page);
 
-    // Dashboard — the hero headline ("Map the company, generate the report…").
+    // Homepage — the hero headline.
     await clickNav(page, 'Home');
     await expect(
-      visibleView(page).getByRole('heading', { name: /research, written for you/i }),
+      visibleView(page).getByRole('heading', { name: /every sentence has a source/i }),
     ).toBeVisible({ timeout: 8000 });
 
     // Company Profile — idle hero headline ("...board-ready in seconds.").
@@ -131,7 +131,7 @@ test.describe('Map workspace — interactive flows', () => {
     // Back to Dashboard to confirm round-trip navigation still works.
     await clickNav(page, 'Home');
     await expect(
-      visibleView(page).getByRole('heading', { name: /research, written for you/i }),
+      visibleView(page).getByRole('heading', { name: /every sentence has a source/i }),
     ).toBeVisible({ timeout: 8000 });
   });
 

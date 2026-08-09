@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import { safeUrl } from '../../lib/markdownSafe';
 
-const BASE = 'http://localhost:3000';
+// Mirrors playwright.config.ts so the proxy checks follow the server the run
+// actually targets (a production build on :3010, say) rather than assuming :3000.
+const BASE = process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000';
 
 // A body larger than the 16 KB proxy cap.
 const OVERSIZED = JSON.stringify({ sector: 'x'.repeat(20_000) });
