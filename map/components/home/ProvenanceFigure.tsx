@@ -22,7 +22,7 @@ export default function ProvenanceFigure({
   return (
     <svg
       className="v4-diagram"
-      data-layout={layout.nodes[0].w < 260 ? "narrow" : "wide"}
+      data-layout={layout.mode}
       viewBox={layout.viewBox}
       role="img"
       aria-labelledby="provenance-title provenance-desc"
@@ -96,15 +96,26 @@ export default function ProvenanceFigure({
           role="button"
           aria-pressed={active === i}
           aria-label={`${PROVENANCE_SOURCES[i].name} — what it contributes`}
-          onMouseEnter={() => onActiveChange(i)}
-          onMouseLeave={() => onActiveChange(null)}
+          // Hover is a mouse idea. A tap on iOS synthesizes pointerenter and
+          // focus before it sends the click, so treating those as hover would
+          // highlight the record and then immediately clear it again — the
+          // diagram would look inert on every phone and tablet.
+          onPointerEnter={(e) => {
+            if (e.pointerType === "mouse") onActiveChange(i);
+          }}
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse") onActiveChange(null);
+          }}
           onFocus={() => onActiveChange(i)}
           onBlur={() => onActiveChange(null)}
-          onClick={() => onActiveChange(active === i ? null : i)}
+          // Selects rather than toggles, for the same reason: whichever of
+          // focus, pointer, and click a device happens to send, they all agree
+          // on the same result instead of racing each other to undo it.
+          onClick={() => onActiveChange(i)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              onActiveChange(active === i ? null : i);
+              onActiveChange(i);
             }
           }}
         >

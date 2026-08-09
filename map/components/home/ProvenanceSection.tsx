@@ -15,10 +15,11 @@ import { captionFor } from "./provenanceSources";
  */
 export default function ProvenanceSection() {
   const [active, setActive] = useState<number | null>(null);
-  // Below ~900px the wide arrangement has to scale down far enough that its
-  // mono labels stop being comfortably readable, so the stacked one takes over
-  // before that happens — earlier than the 768px the rest of the page uses.
-  const narrow = useMediaQuery("(max-width: 899px)");
+  // The wide arrangement scales its 1000-unit drawing down to the container, so
+  // its mono labels shrink with it. Past ~960px that lands under 11px — which
+  // covers a landscape iPhone at 932 — so the stacked arrangement takes over
+  // there, earlier than the 768px the rest of the page switches at.
+  const narrow = useMediaQuery("(max-width: 959px)");
 
   return (
     <>

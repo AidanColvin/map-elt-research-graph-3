@@ -20,6 +20,9 @@ export type NodeBox = {
 export type DocBar = { x: number; y: number; w: number };
 
 export type ProvenanceLayout = {
+  /** Which arrangement this is. Carried explicitly so nothing downstream has to
+      infer it from the geometry — both arrangements use similar node widths. */
+  mode: "wide" | "narrow";
   viewBox: string;
   nodes: NodeBox[];
   /** One path per node, in the same order. */
@@ -78,6 +81,7 @@ export function wideLayout(): ProvenanceLayout {
   const citeBar = bars[3];
 
   return {
+    mode: "wide",
     viewBox: "0 0 1000 470",
     nodes,
     paths,
@@ -131,6 +135,7 @@ export function narrowLayout(): ProvenanceLayout {
   const citeBar = bars[3];
 
   return {
+    mode: "narrow",
     viewBox: "0 0 360 620",
     nodes,
     paths,
