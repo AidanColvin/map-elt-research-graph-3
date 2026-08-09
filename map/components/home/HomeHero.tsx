@@ -17,10 +17,11 @@ const HERO_EXAMPLES = ["Pfizer", "Oncology", "Semiconductors"];
 export default function HomeHero({ onSubmit }: { onSubmit: (query: string) => void }) {
   const [pick, setPick] = useState<FieldPick | null>(null);
 
-  // takes: an example chip's text
-  // does: hands it to the field, counting the pick so the same chip can be
-  //       clicked twice in a row and still read
-  // returns: nothing
+  /**
+   * takes an example chip's text
+   * hands it to the field, counting the pick so one chip can be clicked twice
+   * returns nothing
+   */
   function pickExample(example: string) {
     setPick((prev) => ({ query: example, n: (prev?.n ?? 0) + 1 }));
   }

@@ -12,7 +12,7 @@ import type { NavLink } from "./SiteNav";
  * takes the submit handler for a subject, the nav links, and a navigate handler
  * lays out the homepage's four content sections and the footer, in order, on
  * full-bleed paper with no card floating on top of it
- * returns the page element
+ * returns the page's main landmark
  */
 export default function HomePage({
   onSubmit,
@@ -24,7 +24,7 @@ export default function HomePage({
   onNavigate: (key: string) => void;
 }) {
   return (
-    <div className="v4 v4-page">
+    <main className="v4 v4-page">
       <Section id="hero" first label="Read a company or a research area">
         <div className="v4-hero">
           <HomeHero onSubmit={onSubmit} />
@@ -44,6 +44,6 @@ export default function HomePage({
       </Section>
 
       <SiteFooter links={links} onNavigate={onNavigate} />
-    </div>
+    </main>
   );
 }

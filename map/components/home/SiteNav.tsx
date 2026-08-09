@@ -63,12 +63,12 @@ export default function SiteNav({
 
   return (
     <header className={`v4 v4-nav${solid ? " v4-nav-stuck" : ""}`}>
-      <button className="v4-nav-wordmark" onClick={onHome} aria-label="Map — home">
+      <button className="v4-nav-wordmark" onClick={onHome} aria-label="Map home">
         <LogoMark />
         <span>Map</span>
       </button>
 
-      <nav className="v4-nav-links" aria-label="Sections">
+      <nav className="v4-nav-links" aria-label="Workspace views">
         {links.map((link) => (
           <button
             key={link.key}

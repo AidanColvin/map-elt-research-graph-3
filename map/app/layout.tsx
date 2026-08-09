@@ -22,9 +22,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Map — Research, written for you.",
+  title: "Map — Every sentence has a source.",
   description:
-    "Map reads the public record — SEC filings, grants, papers, trials — and writes you a cited research brief. Free, source-grounded, no API keys.",
+    "Map reads the filings, the trials, the papers, and the grants, and assembles a cited brief. Every claim resolves to one of five public records.",
   // Render full-screen as a home-screen web app on iOS, with a status bar that
   // blends into the light UI.
   appleWebApp: {

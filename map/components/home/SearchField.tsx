@@ -78,9 +78,11 @@ export default function SearchField({
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // takes: a query string
-  // does: checks it reads as a subject and hands it on, or shows why it does not
-  // returns: nothing
+  /**
+   * takes a query string
+   * checks it reads as a subject and hands it on, or shows why it does not
+   * returns nothing
+   */
   function submit(raw: string) {
     const checked = checkQuery(raw);
     if (!checked.ok) {
@@ -101,17 +103,21 @@ export default function SearchField({
   // the render that first saw the pick.
   submitRef.current = submit;
 
-  // takes: a recovery example
-  // does: puts it in the field and reads it, so the error state always has an exit
-  // returns: nothing
+  /**
+   * takes a recovery example
+   * puts it in the field and reads it, so the error state always has an exit
+   * returns nothing
+   */
   function recoverWith(example: string) {
     setValue(example);
     submit(example);
   }
 
-  // takes: a keyboard event from the input
-  // does: submits on Enter and drops focus on Escape
-  // returns: nothing
+  /**
+   * takes a keyboard event from the input
+   * submits on Enter and drops focus on Escape
+   * returns nothing
+   */
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
