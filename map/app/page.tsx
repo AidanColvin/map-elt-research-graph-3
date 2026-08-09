@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import Intro, { hasSeenIntro } from "@/components/Intro";
 import AuthModal, { type AuthContext } from "@/components/workspace/AuthModal";
@@ -129,7 +129,13 @@ export default function MapHome() {
   // its view is first visited — that is what keeps its bundle off the
   // homepage's critical path — and once rendered it stays mounted, so reports,
   // drafts, exports, and scroll positions still survive every later switch.
-  const [visited, setVisited] = useState<Set<View>>(() => new Set<View>(["dashboard"]));
+  //
+  // A ref recorded during render, not state set in an effect: the canvas has to
+  // appear in the SAME commit that switches to its view. An effect would leave
+  // one frame in which the view is active and empty, which anything watching
+  // for the view's first element can miss.
+  const visited = useRef<Set<View>>(new Set<View>(["dashboard"]));
+  visited.current.add(view);
   const [companyDraft, setCompanyDraft] = useState("");
   const [sectorDraft, setSectorDraft] = useState("");
   const [projectsQuery, setProjectsQuery] = useState("");
@@ -231,11 +237,6 @@ export default function MapHome() {
   // there is one document; the title is updated client-side per tab).
   useEffect(() => {
     document.title = VIEW_TITLES[view];
-  }, [view]);
-
-  // Note the view as opened, so its canvas mounts and then stays mounted.
-  useEffect(() => {
-    setVisited((prev) => (prev.has(view) ? prev : new Set(prev).add(view)));
   }, [view]);
 
   // The homepage is full-bleed paper, so the document behind it has to be paper
@@ -409,7 +410,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {visited.has("company") && (
+          {visited.current.has("company") && (
             <CompanyCanvas dive={dive} draft={companyDraft} onDraftChange={setCompanyDraft} saved={saved} />
           )}
         </div>
@@ -423,7 +424,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {visited.has("sector") && (
+          {visited.current.has("sector") && (
           <SectorCanvas
             scan={scan}
             draft={sectorDraft}
@@ -445,7 +446,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {!visited.has("accounts") ? null : user.guest && !pwToken ? (
+          {!visited.current.has("accounts") ? null : user.guest && !pwToken ? (
             <SignInRequired
               viewLabel="Accounts"
               onSignIn={handleSignInFromGuest}
@@ -480,7 +481,7 @@ export default function MapHome() {
           {/* White canvas panel — matches the Company view so the UNC page reads
               on white, not the grey page background. */}
           <section style={{ ...cardStyle, padding: "26px 28px 36px" }}>
-            {!visited.has("partnerships") ? null : user.guest && !pwToken ? (
+            {!visited.current.has("partnerships") ? null : user.guest && !pwToken ? (
               <SignInRequired
                 viewLabel="Partnerships"
                 onSignIn={handleSignInFromGuest}
@@ -505,7 +506,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {visited.has("projects") && (
+          {visited.current.has("projects") && (
             <ProjectsCanvas
               onNewRows={(rows) => setPackageRows((prev) => getUniqueAccounts(prev, rows))}
               initialQuery={projectsQuery}
@@ -522,7 +523,7 @@ export default function MapHome() {
             margin: "0 auto",
           }}
         >
-          {visited.has("account") && (
+          {visited.current.has("account") && (
             <AccountView
               user={user}
               saved={saved}

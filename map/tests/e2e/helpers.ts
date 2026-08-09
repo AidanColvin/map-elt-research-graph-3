@@ -494,7 +494,14 @@ export async function clickNav(page: Page, label: string): Promise<void> {
 export async function unlockWithPassword(page: Page, password = 'unc-blue'): Promise<void> {
   const view = visibleView(page);
   const pwButton = view.getByRole('button', { name: 'Password', exact: true });
-  if (!(await pwButton.isVisible().catch(() => false))) return; // already unlocked
+  // Give the gate a moment to render before concluding there isn't one —
+  // checking instantly would read "already unlocked" from a view that simply
+  // hasn't painted yet, and the caller would then wait for data that never comes.
+  const gated = await pwButton
+    .waitFor({ state: 'visible', timeout: 10000 })
+    .then(() => true)
+    .catch(() => false);
+  if (!gated) return; // already unlocked
   await pwButton.click();
   const dialog = page.getByRole('dialog', { name: 'Password' });
   await dialog.getByRole('textbox').fill(password);
