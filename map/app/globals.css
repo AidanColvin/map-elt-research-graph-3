@@ -1897,6 +1897,12 @@ select.ws-input {
   height: auto;
   max-width: 100%;
 }
+/* The stacked arrangement is drawn for a phone's width. Let it grow a little on
+   a tablet, but not to the full container — a 360-unit drawing stretched across
+   900px reads as a diagram with a typography problem. */
+.v4-diagram[data-layout="narrow"] {
+  max-width: 440px;
+}
 .v4-node-box {
   fill: var(--paper-sunk);
   stroke: var(--rule);

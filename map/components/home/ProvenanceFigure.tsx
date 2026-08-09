@@ -22,6 +22,7 @@ export default function ProvenanceFigure({
   return (
     <svg
       className="v4-diagram"
+      data-layout={layout.nodes[0].w < 260 ? "narrow" : "wide"}
       viewBox={layout.viewBox}
       role="img"
       aria-labelledby="provenance-title provenance-desc"
