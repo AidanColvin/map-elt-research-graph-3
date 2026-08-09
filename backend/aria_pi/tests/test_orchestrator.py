@@ -149,7 +149,7 @@ def test_resolve_seeds_discovered():
         def discover_companies(self, term, limit=15):
             return ["Freshpet", "Chewy"]
 
-    seeds, res = _resolve_seeds("pet food", None, sec=FakeSec())
+    seeds, res = _resolve_seeds("craft beer", None, sec=FakeSec())
     assert res == "discovered"
     assert seeds == ["Freshpet", "Chewy"]
 

@@ -544,13 +544,15 @@ class SECEdgarClient:
             ordered = sorted(merged.values(), key=lambda x: x["fy"])[-years:]
             return [{"fy": x["fy"], "val": x["val"]} for x in ordered]
 
-        REV_CONCEPTS = ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax",
+        # Order matters on recency ties (rank-merge is stable): banks tag BOTH
+        # RevenuesNetOfInterestExpense (their true top line) and the ASC-606
+        # contract-revenue concepts (fee income only) — listing the bank total
+        # ahead of the contract subset keeps a bank's revenue at the right
+        # magnitude, while non-banks simply never carry that concept.
+        REV_CONCEPTS = ("Revenues", "RevenuesNetOfInterestExpense",
+                        "RevenueFromContractWithCustomerExcludingAssessedTax",
                         "RevenueFromContractWithCustomerIncludingAssessedTax", "SalesRevenueNet",
-                        "SalesRevenueGoodsNet", "SalesRevenueServicesNet",
-                        # Broker-dealers / investment banks (Goldman Sachs, Morgan
-                        # Stanley) report top-line revenue under this concept, not
-                        # "Revenues" — without it their revenue came back blank.
-                        "RevenuesNetOfInterestExpense")
+                        "SalesRevenueGoodsNet", "SalesRevenueServicesNet")
         # Multi-concept selection (max end-date) for net income and total assets
         # too, so a company that switched XBRL concept names doesn't freeze these
         # at an old fiscal year next to a current-year revenue.

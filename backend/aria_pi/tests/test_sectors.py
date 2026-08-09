@@ -17,7 +17,9 @@ from aria_pi.clients.sec_edgar_client import SECEdgarClient
 # (input, expected canonical) — None means "route to live discovery".
 ROUTING_CASES = [
     # Niche / qualified terms -> live discovery (None).
-    ("Pet Food", None),
+    # "Pet Food" used to route to discovery, but discovery returned junk
+    # (finance/child-care filers); a curated pet-care set now exists.
+    ("Pet Food", "pet care"),
     ("Dog Food", None),
     ("Solar Panels", None),
     ("HVAC", None),

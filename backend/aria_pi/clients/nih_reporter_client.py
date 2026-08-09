@@ -46,6 +46,23 @@ def _coerce_award(value) -> int:
         return None
 
 
+# Grants last funded within this many years still count as a relationship.
+_RECENCY_YEARS = 10
+
+
+def _recent_fiscal_year(fiscal_year) -> bool:
+    """
+    takes: a grant's fiscal-year value (int, str, or empty)
+    does: checks it falls within the recency window ending this year
+    gives: True when recent enough to count as a live UNC tie
+    """
+    from datetime import date
+    try:
+        return int(str(fiscal_year)) >= date.today().year - _RECENCY_YEARS
+    except (TypeError, ValueError):
+        return False
+
+
 def _pi_name_from(record) -> str:
     """Display name from one PI object, tolerant of field-spelling variants.
 
@@ -209,6 +226,10 @@ class NIHReporterClient:
             if cur is None or str(g.get("fiscal_year", "")) > str(cur.get("fiscal_year", "")):
                 distinct[core] = g
         deduped = sorted(distinct.values(), key=lambda g: str(g.get("fiscal_year", "")), reverse=True)
+        # Recency: a grant whose LAST funded year is over a decade old is not a
+        # current relationship — audit rounds kept surfacing 1999–2011 awards as
+        # live "UNC ties" (and their text matches are often keyword collisions).
+        deduped = [g for g in deduped if _recent_fiscal_year(g.get("fiscal_year"))]
         return deduped[:max_results]
 
 

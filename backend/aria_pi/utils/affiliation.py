@@ -145,6 +145,38 @@ _COMPANY_ALIASES = {
     # "Moog" (the aerospace actuator maker, NYSE: MOG.A) is also a common
     # German/Dutch surname that turned up as an unrelated paper author.
     "moog": ["Moog Inc", "Moog, Inc"],
+    # Institution-name collisions: each of these company names is ALSO the name
+    # of a famous academic/medical institution that floods PubMed affiliations —
+    # Rollins School of Public Health (Emory), the Milton S. Hershey Medical
+    # Center (Penn State), the Huntsman Cancer Institute (Utah), the Blackrock
+    # Clinic (Dublin), the William E. Boeing Department of Aeronautics (UW),
+    # the Linde Institute (Caltech), and endowed "Bank of America Professor"
+    # chairs. Corporate-suffix anchoring keeps the signal to the company.
+    "rollins": ["Rollins, Inc", "Rollins Inc"],
+    "hershey": ["Hershey Company", "The Hershey Company", "Hershey Co"],
+    "huntsman": ["Huntsman Corporation", "Huntsman Corp", "Huntsman International"],
+    "blackrock": ["BlackRock, Inc", "BlackRock Inc", "BlackRock Investment Management"],
+    "blackstone": ["Blackstone Inc", "The Blackstone Group", "Blackstone Group"],
+    "boeing": ["Boeing Company", "The Boeing Company", "Boeing Co", "Boeing Commercial", "Boeing Defense"],
+    "linde": ["Linde plc", "Linde Inc", "Linde Gas"],
+    "bank of america": ["Bank of America Corporation", "Bank of America Corp", "Bank of America, N.A"],
+    # "Comcast" matched authors' personal @comcast.net email addresses inside
+    # affiliation strings — anchor to the corporation.
+    "comcast": ["Comcast Corporation", "Comcast Corp", "Comcast Cable", "NBCUniversal"],
+    # "Fluor" is a substring of fluorescence/fluoride in grant full text.
+    "fluor": ["Fluor Corporation", "Fluor Corp"],
+    # "Waste Management" the company collides with the PHRASE "waste management"
+    # in every environmental-health grant and paper.
+    "waste management": ["Waste Management, Inc", "Waste Management Inc", "WM Intellectual Property"],
+    # Common-word company names from the niche-sector seed sets.
+    "dow": ["Dow Inc", "Dow Chemical", "Dow Silicones"],
+    "olin": ["Olin Corporation", "Olin Corp"],
+    "westlake": ["Westlake Corporation", "Westlake Chemical"],
+    "frontline": ["Frontline plc", "Frontline Ltd"],
+    "kirby": ["Kirby Corporation", "Kirby Corp"],
+    "tidewater": ["Tidewater Inc", "Tidewater Marine"],
+    "beyond": ["Beyond, Inc", "Beyond Inc", "Overstock.com"],
+    "bark": ["BARK, Inc", "Bark Inc", "BarkBox"],
 }
 
 # Normalized keys whose BARE name must never be used as a query phrase or an
@@ -156,6 +188,10 @@ _AMBIGUOUS_TOKENS = {
     "oracle", "green dot", "tesla", "stem", "unity", "micron", "arm",
     "compass", "chewy", "pattern energy", "first solar", "progressive",
     "travelers", "mosaic", "rtx", "moog", "aflac",
+    "rollins", "hershey", "huntsman", "blackrock", "blackstone", "boeing",
+    "linde", "bank of america", "comcast", "fluor", "waste management",
+    "dow", "olin", "westlake", "frontline", "kirby", "tidewater",
+    "beyond", "bark",
 }
 
 _PARENS_RE = re.compile(r"\(.*?\)")

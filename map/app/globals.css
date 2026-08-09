@@ -9,10 +9,12 @@
      whole app reads with a single, unmistakable voice.
      ------------------------------------------------------------------------ */
 
-  /* Surfaces — a cool system-gray canvas with crisp white panels on top. */
-  --bg: #f5f5f7;
+  /* Surfaces — a warm neutral canvas (matches the splash/auth warmth) with
+     crisp white panels on top. */
+  --bg: #faf9f7;
   --panel: #ffffff;
   --panel-2: #fbfbfd;
+  --bg-sunken: #f2f0ec;
 
   /* Text — system label ramp (primary → quaternary). */
   --ink: #1d1d1f;
@@ -40,13 +42,29 @@
   --r-sm: 8px;
   --r-md: 12px;
   --r-lg: 16px;
+  --r-card: 18px;
   --r-xl: 22px;
   --r-pill: 999px;
+  --r-control: var(--r-md);
+
+  /* Text ramp — one type scale for marketing surfaces (hero/demo/footer). */
+  --ink-secondary: var(--muted);
+  --ink-tertiary: var(--faint);
+  --accent-ink: #ffffff;
+  --danger: var(--neg);
+  --text-hero: clamp(44px, 7.5vw, 76px);
+  --text-sub: 18px;
+  --text-body: 15px;
+  --text-caption: 12px;
 
   /* Elevation — soft, layered, low-contrast (Apple shadows are barely there). */
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 1px rgba(0, 0, 0, 0.03);
   --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.05), 0 8px 24px rgba(0, 0, 0, 0.05);
   --shadow-3: 0 1px 1px rgba(0, 0, 0, 0.03), 0 16px 48px rgba(0, 0, 0, 0.07);
+  /* The homepage's two lifted objects — the search field and the demo panel.
+     Nothing else above the fold carries a shadow. */
+  --shadow-rest: 0 8px 30px rgba(0, 0, 0, 0.06);
+  --shadow-lift: 0 12px 40px rgba(0, 0, 0, 0.09);
   --ring: 0 0 0 4px var(--accent-tint);
 
   /* Motion — Apple's standard ease + a gentle spring for interactive lifts. */
@@ -892,6 +910,233 @@ a {
   }
 }
 
+/* The intro draws itself with inline animation styles. Under reduced motion,
+   jump every one of them straight to the finished state — done in CSS rather
+   than JS so it holds no matter when the client decides the preference. */
+@media (prefers-reduced-motion: reduce) {
+  .intro-svg *,
+  .intro-caption {
+    animation: none !important;
+    opacity: 1 !important;
+    stroke-dashoffset: 0 !important;
+    transform: none !important;
+  }
+}
+
+/* The auth card is written to fill the page. Inside the sign-in modal it has
+   to sit in a panel instead — framing only, so the card's own behaviour is
+   untouched. */
+.auth-in-modal > main {
+  min-height: auto !important;
+  padding: 8px 20px 22px !important;
+  background: transparent !important;
+}
+.auth-in-modal > main > * {
+  border: none !important;
+  background: transparent !important;
+}
+
+/* The account controls appear once someone signs in; fade them in so the
+   header does not visibly snap. */
+.ws-fade-in {
+  animation: wsFadeIn 400ms var(--ease) both;
+}
+@keyframes wsFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ws-fade-in {
+    animation: none;
+  }
+}
+
+/* Header nav — the tab row collapses into a menu on phones, where six tabs
+   previously ran off the edge with no way to reach the rest. */
+.ws-menu-btn {
+  display: none;
+}
+@media (max-width: 767px) {
+  .ws-nav {
+    display: none !important;
+  }
+  .ws-menu-btn {
+    display: flex !important;
+  }
+  .ws-account-label {
+    display: none;
+  }
+}
+.ws-menu-sheet {
+  position: absolute;
+  top: 100%;
+  right: max(12px, env(safe-area-inset-right));
+  min-width: 200px;
+  padding: 6px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-2);
+  display: flex;
+  flex-direction: column;
+}
+.ws-menu-sheet button {
+  min-height: 44px;
+  padding: 0 14px;
+  text-align: left;
+  border: none;
+  background: none;
+  border-radius: var(--r-sm);
+  font: inherit;
+  font-size: 15px;
+  color: var(--ink);
+  cursor: pointer;
+}
+.ws-menu-sheet button[aria-current="page"] {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* ---- Homepage redesign: demo panel, placeholder cycling, replay control ---- */
+.demo-fade {
+  transition: opacity 400ms var(--ease);
+}
+.demo-rise {
+  transition: opacity 400ms var(--ease), transform 400ms var(--ease);
+}
+.demo-caret {
+  display: inline-block;
+  margin-left: 1px;
+  animation: demoCaretBlink 0.9s steps(1) infinite;
+}
+@keyframes demoCaretBlink {
+  50% { opacity: 0; }
+}
+[role="group"]:hover .demo-replay,
+[role="group"]:focus-visible .demo-replay {
+  opacity: 1 !important;
+}
+.home-placeholder-cycle {
+  transition: opacity 200ms var(--ease);
+}
+@media (prefers-reduced-motion: reduce) {
+  .demo-fade,
+  .demo-rise,
+  .home-placeholder-cycle {
+    transition: none !important;
+  }
+  .demo-caret {
+    animation: none;
+  }
+}
+
+/* ---------------------------- homepage hero ----------------------------- */
+/* The hero owns the first viewport: header, headline, one sentence, one field,
+   whitespace. The demo panel begins below the fold, so the empty space at the
+   bottom of the screen is the only scroll cue the page needs. 78px is the fixed
+   header plus the workspace's top gutter. */
+.home-hero {
+  min-height: calc(100dvh - 78px);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+.home-h1 {
+  letter-spacing: -0.04em;
+}
+.home-sub {
+  font-size: 20px;
+}
+.home-field {
+  height: 60px;
+}
+/* The input and the two overlays drawn behind it (ghost completion, cycling
+   placeholder) must share one font size or the gray prediction stops lining up
+   with the typed text. */
+.home-field input,
+.home-field-text {
+  font-size: 19px;
+}
+.home-cta {
+  height: 44px;
+}
+/* Air below the fold: the demo panel gets a wide gap above it, and the closing
+   captions get one below them. */
+.home-demo-gap {
+  margin-top: 96px;
+}
+.home-footer-gap {
+  margin-top: 96px;
+}
+
+@media (max-width: 767px) {
+  /* A phone gets natural flow instead of a full-screen hero — the field should
+     be reachable without the headline pushing it to the bottom of the screen. */
+  .home-hero {
+    min-height: 70svh;
+  }
+  .home-h1 {
+    letter-spacing: -0.03em;
+  }
+  .home-sub {
+    font-size: 18px;
+  }
+  /* The field grows a second row so the button can span the full width beneath
+     the input rather than squeezing the typing space. */
+  .home-field {
+    height: auto;
+    flex-wrap: wrap;
+    padding: 8px !important;
+  }
+  /* 17px, comfortably over the 16px floor below which iOS Safari zooms the page
+     in when the field takes focus. */
+  .home-field input,
+  .home-field-text {
+    font-size: 17px;
+  }
+  .home-cta {
+    flex: 0 0 100%;
+    order: 3;
+  }
+  .home-demo-gap {
+    margin-top: 64px;
+  }
+  .home-footer-gap {
+    margin-top: 64px;
+  }
+}
+
+/* First paint, once per load: the three hero elements rise into place. Only
+   opacity and transform move, so nothing reflows and the layout never shifts.
+   The finished state is each element's natural state — the animation adds a
+   beginning, it does not decide whether the content is visible. */
+@keyframes homeEnter {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.home-enter {
+  animation: homeEnter 500ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.home-enter-2 {
+  animation-delay: 80ms;
+}
+.home-enter-3 {
+  animation-delay: 160ms;
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-enter {
+    animation: none;
+  }
+}
+
 /* leadership org chart */
 .org {
   display: flex;
@@ -1443,7 +1688,8 @@ select.ws-input {
     padding-left: max(12px, env(safe-area-inset-left)) !important;
     padding-right: max(12px, env(safe-area-inset-right)) !important;
   }
-  .dash-home { padding: 32px 18px 28px !important; }
+  /* No top padding: the hero's own min-height governs the first screen. */
+  .dash-home { padding: 0 18px 28px !important; }
 }
 
 /* Inline company autocomplete ghost — mirrors .ws-input metrics exactly so the

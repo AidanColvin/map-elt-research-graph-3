@@ -12,9 +12,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Map — Research & Company Intelligence",
+  title: "Map — Research, written for you.",
   description:
-    "Free, source-grounded intelligence reports. Company profiles from SEC EDGAR and sector scans mapping public companies to UNC Chapel Hill research. No API keys, no cost.",
+    "Map reads the public record — SEC filings, grants, papers, trials — and writes you a cited research brief. Free, source-grounded, no API keys.",
   // Render full-screen as a home-screen web app on iOS, with a status bar that
   // blends into the light UI.
   appleWebApp: {
@@ -34,7 +34,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#f5f5f7",
+  themeColor: "#faf9f7",
 };
 
 export default function RootLayout({

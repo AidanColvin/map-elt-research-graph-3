@@ -3,3 +3,10 @@
 
 # editor/agent local config
 .claude/
+CLAUDE.md
+**/CLAUDE.md
+
+# local working notes and large capture artifacts
+RESUME.local.md
+PRIVACY_INVENTORY.local.md
+qa-viewports/
